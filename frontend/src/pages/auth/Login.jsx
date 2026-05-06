@@ -1,33 +1,57 @@
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
-import { useAuth } from "../../context/useAuth";
-import { loginUser } from "../../api/auth.api";
+import { Link, useNavigate } from "react-router-dom";
+import { Eye, EyeOff, KeyRound, Mail } from "lucide-react";
+import { login as apiLogin } from "../../api/auth";
+import { useAuth } from "../../hooks/useAuth";
 
-import qonformeLogo      from "../../assets/icons/qonforme-logo.svg";
-import googleLogo        from "../../assets/icons/google-logo.svg";
+import qonformeLogo from "../../assets/icons/qonforme-logo.svg";
+import googleLogo from "../../assets/icons/google-logo.svg";
 import loginIllustration from "../../assets/images/login-illustration.svg";
+
+function isValidEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
 
 export default function Login() {
   const navigate = useNavigate();
   const { login } = useAuth();
 
-  const [email,        setEmail]        = useState("");
-  const [password,     setPassword]     = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe,   setRememberMe]   = useState(false);
-  const [error,        setError]        = useState("");
-  const [loading,      setLoading]      = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
     setError("");
+
+    const normalizedEmail = email.trim();
+    if (!normalizedEmail || !password) {
+      setError("Veuillez saisir votre email et votre mot de passe.");
+      return;
+    }
+
+    if (!isValidEmail(normalizedEmail)) {
+      setError("Veuillez saisir un email valide, par exemple sarra@qonforme.dz.");
+      return;
+    }
+
     setLoading(true);
     try {
-      const data = await loginUser({ email, password });
+      const data = await apiLogin(normalizedEmail, password);
       login(data);
-      navigate("/dashboard");
+      navigate("/", { replace: true });
     } catch (err) {
-      setError(err?.response?.data?.detail || "Identifiants incorrects. Veuillez réessayer.");
+      const detail = err?.response?.data?.detail || "";
+      if (detail.includes("désactivé") || detail.includes("desactive")) {
+        setError("Compte désactivé. Contactez l'administrateur.");
+      } else if (err?.response?.status === 401) {
+        setError("Identifiants incorrects. Veuillez réessayer.");
+      } else {
+        setError(detail || "Impossible de se connecter. Vérifiez que le backend est lancé.");
+      }
     } finally {
       setLoading(false);
     }
@@ -36,308 +60,115 @@ export default function Login() {
   return (
     <>
       <style>{`
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         html, body, #root { height: 100%; width: 100%; overflow: hidden; }
-        body { font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; }
-        input { font-family: inherit; }
-        button { font-family: inherit; }
-        input::placeholder { color: #ffffff; font-size: 14px; }
-        input:focus { outline: none; }
-        a { text-decoration: none; }
+        body { font-family: Inter, Segoe UI, system-ui, sans-serif; }
+        * { box-sizing: border-box; }
+        input, button { font-family: inherit; }
+        input::placeholder { color: #9ca3af; }
       `}</style>
 
-      {/* ─── ROOT: full screen, two columns side by side ─────────── */}
-      <div style={{ display: "flex", height: "100vh", width: "100vw", overflow: "hidden" }}>
-
-        {/* ══════════════════════════════════════════════════════════
-            LEFT — grey background + logo top-left + illustration
-        ══════════════════════════════════════════════════════════ */}
-        <div style={{
-          flex: 1,
-          backgroundColor: "#eeeaf2",
-          position: "relative",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: "40px",
-        }}>
-          {/* Logo top-left */}
-          <div style={{
-            position: "absolute",
-            top: 24,
-            left: 28,
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-          }}>
-            <img src={qonformeLogo} alt="Qonforme" style={{ width: 30, height: 30 }} />
-            <span style={{ fontSize: 15, fontWeight: 700, color: "#111827" }}>Qonforme</span>
+      <div className="flex h-screen w-screen overflow-hidden bg-white text-left">
+        <div className="relative hidden flex-1 items-center justify-center bg-[#eeeaf2] p-10 md:flex">
+          <div className="absolute left-7 top-6 flex items-center gap-3">
+            <img src={qonformeLogo} alt="Qonforme" className="h-8 w-8" />
+            <span className="text-base font-bold text-gray-900">Qonforme</span>
           </div>
-
-          {/* Illustration */}
           <img
             src={loginIllustration}
-            alt="Illustration"
+            alt=""
             draggable={false}
-            style={{
-              width: "100%",
-              maxWidth: 460,
-              objectFit: "contain",
-              userSelect: "none",
-            }}
+            className="w-full max-w-[460px] select-none object-contain"
           />
         </div>
 
-        {/* ══════════════════════════════════════════════════════════
-            RIGHT — pure white, full height, scrollable, centered
-        ══════════════════════════════════════════════════════════ */}
-        <div style={{
-          width: 520,
-          flexShrink: 0,
-          backgroundColor: "#ffffff",
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "center",
-          padding: "60px 48px",
-          overflowY: "auto",
-        }}>
-
-          {/* ── Title ───────────────────────────────────────────── */}
-          <h1 style={{
-            fontSize: 28,
-            fontWeight: 700,
-            color: "#111827",
-            marginBottom: 18,
-            lineHeight: 1.2,
-          }}>
+        <div className="flex w-full shrink-0 flex-col justify-center overflow-y-auto px-8 py-10 md:w-[520px] md:px-12">
+          <h1 className="mb-5 text-3xl font-bold leading-tight text-gray-900">
             Bienvenue sur
           </h1>
 
-          {/* ── Brand pill ──────────────────────────────────────── */}
-          <div style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 10,
-            border: "1.5px solid #E5E7EB",
-            borderRadius: 12,
-            padding: "10px 18px 10px 14px",
-            width: "fit-content",
-            marginBottom: 22,
-          }}>
-            <img src={qonformeLogo} alt="" style={{ width: 26, height: 26 }} />
-            <span style={{ fontSize: 15, fontWeight: 600, color: "#111827" }}>Qonforme</span>
+          <div className="mb-6 inline-flex w-fit items-center gap-3 rounded-xl border border-gray-200 px-4 py-3">
+            <img src={qonformeLogo} alt="" className="h-7 w-7" />
+            <span className="text-sm font-semibold text-gray-900">Qonforme</span>
           </div>
 
-          {/* ── Google button ───────────────────────────────────── */}
           <button
             type="button"
-            onClick={() => { /* TODO: window.location.href = `${import.meta.env.VITE_API_URL}/auth/google/` */ }}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 10,
-              width: "100%",
-              border: "1.5px solid #E5E7EB",
-              borderRadius: 12,
-              padding: "13px 16px",
-              fontSize: 14,
-              fontWeight: 500,
-              color: "#374151",
-              backgroundColor: "#fff",
-              cursor: "pointer",
-              marginBottom: 22,
-              transition: "background 0.15s",
-            }}
-            onMouseEnter={e => e.currentTarget.style.backgroundColor = "#F9FAFB"}
-            onMouseLeave={e => e.currentTarget.style.backgroundColor = "#fff"}
+            className="mb-6 flex w-full items-center justify-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50"
           >
-            <img src={googleLogo} alt="Google" style={{ width: 20, height: 20 }} />
+            <img src={googleLogo} alt="" className="h-5 w-5" />
             Se connecter avec Google
           </button>
 
-          {/* ── OU divider ──────────────────────────────────────── */}
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 22 }}>
-            <div style={{ flex: 1, height: 1, backgroundColor: "#E5E7EB" }} />
-            <span style={{ fontSize: 12, color: "#9CA3AF", fontWeight: 500, letterSpacing: "0.05em" }}>OU</span>
-            <div style={{ flex: 1, height: 1, backgroundColor: "#E5E7EB" }} />
+          <div className="mb-6 flex items-center gap-3">
+            <div className="h-px flex-1 bg-gray-200" />
+            <span className="text-xs font-semibold tracking-wide text-gray-400">OU</span>
+            <div className="h-px flex-1 bg-gray-200" />
           </div>
 
-          {/* ── Form ────────────────────────────────────────────── */}
-          <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-
-            {/* Email field */}
-            <div style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 14,
-              backgroundColor: "#F3F3F6",
-              borderRadius: 12,
-              padding: "0 16px",
-              height: 64,
-            }}>
-              {/* Envelope icon — solid black */}
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="#111827" style={{ flexShrink: 0 }}>
-                <path d="M20 4H4C2.9 4 2 4.9 2 6v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4-8 5-8-5V6l8 5 8-5v2z"/>
-              </svg>
-
-              {/* Label + input stacked */}
-              <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", justifyContent: "center" }}>
-                
-                <input
-                  type="email"
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  placeholder="example@gmail.com"
-                  required
-                  autoComplete="email"
-                  style={{
-                    background: "transparent",
-                    border: "none",
-                    outline: "none",
-                    fontSize: 14,
-                    color: "#111827",
-                    width: "100%",
-                    padding: 0,
-                    lineHeight: 1.4,
-                  }}
-                />
-              </div>
+          <form noValidate onSubmit={handleSubmit} className="flex flex-col gap-3">
+            <div className="flex h-16 items-center gap-3 rounded-xl bg-[#f3f3f6] px-4">
+              <Mail className="h-5 w-5 shrink-0 text-gray-900" />
+              <input
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="sarra@qonforme.dz"
+                autoComplete="email"
+                className="min-w-0 flex-1 border-0 bg-transparent text-sm text-gray-900 outline-none"
+              />
             </div>
 
-            {/* Password field */}
-            <div style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 14,
-              backgroundColor: "#F3F3F6",
-              borderRadius: 12,
-              padding: "0 16px",
-              height: 64,
-            }}>
-              {/* Key icon */}
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="#111827" style={{ flexShrink: 0 }}>
-                <path d="M12.65 10A5.99 5.99 0 0 0 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6a5.99 5.99 0 0 0 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/>
-              </svg>
-
-              {/* Label + input stacked */}
-              <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", justifyContent: "center" }}>
-                
-                <input
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  placeholder="••••••••••••"
-                  required
-                  autoComplete="current-password"
-                  style={{
-                    background: "transparent",
-                    border: "none",
-                    outline: "none",
-                    fontSize: 14,
-                    color: "#111827",
-                    width: "100%",
-                    padding: 0,
-                    lineHeight: 1.4,
-                  }}
-                />
-              </div>
-
-              {/* Eye toggle */}
+            <div className="flex h-16 items-center gap-3 rounded-xl bg-[#f3f3f6] px-4">
+              <KeyRound className="h-5 w-5 shrink-0 text-gray-900" />
+              <input
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="Mot de passe"
+                autoComplete="current-password"
+                className="min-w-0 flex-1 border-0 bg-transparent text-sm text-gray-900 outline-none"
+              />
               <button
                 type="button"
-                onClick={() => setShowPassword(v => !v)}
-                tabIndex={-1}
-                aria-label={showPassword ? "Masquer" : "Afficher"}
-                style={{
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  padding: 0,
-                  color: "#9CA3AF",
-                  flexShrink: 0,
-                  display: "flex",
-                  alignItems: "center",
-                }}
+                onClick={() => setShowPassword((value) => !value)}
+                aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                className="text-gray-400 hover:text-gray-600"
               >
-                {showPassword ? (
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5C21.27 7.61 17 4.5 12 4.5zm0 12.5c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
-                  </svg>
-                ) : (
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75C21.27 7.61 17 4.5 12 4.5c-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zm7.53 5.53 1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78 3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/>
-                  </svg>
-                )}
+                {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
               </button>
             </div>
 
-            {/* API error */}
             {error && (
-              <p style={{ color: "#EF4444", fontSize: 13, textAlign: "center" }}>{error}</p>
+              <p className="rounded-lg bg-red-50 px-3 py-2 text-center text-sm text-red-600">
+                {error}
+              </p>
             )}
 
-            {/* Remember me + Forgot password */}
-            <div style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              margin: "4px 0",
-            }}>
-              <label style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                fontSize: 13,
-                color: "#4B5563",
-                cursor: "pointer",
-                userSelect: "none",
-              }}>
+            <div className="my-1 flex items-center justify-between">
+              <label className="flex cursor-pointer select-none items-center gap-2 text-sm text-gray-600">
                 <input
                   type="checkbox"
                   checked={rememberMe}
-                  onChange={e => setRememberMe(e.target.checked)}
-                  style={{ width: 15, height: 15, accentColor: "#6B21A8" }}
+                  onChange={(event) => setRememberMe(event.target.checked)}
+                  className="h-4 w-4 accent-purple-700"
                 />
                 Se souvenir de moi
               </label>
-              <Link
-                to="/forgot-password"
-                style={{ fontSize: 13, color: "#6B21A8", fontWeight: 500 }}
-              >
+              <Link to="/forgot-password" className="text-sm font-medium text-purple-700">
                 Mot de passe oublié?
               </Link>
             </div>
 
-            {/* Submit */}
             <button
               type="submit"
               disabled={loading}
-              style={{
-                width: "100%",
-                backgroundColor: "#5B1FA8",
-                color: "#fff",
-                fontWeight: 600,
-                fontSize: 15,
-                padding: "15px 0",
-                borderRadius: 12,
-                border: "none",
-                cursor: loading ? "not-allowed" : "pointer",
-                opacity: loading ? 0.7 : 1,
-                marginTop: 4,
-                letterSpacing: "0.01em",
-                transition: "background 0.15s",
-              }}
-              onMouseEnter={e => { if (!loading) e.currentTarget.style.backgroundColor = "#4A1890"; }}
-              onMouseLeave={e => { if (!loading) e.currentTarget.style.backgroundColor = "#5B1FA8"; }}
+              className="mt-1 w-full rounded-xl bg-[#5b1fa8] py-4 text-sm font-semibold text-white transition hover:bg-[#4a1890] disabled:cursor-not-allowed disabled:opacity-70"
             >
               {loading ? "Connexion..." : "Se connecter"}
             </button>
           </form>
-
-         
-        </div>{/* end white panel */}
-      </div>{/* end root flex */}
+        </div>
+      </div>
     </>
   );
 }

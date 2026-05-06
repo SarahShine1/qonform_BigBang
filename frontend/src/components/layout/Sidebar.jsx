@@ -11,6 +11,7 @@ import {
   ClipboardList,
 } from "lucide-react";
 import qonformeLogo      from "../../assets/icons/qonforme-logo.svg";
+import { useAuth } from "../../hooks/useAuth";
 
 const navItems = [
   { label: "Dashboard",            icon: LayoutGrid,  to: "/dashboard" },
@@ -22,6 +23,8 @@ const navItems = [
 ];
 
 export default function Sidebar() {
+  const { logout } = useAuth();
+
   return (
     <aside
       style={{ width: 192 }}
@@ -88,7 +91,10 @@ export default function Sidebar() {
           <HelpCircle className="w-4 h-4 flex-shrink-0" style={{ color: "#9ca3af" }} />
           <span style={{ fontSize: 13, fontWeight: 500, color: "#4b5563" }}>Aide</span>
         </button>
-        <button className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors">
+        <button
+          onClick={logout}
+          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors"
+        >
           <LogOut className="w-4 h-4 flex-shrink-0" style={{ color: "#9ca3af" }} />
           <span style={{ fontSize: 13, fontWeight: 500, color: "#4b5563" }}>Se déconnecter</span>
         </button>

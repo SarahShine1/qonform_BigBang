@@ -6,7 +6,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 # ── Security ─────────────────────────────────────────────
 SECRET_KEY = config('DJANGO_SECRET_KEY')
-DEBUG = config('DEBUG', default=False, cast=bool)
+DEBUG = config(
+    'DEBUG',
+    default=False,
+    cast=lambda value: str(value).strip().lower()
+    in ('1', 'true', 'yes', 'on', 'debug', 'development'),
+)
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost').split(',')
 
 # ── Custom user model (MUST be before any migration) ─────
@@ -32,6 +37,7 @@ THIRD_PARTY_APPS = [
 
 LOCAL_APPS = [
     'apps.accounts',
+    'apps.organigramme',
     'apps.processus',
     'apps.audit',
     'apps.documents',
@@ -111,7 +117,7 @@ REST_FRAMEWORK = {
 from datetime import timedelta
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME':  timedelta(hours=1),
+    'ACCESS_TOKEN_LIFETIME':  timedelta(hours=8),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'ROTATE_REFRESH_TOKENS':  True,
     'AUTH_HEADER_TYPES':      ('Bearer',),
