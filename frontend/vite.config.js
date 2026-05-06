@@ -17,7 +17,7 @@ export default defineConfig({
     proxy: {
       // Proxy API calls to Django during dev — avoids CORS issues
       '/api': {
-        target: 'http://localhost:8000',
+        target: 'http://127.0.0.1:8000',
         changeOrigin: true,
       },
     },

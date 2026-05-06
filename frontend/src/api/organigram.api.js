@@ -1,7 +1,28 @@
-import axios from "axios";
-const BASE = import.meta.env.VITE_API_URL;
+import { apiClient } from "./auth";
 
 export const organigramApi = {
-  getTree:      () => axios.get(`${BASE}/api/organigram/tree/`).then(r => r.data),
-  getEmployees: () => axios.get(`${BASE}/api/organigram/employees/`).then(r => r.data),
+  getTree: async () => {
+    const { data } = await apiClient.get("/organigramme/tree/");
+    return data;
+  },
+  getUnits: async () => {
+    const { data } = await apiClient.get("/organigramme/units/");
+    return data;
+  },
+  createUnit: async (payload) => {
+    const { data } = await apiClient.post("/organigramme/units/", payload);
+    return data;
+  },
+  updateUnit: async (id, payload) => {
+    const { data } = await apiClient.patch(`/organigramme/units/${id}/`, payload);
+    return data;
+  },
+  deleteUnit: async (id) => {
+    await apiClient.delete(`/organigramme/units/${id}/`);
+  },
+  getEmployees: async () => {
+    const { data } = await apiClient.get("/organigramme/employees/");
+    return data;
+  },
 };
+
