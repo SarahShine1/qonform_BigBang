@@ -9,6 +9,7 @@ import MesAudits from "./pages/audit/MesAudits";
 import GestionUtilisateurs from "./pages/users/GestionUtilisateurs";
 import MaturityPage from "./pages/maturity/MaturityPage";
 import ModulePlaceholderPage from "./pages/shared/ModulePlaceholderPage";
+import FicheProcessusForm from "./pages/fiche_form/FicheProcessusForm";
 
 export default function App() {
   return (
@@ -84,6 +85,10 @@ export default function App() {
                 />
               }
             />
+
+            {/* Gestion processus */}
+            <Route path="/gestion-processus/fiches/nouveau" element={<FicheProcessusForm />} />
+            <Route path="/gestion-processus/fiches/:id/modifier" element={<FicheProcessusForm />} />
 
             <Route
               path="/niveau-maturite"
