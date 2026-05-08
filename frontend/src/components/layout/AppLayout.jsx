@@ -1,18 +1,34 @@
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
+import { SIDEBAR_WIDTH, TOPBAR_HEIGHT } from "./layout.constants";
 
-export default function AppLayout({ pageTitle, userName, userRole, children }) {
+export default function AppLayout({
+  pageTitle,
+  userName,
+  userRole,
+  children,
+  contentClassName = "",
+}) {
   return (
-    <div style={{ minHeight: "100vh", backgroundColor: "#f9fafb" }}>
-      {/* Fixed left sidebar */}
+    <div
+      className="app-layout h-screen overflow-hidden bg-[#F8F7FC] transition-colors dark:bg-slate-950"
+      style={{ "--navbar-height": `${TOPBAR_HEIGHT}px` }}
+    >
       <Sidebar />
-
-      {/* Fixed top header — starts after sidebar */}
       <Topbar pageTitle={pageTitle} userName={userName} userRole={userRole} />
 
-      {/* Scrollable main content — offset 192px left, 56px top */}
-      <main style={{ marginLeft: 192, paddingTop: 56, minHeight: "100vh" }}>
-        <div style={{ padding: 24 }}>{children}</div>
+      <main
+        className="overflow-hidden"
+        style={{ marginLeft: SIDEBAR_WIDTH, paddingTop: TOPBAR_HEIGHT, height: "100vh" }}
+      >
+        <div
+          className={[
+            "page-content h-[calc(100vh-var(--navbar-height))] overflow-x-hidden overflow-y-auto px-[18px] py-[14px]",
+            contentClassName,
+          ].join(" ")}
+        >
+          {children}
+        </div>
       </main>
     </div>
   );

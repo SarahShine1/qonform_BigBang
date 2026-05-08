@@ -721,3 +721,94 @@ class ExpiredRoleExclusionTests(APITestCase):
         self.assertIn("roles", payload)
         self.assertIn("Pilote", payload["roles"])
         self.assertNotIn("CAQ", payload["roles"])
+
+
+class ManagedUsersApiTests(APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.admin_user, cls.admin_utilisateur = make_user(
+            username="manager_user",
+            email="manager@esi.dz",
+            password="managerpass123",
+            nom="Manager",
+            prenom="Amina",
+            est_actif=True,
+            roles=["CAQ"],
+        )
+        cls.target_user, cls.target_utilisateur = make_user(
+            username="target_user",
+            email="target@esi.dz",
+            password="targetpass123",
+            nom="Target",
+            prenom="User",
+            est_actif=True,
+            roles=["Pilote"],
+        )
+        Role.objects.get_or_create(libelle="Auditeur interne")
+
+    def setUp(self):
+        self.client = APIClient()
+
+    def authenticate(self):
+        response = self.client.post(
+            "/api/v1/auth/token/",
+            {"email": "manager@esi.dz", "password": "managerpass123"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {response.data['access']}")
+
+    def test_roles_endpoint_returns_roles(self):
+        self.authenticate()
+        response = self.client.get("/api/v1/auth/roles/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        labels = [item["libelle"] for item in response.data]
+        self.assertIn("CAQ", labels)
+        self.assertIn("Pilote", labels)
+
+    def test_users_list_returns_roles(self):
+        self.authenticate()
+        response = self.client.get("/api/v1/auth/users/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertGreaterEqual(len(response.data), 2)
+        target = next(item for item in response.data if item["email"] == "target@esi.dz")
+        self.assertIn("Pilote", target["roles"])
+
+    def test_create_user_endpoint_creates_auth_profile_and_roles(self):
+        self.authenticate()
+        payload = {
+            "full_name": "Rima Bouali",
+            "email": "rima@esi.dz",
+            "password": "securepass123",
+            "departement": 3,
+            "est_actif": True,
+            "roles": ["Auditeur interne"],
+        }
+        response = self.client.post("/api/v1/auth/users/", payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["email"], "rima@esi.dz")
+        self.assertIn("Auditeur interne", response.data["roles"])
+        self.assertTrue(User.objects.filter(email="rima@esi.dz").exists())
+        self.assertTrue(Utilisateur.objects.filter(email="rima@esi.dz").exists())
+
+    def test_patch_user_updates_roles_and_status(self):
+        self.authenticate()
+        response = self.client.patch(
+            f"/api/v1/auth/users/{self.target_utilisateur.id_user}/",
+            {"roles": ["CAQ"], "est_actif": False},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["statut"], "Desactive")
+        self.assertIn("CAQ", response.data["roles"])
+        self.target_utilisateur.refresh_from_db()
+        self.assertFalse(self.target_utilisateur.est_actif)
+
+    def test_delete_user_soft_deactivates_account(self):
+        self.authenticate()
+        response = self.client.delete(
+            f"/api/v1/auth/users/{self.target_utilisateur.id_user}/"
+        )
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.target_utilisateur.refresh_from_db()
+        self.assertFalse(self.target_utilisateur.est_actif)
