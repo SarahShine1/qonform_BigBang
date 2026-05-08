@@ -5,6 +5,7 @@ import RoleProtectedRoute from "./components/auth/RoleProtectedRoute";
 import Login from "./pages/auth/Login";
 import Organigramme from "./pages/organigram/Organigramme";
 import MesAudits from "./pages/audit/MesAudits";
+import AuditExecution from "./pages/audit/AuditExecution";
 
 export default function App() {
   return (
@@ -17,6 +18,8 @@ export default function App() {
         <Routes>
           {/* ── Public routes ─────────────────────────────────── */}
           <Route path="/login" element={<Login />} />
+          {/* TODO(audit-auth): remove this preview route when audit execution is linked to real auth. */}
+          <Route path="/audit-preview" element={<AuditExecution />} />
 
           {/* ── Protected routes ──────────────────────────────── */}
           <Route element={<ProtectedRoute />}>
@@ -28,6 +31,7 @@ export default function App() {
             <Route path="/mes-audits" element={<MesAudits />} />
             <Route path="/mes-audits/planifies" element={<MesAudits />} />
             <Route path="/mes-audits/clotures" element={<MesAudits />} />
+            <Route path="/mes-audits/execution/:auditId" element={<AuditExecution />} />
           </Route>
 
           <Route element={<RoleProtectedRoute roles={["CAQ", "ADMIN", "Admin"]} />}>
