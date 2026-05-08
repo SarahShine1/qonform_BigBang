@@ -1,6 +1,9 @@
+import json
+
 from rest_framework import serializers
 
 from apps.accounts.models import Utilisateur
+from apps.accounts.utils import get_active_role_labels_for_user
 
 from .models import OrganizationUnit
 
@@ -13,16 +16,25 @@ TYPE_PREFIXES = {
     OrganizationUnit.UnitType.CELLULE: 'CELL',
 }
 
+ORG_METADATA_PREFIX = '__QONFORME_ORG_META__:'
+
 
 def normalize_role(role):
     return str(role or '').strip().upper()
 
 
 def get_user_profile(user):
-    try:
-        return user.utilisateur
-    except (AttributeError, Utilisateur.DoesNotExist):
-        return None
+    email = str(getattr(user, 'email', '') or '').strip().lower()
+    if email:
+        profile = Utilisateur.objects.filter(email__iexact=email).first()
+        if profile:
+            return profile
+
+    user_id = getattr(user, 'id', None)
+    if isinstance(user_id, int):
+        return Utilisateur.objects.filter(id_user=user_id).first()
+
+    return None
 
 
 def generate_unit_code(unit_type):
@@ -44,6 +56,48 @@ def generate_unit_code(unit_type):
     return f'{prefix}-{next_number:03d}'
 
 
+def unpack_unit_metadata(raw_description):
+    if not raw_description:
+        return {
+            'description': '',
+            'title': '',
+            'displayCode': '',
+        }
+
+    if not raw_description.startswith(ORG_METADATA_PREFIX):
+        return {
+            'description': raw_description,
+            'title': '',
+            'displayCode': '',
+        }
+
+    try:
+        metadata = json.loads(raw_description[len(ORG_METADATA_PREFIX):])
+    except (TypeError, ValueError):
+        return {
+            'description': raw_description,
+            'title': '',
+            'displayCode': '',
+        }
+
+    return {
+        'description': str(metadata.get('description', '') or '').strip(),
+        'title': str(metadata.get('title', '') or '').strip(),
+        'displayCode': str(metadata.get('displayCode', '') or '').strip(),
+    }
+
+
+def pack_unit_metadata(description='', title='', display_code=''):
+    payload = {
+        'description': str(description or '').strip(),
+        'title': str(title or '').strip(),
+        'displayCode': str(display_code or '').strip(),
+    }
+    if not payload['title'] and not payload['displayCode']:
+        return payload['description']
+    return f'{ORG_METADATA_PREFIX}{json.dumps(payload, ensure_ascii=True)}'
+
+
 class OrganizationUnitSerializer(serializers.ModelSerializer):
     parentId = serializers.IntegerField(
         source='parent_id',
@@ -60,6 +114,8 @@ class OrganizationUnitSerializer(serializers.ModelSerializer):
     updatedAt = serializers.DateTimeField(source='updated_at', read_only=True)
     childrenCount = serializers.SerializerMethodField()
     responsable = serializers.SerializerMethodField()
+    title = serializers.CharField(required=False, allow_blank=True, max_length=120)
+    displayCode = serializers.CharField(required=False, allow_blank=True, max_length=20)
 
     class Meta:
         model = OrganizationUnit
@@ -71,6 +127,8 @@ class OrganizationUnitSerializer(serializers.ModelSerializer):
             'parentId',
             'level',
             'description',
+            'title',
+            'displayCode',
             'responsableId',
             'responsable',
             'createdBy',
@@ -110,6 +168,45 @@ class OrganizationUnitSerializer(serializers.ModelSerializer):
             'email': utilisateur.email,
         }
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        metadata = unpack_unit_metadata(instance.description)
+        data['description'] = metadata['description']
+        data['title'] = metadata['title']
+        data['displayCode'] = metadata['displayCode'] or instance.code
+        return data
+
+    def create(self, validated_data):
+        title = validated_data.pop('title', '')
+        display_code = validated_data.pop('displayCode', '')
+        description = validated_data.pop('description', '')
+        validated_data['description'] = pack_unit_metadata(
+            description=description,
+            title=title,
+            display_code=display_code,
+        )
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        title = validated_data.pop(
+            'title',
+            unpack_unit_metadata(instance.description)['title'],
+        )
+        display_code = validated_data.pop(
+            'displayCode',
+            unpack_unit_metadata(instance.description)['displayCode'],
+        )
+        description = validated_data.pop(
+            'description',
+            unpack_unit_metadata(instance.description)['description'],
+        )
+        validated_data['description'] = pack_unit_metadata(
+            description=description,
+            title=title,
+            display_code=display_code,
+        )
+        return super().update(instance, validated_data)
+
     def validate_name(self, value):
         value = value.strip()
         if len(value) < 3:
@@ -117,6 +214,12 @@ class OrganizationUnitSerializer(serializers.ModelSerializer):
                 'Le nom doit contenir au moins 3 caracteres.'
             )
         return value
+
+    def validate_title(self, value):
+        return value.strip()
+
+    def validate_displayCode(self, value):
+        return value.strip().upper()
 
     def validate(self, attrs):
         unit_type = attrs.get('type', getattr(self.instance, 'type', None))
@@ -201,5 +304,4 @@ class EmployeeSerializer(serializers.Serializer):
         return f'EMP-{obj.id_user:03d}'
 
     def get_roles(self, obj):
-        roles = obj.userrole_set.select_related('role').all()
-        return [user_role.role.libelle for user_role in roles]
+        return get_active_role_labels_for_user(obj.id_user)

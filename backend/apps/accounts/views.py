@@ -1,57 +1,189 @@
-from rest_framework.views import APIView
+from django.db import transaction
+from django.db.models import Q
+from django.shortcuts import get_object_or_404
+from rest_framework import status
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
-from .serializers import CustomTokenObtainPairSerializer
-from .models import Utilisateur
+from .models import Departement, Role, Utilisateur
+from .permissions import HasRole
+from .serializers import (
+    CustomTokenObtainPairSerializer,
+    DepartementSerializer,
+    ManagedUserSerializer,
+    ManagedUserWriteSerializer,
+    RoleSerializer,
+)
+from .utils import get_active_role_labels_for_user, get_auth_user_for_utilisateur
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
-    """
-    POST /api/v1/auth/token/
-    Returns an access + refresh token pair along with the user profile dict.
-    Uses CustomTokenObtainPairSerializer which embeds email, roles, and
-    departement_id into the JWT claims and rejects inactive accounts.
-    """
     serializer_class = CustomTokenObtainPairSerializer
     permission_classes = [AllowAny]
 
 
 class CustomTokenRefreshView(TokenRefreshView):
-    """
-    POST /api/v1/auth/token/refresh/
-    Standard simplejwt refresh endpoint, explicitly open to unauthenticated
-    callers (the refresh token itself is the credential).
-    """
     permission_classes = [AllowAny]
 
 
 class MeView(APIView):
-    """
-    GET /api/v1/auth/me/
-    Returns the authenticated user's profile by reading claims from the
-    decoded JWT payload.  A single DB query fetches nom and prenom because
-    those fields are not stored in the token.
-    """
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         payload = request.auth.payload
+        email = payload.get("email")
+        roles = payload.get("roles", [])
+        departement_id = payload.get("departement_id")
 
-        email = payload.get('email')
-        roles = payload.get('roles', [])
-        departement_id = payload.get('departement_id')
-        user_id = payload.get('user_id')
-
-        # nom and prenom are not in the JWT — one DB query to retrieve them.
         utilisateur = Utilisateur.objects.get(email=email)
 
-        return Response({
-            'id_user': utilisateur.id_user,
-            'nom': utilisateur.nom,
-            'prenom': utilisateur.prenom,
-            'email': email,
-            'roles': roles,
-            'departement': departement_id,
-        })
+        return Response(
+            {
+                "id_user": utilisateur.id_user,
+                "nom": utilisateur.nom,
+                "prenom": utilisateur.prenom,
+                "email": email,
+                "roles": roles,
+                "departement": departement_id,
+            }
+        )
+
+
+class ManagedUserListCreateView(APIView):
+    permission_classes = [IsAuthenticated, HasRole("CAQ", "ADMIN", "Admin")]
+
+    def get(self, request):
+        search = str(request.query_params.get("search", "") or "").strip()
+        departement = request.query_params.get("departement")
+        statut = str(request.query_params.get("statut", "") or "").strip().lower()
+        role = str(request.query_params.get("role", "") or "").strip().upper()
+
+        queryset = Utilisateur.objects.all().order_by("nom", "prenom", "id_user")
+
+        if search:
+            queryset = queryset.filter(
+                Q(nom__icontains=search)
+                | Q(prenom__icontains=search)
+                | Q(email__icontains=search)
+            )
+
+        if departement not in (None, ""):
+            queryset = queryset.filter(id_departement=departement)
+
+        if statut == "actif":
+            queryset = queryset.filter(est_actif=True)
+        elif statut in {"desactive", "disabled", "inactive"}:
+            queryset = queryset.filter(est_actif=False)
+
+        users = list(queryset)
+
+        if role:
+            users = [
+                user
+                for user in users
+                if role
+                in {
+                    label.upper()
+                    for label in get_active_role_labels_for_user(user.id_user)
+                }
+            ]
+
+        return Response(ManagedUserSerializer(users, many=True).data)
+
+    @transaction.atomic
+    def post(self, request):
+        serializer = ManagedUserWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        utilisateur = serializer.save()
+
+        return Response(
+            ManagedUserSerializer(utilisateur).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class ManagedUserDetailView(APIView):
+    permission_classes = [IsAuthenticated, HasRole("CAQ", "ADMIN", "Admin")]
+
+    def get_object(self, user_id):
+        return get_object_or_404(Utilisateur, pk=user_id)
+
+    def get(self, request, user_id):
+        utilisateur = self.get_object(user_id)
+        return Response(ManagedUserSerializer(utilisateur).data)
+
+    @transaction.atomic
+    def patch(self, request, user_id):
+        utilisateur = self.get_object(user_id)
+        serializer = ManagedUserWriteSerializer(
+            utilisateur,
+            data=request.data,
+            partial=True,
+        )
+        serializer.is_valid(raise_exception=True)
+        utilisateur = serializer.save()
+
+        return Response(ManagedUserSerializer(utilisateur).data)
+
+    @transaction.atomic
+    def delete(self, request, user_id):
+        utilisateur = self.get_object(user_id)
+        utilisateur.est_actif = False
+        utilisateur.save(update_fields=["est_actif"])
+
+        auth_user = get_auth_user_for_utilisateur(utilisateur)
+
+        if auth_user:
+            auth_user.is_active = False
+            auth_user.save(update_fields=["is_active"])
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class RoleListView(APIView):
+    permission_classes = [IsAuthenticated, HasRole("CAQ", "ADMIN", "Admin")]
+
+    def get(self, request):
+        roles = Role.objects.all().order_by("libelle")
+        return Response(RoleSerializer(roles, many=True).data)
+
+
+class DepartementListView(APIView):
+    permission_classes = [IsAuthenticated, HasRole("CAQ", "ADMIN", "Admin")]
+
+    def get(self, request):
+        departments = Departement.objects.all().order_by("nom")
+        return Response(DepartementSerializer(departments, many=True).data)
+
+
+class ManagedUserStatsView(APIView):
+    permission_classes = [IsAuthenticated, HasRole("CAQ", "ADMIN", "Admin")]
+
+    def get(self, request):
+        stats = {
+            "activeUsers": 0,
+            "pilotes": 0,
+            "auditeurs": 0,
+            "disabledUsers": 0,
+        }
+
+        for user in Utilisateur.objects.all():
+            role_labels = {
+                label.upper()
+                for label in get_active_role_labels_for_user(user.id_user)
+            }
+
+            if user.est_actif:
+                stats["activeUsers"] += 1
+            else:
+                stats["disabledUsers"] += 1
+
+            if "PILOTE" in role_labels or "PILOTE DE PROCESSUS" in role_labels:
+                stats["pilotes"] += 1
+
+            if "AUDITEUR" in role_labels or "AUDITEUR INTERNE" in role_labels:
+                stats["auditeurs"] += 1
+
+        return Response(stats)

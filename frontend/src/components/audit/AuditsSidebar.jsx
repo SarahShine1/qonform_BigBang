@@ -1,84 +1,80 @@
-import { useState } from "react"
-import { NavLink } from "react-router-dom"
+import { useState } from "react";
+import { NavLink } from "react-router-dom";
 import {
   ChevronDown,
   ChevronUp,
+  ClipboardList,
   FileText,
   HelpCircle,
   LayoutGrid,
-  LogOut,
   List,
-  ClipboardList,
-} from "lucide-react"
+  LogOut,
+} from "lucide-react";
 
 export default function AuditsSidebar() {
-  const [auditsOpen, setAuditsOpen] = useState(true)
+  const [auditsOpen, setAuditsOpen] = useState(true);
 
   return (
-    <aside className="w-[200px] shrink-0 self-stretch min-h-[min(100vh-8rem,900px)] bg-white border border-gray-100 rounded-xl flex flex-col shadow-sm">
-      {/* Logo */}
-      <div className="p-4 flex items-center gap-2">
-        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#6366f1] to-[#06b6d4] flex items-center justify-center">
-          <div className="w-5 h-5 rounded-full border-2 border-white" />
+    <aside className="min-h-[min(100vh-8rem,900px)] w-[188px] shrink-0 self-stretch rounded-[18px] border border-slate-200 bg-white shadow-sm transition-colors dark:border-slate-800 dark:bg-slate-900">
+      <div className="flex items-center gap-2 p-4">
+        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-[#6366f1] to-[#06b6d4]">
+          <div className="h-4 w-4 rounded-full border-2 border-white" />
         </div>
-        <span className="font-semibold text-gray-900 text-lg">Qonforme</span>
+        <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">Qonforme</span>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 px-3 py-4">
+      <nav className="flex-1 px-3 py-3">
         <ul className="space-y-1">
-          {/* Dashboard */}
           <li>
             <NavLink
               to="/dashboard"
               className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm ${
-                  isActive ? "bg-[#6366f1] text-white" : "text-gray-600 hover:bg-gray-50"
+                `flex items-center gap-3 rounded-lg px-3 py-2 text-sm ${
+                  isActive
+                    ? "bg-[#6366f1] text-white"
+                    : "text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
                 }`
               }
             >
-              <LayoutGrid className="w-5 h-5" />
+              <LayoutGrid className="h-4 w-4" />
               <span>Dashboard</span>
             </NavLink>
           </li>
 
-          {/* Taches */}
           <li>
             <NavLink
               to="/taches"
               className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm ${
-                  isActive ? "bg-[#6366f1] text-white" : "text-gray-600 hover:bg-gray-50"
+                `flex items-center gap-3 rounded-lg px-3 py-2 text-sm ${
+                  isActive
+                    ? "bg-[#6366f1] text-white"
+                    : "text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
                 }`
               }
             >
-              <List className="w-5 h-5" />
+              <List className="h-4 w-4" />
               <span>Taches</span>
             </NavLink>
           </li>
 
-          {/* Mes audits - Active with dropdown */}
           <li>
             <button
-              onClick={() => setAuditsOpen(!auditsOpen)}
-              className="flex items-center justify-between w-full px-3 py-2.5 bg-[#6366f1] text-white rounded-lg text-sm"
+              onClick={() => setAuditsOpen((current) => !current)}
+              className="flex w-full items-center justify-between rounded-lg bg-[#6366f1] px-3 py-2 text-sm text-white"
             >
               <div className="flex items-center gap-3">
-                <ClipboardList className="w-5 h-5" />
+                <ClipboardList className="h-4 w-4" />
                 <span>Mes audits</span>
               </div>
-              {auditsOpen ? (
-                <ChevronUp className="w-4 h-4" />
-              ) : (
-                <ChevronDown className="w-4 h-4" />
-              )}
+              {auditsOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
             </button>
-            {auditsOpen && (
-              <ul className="mt-1 ml-4 space-y-1">
+
+            {auditsOpen ? (
+              <ul className="ml-4 mt-1 space-y-1">
                 <li>
                   <NavLink
                     to="/mes-audits/planifies"
-                    className="block px-3 py-2 text-gray-500 hover:text-gray-700 text-sm"
+                    className="block px-3 py-2 text-sm text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
                   >
                     Audits planifiés
                   </NavLink>
@@ -88,52 +84,54 @@ export default function AuditsSidebar() {
                     to="/mes-audits/clotures"
                     className={({ isActive }) =>
                       `flex items-center gap-2 px-3 py-2 text-sm ${
-                        isActive ? "text-[#6366f1]" : "text-gray-500 hover:text-gray-700"
+                        isActive
+                          ? "text-[#6366f1] dark:text-violet-300"
+                          : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
                       }`
                     }
                   >
-                    <span className="w-2 h-2 rounded-full bg-[#6366f1]"></span>
+                    <span className="h-2 w-2 rounded-full bg-[#6366f1]" />
                     Audits clôturés
                   </NavLink>
                 </li>
               </ul>
-            )}
+            ) : null}
           </li>
 
-          {/* Fiches processus */}
           <li>
             <NavLink
               to="/processus"
               className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm ${
-                  isActive ? "bg-[#6366f1] text-white" : "text-gray-600 hover:bg-gray-50"
+                `flex items-center gap-3 rounded-lg px-3 py-2 text-sm ${
+                  isActive
+                    ? "bg-[#6366f1] text-white"
+                    : "text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
                 }`
               }
             >
-              <FileText className="w-5 h-5" />
+              <FileText className="h-4 w-4" />
               <span>Fiches processus</span>
             </NavLink>
           </li>
         </ul>
       </nav>
 
-      {/* Bottom links */}
-      <div className="px-3 pb-4 space-y-1">
+      <div className="space-y-1 px-3 pb-4">
         <a
           href="#"
-          className="flex items-center gap-3 px-3 py-2.5 text-gray-600 hover:bg-gray-50 rounded-lg text-sm"
+          className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
         >
-          <HelpCircle className="w-5 h-5" />
+          <HelpCircle className="h-4 w-4" />
           <span>Help</span>
         </a>
         <a
           href="#"
-          className="flex items-center gap-3 px-3 py-2.5 text-gray-600 hover:bg-gray-50 rounded-lg text-sm"
+          className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
         >
-          <LogOut className="w-5 h-5" />
+          <LogOut className="h-4 w-4" />
           <span>Logout</span>
         </a>
       </div>
     </aside>
-  )
+  );
 }

@@ -1,0 +1,85 @@
+from datetime import date
+
+from django.db import connection
+
+from .models import Role, User
+
+
+def split_full_name(full_name):
+    chunks = [part for part in str(full_name or "").strip().split() if part]
+    if not chunks:
+        return "", ""
+    if len(chunks) == 1:
+        return chunks[0], chunks[0]
+    return chunks[-1], " ".join(chunks[:-1])
+
+
+def normalize_role_names(role_names):
+    cleaned = []
+    seen = set()
+    for role_name in role_names or []:
+        label = " ".join(str(role_name or "").strip().split())
+        if not label:
+            continue
+        key = label.upper()
+        if key in seen:
+            continue
+        seen.add(key)
+        cleaned.append(label)
+    return cleaned
+
+
+def get_active_role_labels_for_user(user_id):
+    today = date.today()
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT r.libelle
+            FROM user_role ur
+            INNER JOIN role r ON r.id_role = ur.id_role
+            WHERE ur.id_user = %s
+              AND (ur.date_expiration IS NULL OR ur.date_expiration > %s)
+            ORDER BY r.libelle ASC
+            """,
+            [user_id, today],
+        )
+        return [row[0] for row in cursor.fetchall()]
+
+
+def sync_roles_for_user(user_id, role_names):
+    normalized_roles = normalize_role_names(role_names)
+    role_ids = []
+
+    for role_name in normalized_roles:
+        role, _ = Role.objects.get_or_create(libelle=role_name)
+        role_ids.append(role.id_role)
+
+    with connection.cursor() as cursor:
+        cursor.execute("DELETE FROM user_role WHERE id_user = %s", [user_id])
+        for role_id in role_ids:
+            cursor.execute(
+                """
+                INSERT INTO user_role (id_user, id_role, date_expiration)
+                VALUES (%s, %s, NULL)
+                """,
+                [user_id, role_id],
+            )
+
+
+def get_auth_user_for_utilisateur(utilisateur):
+    if not utilisateur:
+        return None
+
+    try:
+        auth_user = getattr(utilisateur, "auth", None)
+    except Exception:
+        auth_user = None
+
+    if auth_user:
+        return auth_user
+
+    email = str(getattr(utilisateur, "email", "") or "").strip()
+    if not email:
+        return None
+
+    return User.objects.filter(email__iexact=email).first()
