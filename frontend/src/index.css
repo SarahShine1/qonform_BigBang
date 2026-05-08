@@ -138,3 +138,11 @@ code {
   padding: 4px 8px;
   background: var(--code-bg);
 }
+.sidebar-scroll {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE / Edge old */
+}
+
+.sidebar-scroll::-webkit-scrollbar {
+  display: none; /* Chrome, Edge, Safari */
+}
