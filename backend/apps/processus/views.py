@@ -15,4 +15,8 @@ class ProcessusViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return Processus.objects.all().order_by("nom")
+        qs = Processus.objects.all()
+        dept = self.request.query_params.get("departement")
+        if dept:
+            qs = qs.filter(id_departement=dept)
+        return qs.order_by("nom")

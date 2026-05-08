@@ -1,5 +1,5 @@
 import { useState, useEffect, useLayoutEffect, useCallback, useRef } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   ChevronLeft, Save, Loader2, AlertCircle, Send,
   CheckCircle2, AlertTriangle, XCircle, X, Lock,
@@ -121,8 +121,11 @@ function VerifPanel({ data, onClose, overlayStyle }) {
 // ── Page principale ───────────────────────────────────────────────────────────
 export default function FicheProcessusForm() {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+
+  const processusFromQuery = searchParams.get("processus") ?? "";
 
   const [sections,             setSections]           = useState([]);
   const [processusList,        setProcessusList]      = useState([]);
@@ -193,6 +196,10 @@ export default function FicheProcessusForm() {
         setSections(sectionsWithChamps);
         setProcessusList(processus);
 
+        if (!isUrlEdit && processusFromQuery) {
+          setSelectedProcessusId(processusFromQuery);
+        }
+
         if (isUrlEdit) {
           const [fiche, champsExistants] = await Promise.all([
             getVersionFiche(id),
@@ -218,7 +225,7 @@ export default function FicheProcessusForm() {
       }
     }
     load();
-  }, [id, isUrlEdit]);
+  }, [id, isUrlEdit, processusFromQuery]);
 
   // ── Auto-détection fiche existante au changement de processus ─────────────
   useEffect(() => {
@@ -288,7 +295,7 @@ export default function FicheProcessusForm() {
 
   const resetForm = () => {
     if (!isUrlEdit) {
-      setSelectedProcessusId("");
+      if (!processusFromQuery) setSelectedProcessusId("");
       setExistingVersionId(null);
       setReadOnly(false);
     }
@@ -417,26 +424,28 @@ export default function FicheProcessusForm() {
             </div>
           </div>
 
-          {/* ── Sélecteur de processus ── */}
-          <div className="mb-3 flex items-center gap-4 rounded-xl bg-white px-5 py-3"
-            style={{ border: `1px solid ${BORDER}` }}>
-            <label className="shrink-0 text-[12px] font-semibold" style={{ color: PURPLE }}>
-              Processus concerné
-            </label>
-            <select value={selectedProcessusId} onChange={(e) => setSelectedProcessusId(e.target.value)}
-              disabled={isUrlEdit || loading}
-              className={selectCls} style={{ border: `1px solid ${BORDER}` }}>
-              <option value="">-- Sélectionner un processus --</option>
-              {processusList.map((p) => (
-                <option key={p.id_processus} value={p.id_processus}>
-                  {p.code_process} — {p.nom}
-                </option>
-              ))}
-            </select>
-            {checkingFiche && (
-              <Loader2 size={14} className="animate-spin shrink-0" style={{ color: PURPLE }} />
-            )}
-          </div>
+          {/* ── Sélecteur de processus — caché si pré-sélectionné depuis l'URL ── */}
+          {!processusFromQuery && !isUrlEdit && (
+            <div className="mb-3 flex items-center gap-4 rounded-xl bg-white px-5 py-3"
+              style={{ border: `1px solid ${BORDER}` }}>
+              <label className="shrink-0 text-[12px] font-semibold" style={{ color: PURPLE }}>
+                Processus concerné
+              </label>
+              <select value={selectedProcessusId} onChange={(e) => setSelectedProcessusId(e.target.value)}
+                disabled={loading}
+                className={selectCls} style={{ border: `1px solid ${BORDER}` }}>
+                <option value="">-- Sélectionner un processus --</option>
+                {processusList.map((p) => (
+                  <option key={p.id_processus} value={p.id_processus}>
+                    {p.code_process} — {p.nom}
+                  </option>
+                ))}
+              </select>
+              {checkingFiche && (
+                <Loader2 size={14} className="animate-spin shrink-0" style={{ color: PURPLE }} />
+              )}
+            </div>
+          )}
 
           {/* ── Bandeau d'infos processus ── */}
           <div className="mb-3 rounded-xl bg-white px-6 py-4" style={{ border: `1px solid ${BORDER}` }}>

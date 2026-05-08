@@ -42,22 +42,14 @@ const chefProjetItems = [
 const piloteItems = [
   { label: "Tableau de bord", icon: LayoutDashboard, to: "/dashboard-pilote" },
   { label: "Organigramme", icon: GitBranch, to: "/organigramme" },
-  // {
-  //   label: "Gestion processus",
-  //   icon: ClipboardList,
-  //   children: [
-  //     { label: "Fiches de processus", icon: FileText, to: "/gestion-processus/fiches/nouveau" },
-  //   ],
-  // },
   {
-    label: "Cartographie",
-    icon: Map,
-    children: [
-      { label: "Processus", icon: Network, to: "/cartographie/processus" },
-      { label: "Interactions", icon: GitBranch, to: "/cartographie/interactions" },
-       { label: "Fiches de processus", icon: FileText, to: "/gestion-processus/fiches/nouveau" },
-    ],
-  },
+  label: "Cartographie",
+  icon: Map,
+  children: [
+    { label: "Processus", icon: Network, to: "/cartographie/processus" },
+    { label: "Interactions", icon: GitBranch, to: "/cartographie/interactions" },
+  ],
+},
   {
     label: "Planif et suivi",
     icon: Calendar,

@@ -10,6 +10,7 @@ import GestionUtilisateurs from "./pages/users/GestionUtilisateurs";
 import MaturityPage from "./pages/maturity/MaturityPage";
 import ModulePlaceholderPage from "./pages/shared/ModulePlaceholderPage";
 import FicheProcessusForm from "./pages/fiche_form/FicheProcessusForm";
+import ProcessusPage from "./pages/processus/ProcessusPage";
 
 export default function App() {
   return (
@@ -49,7 +50,7 @@ export default function App() {
             />
 
             <Route path="/cartographie/canevas-fiche" element={<ModulePlaceholderPage title="Canevas fiche" />} />
-            <Route path="/cartographie/processus" element={<ModulePlaceholderPage title="Processus" />} />
+            <Route path="/cartographie/processus" element={<ProcessusPage />} />
             <Route path="/cartographie/interactions" element={<ModulePlaceholderPage title="Matrice d'interaction entre processus" />}/>
             <Route path="/suivi" element={<ModulePlaceholderPage title="Suivi" />} />
             <Route path="/audit/preaudit" element={<ModulePlaceholderPage title="Préaudit" />} />
