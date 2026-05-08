@@ -1,122 +1,126 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { AuthProvider } from "./context/AuthContext";
+import ProtectedRoute from "./components/auth/ProtectedRoute";
+import RoleProtectedRoute from "./components/auth/RoleProtectedRoute";
+import Login from "./pages/auth/Login";
+import AccueilPage from "./pages/accueil/AccueilPage";
+import Organigramme from "./pages/organigram/Organigramme";
+import MesAudits from "./pages/audit/MesAudits";
+import GestionUtilisateurs from "./pages/users/GestionUtilisateurs";
+import MaturityPage from "./pages/maturity/MaturityPage";
+import ModulePlaceholderPage from "./pages/shared/ModulePlaceholderPage";
 
-function App() {
-  const [count, setCount] = useState(0)
-
+export default function App() {
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    <BrowserRouter>
+      <AuthProvider>
+        <Routes>
+          <Route path="/login" element={<Login />} />
 
-      <div className="ticks"></div>
+          <Route element={<ProtectedRoute />}>
+            <Route path="/" element={<Navigate to="/accueil" replace />} />
+            <Route path="/accueil" element={<AccueilPage />} />
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+            <Route
+              path="/dashboard"
+              element={
+                <ModulePlaceholderPage
+                  pageTitle="Tableau de bord"
+                  title="Tableau de bord"
+                  description="Cette section servira de vue de pilotage et pourra etre reliee a des donnees reelles plus tard."
+                />
+              }
+            />
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+            <Route path="/organigram" element={<Organigramme />} />
+            <Route path="/organigramme" element={<Organigramme />} />
+            <Route path="/gestion-utilisateurs" element={<GestionUtilisateurs />} />
+
+            <Route
+              path="/cartographie"
+              element={
+                <ModulePlaceholderPage
+                  pageTitle="Cartographie"
+                  title="Cartographie"
+                  description="La cartographie des processus pourra etre detaillee ici tout en conservant le meme layout."
+                />
+              }
+            />
+
+            <Route path="/cartographie/canevas-fiche" element={<ModulePlaceholderPage title="Canevas fiche" />} />
+            <Route path="/cartographie/processus" element={<ModulePlaceholderPage title="Processus" />} />
+            <Route path="/cartographie/interactions" element={<ModulePlaceholderPage title="Matrice d'interaction entre processus" />}/>
+            <Route path="/suivi" element={<ModulePlaceholderPage title="Suivi" />} />
+            <Route path="/audit/preaudit" element={<ModulePlaceholderPage title="Préaudit" />} />
+            <Route path="/audit/mes-audits" element={<ModulePlaceholderPage title="Mes audits" />} />
+            <Route path="/audit/audits-terrain" element={<ModulePlaceholderPage title="Audits terrain" />} />
+            <Route path="/dashboard-pilote" element={<ModulePlaceholderPage title="Dashboard Pilote" />} />
+<Route path="/dashboard-auditeur" element={<ModulePlaceholderPage title="Dashboard Auditeur" />} />
+
+            <Route
+              path="/planification"
+              element={
+                <ModulePlaceholderPage
+                  pageTitle="Planification"
+                  title="Planification"
+                  description="Cette section pourra accueillir la planification qualite, les echeances et les jalons de preparation."
+                />
+              }
+            />
+
+            <Route path="/audits" element={<MesAudits />} />
+            <Route path="/mes-audits" element={<MesAudits />} />
+            <Route path="/mes-audits/planifies" element={<MesAudits />} />
+            <Route path="/mes-audits/clotures" element={<MesAudits />} />
+
+            <Route
+              path="/documents"
+              element={
+                <ModulePlaceholderPage
+                  pageTitle="Documents"
+                  title="Documents"
+                  description="Cette page accueillera la gestion documentaire et les references qualite partagees."
+                />
+              }
+            />
+
+            <Route
+              path="/actions"
+              element={
+                <ModulePlaceholderPage
+                  pageTitle="Actions"
+                  title="Actions"
+                  description="Cette section pourra centraliser les actions correctives, preventives et les suivis associes."
+                />
+              }
+            />
+
+            <Route
+              path="/niveau-maturite"
+              element={
+                <MaturityPage />
+              }
+            />
+
+            <Route
+              path="/parametres"
+              element={
+                <ModulePlaceholderPage
+                  pageTitle="Parametres"
+                  title="Param\u00E8tres"
+                  description="Les parametres de la plateforme pourront etre completes ici sans changer la navigation actuelle."
+                />
+              }
+            />
+          </Route>
+
+          <Route element={<RoleProtectedRoute roles={["CAQ", "ADMIN", "Admin"]} />}>
+            <Route path="/caq/organigramme" element={<Organigramme />} />
+          </Route>
+
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </AuthProvider>
+    </BrowserRouter>
+  );
 }
-
-export default App
