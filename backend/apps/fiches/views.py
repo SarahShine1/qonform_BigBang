@@ -45,7 +45,11 @@ class VersionFicheViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return VersionFiche.objects.all()
+        qs = VersionFiche.objects.all()
+        id_processus = self.request.query_params.get("id_processus")
+        if id_processus:
+            qs = qs.filter(id_processus=id_processus)
+        return qs
 
     def perform_create(self, serializer):
         try:

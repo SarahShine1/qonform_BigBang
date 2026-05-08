@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import SectionTemplate, ChampTemplate, VersionFiche, ChampFiche
+from .models import SectionTemplate, ChampTemplate, ColonneTemplate, OptionChamp, VersionFiche, ChampFiche
 
 # champ_template utilise 'text'/'checklist'/'tableau'
 # mais la contrainte DB de champ_fiche n'accepte que 'texte'/'liste'
@@ -25,7 +25,30 @@ class SectionTemplateSerializer(serializers.ModelSerializer):
         read_only_fields = ["id_section_template", "created_at", "updated_at"]
 
 
+class ColonneTemplateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ColonneTemplate
+        fields = ["id", "cle", "libelle", "placeholder", "ordre"]
+
+
+class OptionChampSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = OptionChamp
+        fields = ["id", "valeur", "libelle", "ordre"]
+
+
 class ChampTemplateSerializer(serializers.ModelSerializer):
+    colonnes = serializers.SerializerMethodField()
+    options  = serializers.SerializerMethodField()
+
+    def get_colonnes(self, obj):
+        qs = ColonneTemplate.objects.filter(id_champ=obj.id_champ_template).order_by("ordre")
+        return ColonneTemplateSerializer(qs, many=True).data
+
+    def get_options(self, obj):
+        qs = OptionChamp.objects.filter(id_champ=obj.id_champ_template).order_by("ordre")
+        return OptionChampSerializer(qs, many=True).data
+
     class Meta:
         model = ChampTemplate
         fields = [
@@ -33,6 +56,7 @@ class ChampTemplateSerializer(serializers.ModelSerializer):
             "type_champ", "configuration", "est_obligatoire",
             "placeholder", "aide", "ordre", "est_actif",
             "created_at", "updated_at",
+            "colonnes", "options",
         ]
         read_only_fields = ["id_champ_template", "created_at", "updated_at"]
 

@@ -99,6 +99,39 @@ class VersionFiche(models.Model):
         return f"Fiche v{self.numero_version} (processus {self.id_processus})"
 
 
+class ColonneTemplate(models.Model):
+    id = models.AutoField(primary_key=True)
+    id_champ = models.IntegerField()
+    cle = models.CharField(max_length=50)
+    libelle = models.CharField(max_length=200)
+    placeholder = models.CharField(max_length=255, blank=True, null=True)
+    ordre = models.IntegerField(default=1)
+
+    class Meta:
+        managed = False
+        db_table = "colonne_template"
+        ordering = ["ordre"]
+
+    def __str__(self):
+        return self.libelle
+
+
+class OptionChamp(models.Model):
+    id = models.AutoField(primary_key=True)
+    id_champ = models.IntegerField()
+    valeur = models.CharField(max_length=100)
+    libelle = models.CharField(max_length=200)
+    ordre = models.IntegerField(default=1)
+
+    class Meta:
+        managed = False
+        db_table = "option_champ"
+        ordering = ["ordre"]
+
+    def __str__(self):
+        return self.libelle
+
+
 class ChampFiche(models.Model):
     # La contrainte DB n'accepte que ces 5 valeurs
     TYPE_CHOICES = [
