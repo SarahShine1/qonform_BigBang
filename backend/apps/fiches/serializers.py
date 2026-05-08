@@ -41,14 +41,19 @@ class VersionFicheSerializer(serializers.ModelSerializer):
     class Meta:
         model = VersionFiche
         fields = [
-            "id_version", "id_processus", "id_statut", "id_redacteur",
+            "id_version", "id_processus", "statut", "id_redacteur",
             "numero_version", "commentaire_version",
             "date_creation", "date_derniere_modif", "date_validation",
+            "id_processus_amont", "id_processus_aval",
         ]
         read_only_fields = ["id_version", "id_redacteur", "date_creation"]
 
 
 class ChampFicheSerializer(serializers.ModelSerializer):
+    # Plain CharField so DRF doesn't reject template type values ('text','checklist','tableau')
+    # before validate_type_champ can remap them to DB-allowed values.
+    type_champ = serializers.CharField(max_length=20)
+
     class Meta:
         model = ChampFiche
         fields = [

@@ -71,13 +71,25 @@ class StatutFiche(models.Model):
 class VersionFiche(models.Model):
     id_version = models.AutoField(primary_key=True)
     id_processus = models.IntegerField()
-    id_statut = models.IntegerField(default=1)
+    statut = models.CharField(
+        max_length=20,
+        default="Brouillon",
+        choices=[
+            ("Brouillon",   "Brouillon"),
+            ("Soumise",     "Soumise"),
+            ("En_revision", "En révision"),
+            ("Publiee",     "Publiée"),
+            ("Archivee",    "Archivée"),
+        ],
+    )
     id_redacteur = models.IntegerField()
     numero_version = models.CharField(max_length=50)
     commentaire_version = models.TextField(blank=True, null=True)
     date_creation = models.DateTimeField(auto_now_add=True)
     date_derniere_modif = models.DateTimeField(blank=True, null=True)
     date_validation = models.DateTimeField(blank=True, null=True)
+    id_processus_amont = models.IntegerField(blank=True, null=True)
+    id_processus_aval = models.IntegerField(blank=True, null=True)
 
     class Meta:
         managed = False
