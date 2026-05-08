@@ -1,4 +1,11 @@
-﻿from django.urls import path
+﻿# backend/apps/documents/urls.py
+
+from django.urls import path
 from . import views
 
-urlpatterns = []
+urlpatterns = [
+    path('', views.DocumentListView.as_view(), name='document-list'),
+    path('upload/', views.DocumentUploadView.as_view(), name='document-upload'),
+    path('<int:pk>/', views.DocumentDetailView.as_view(), name='document-detail'),
+    path('<int:pk>/download/', views.DocumentDownloadView.as_view(), name='document-download'),
+]

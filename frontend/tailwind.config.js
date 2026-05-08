@@ -1,10 +1,20 @@
+// frontend/tailwind.config.js
+/** @type {import('tailwindcss').Config} */
 export default {
-  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
+  content: [
+    "./index.html",
+    "./src/**/*.{js,ts,jsx,tsx}",
+  ],
   theme: {
     extend: {
-      colors: {
-        navy:  { DEFAULT: '#1B2A4A', light: '#2d4270' },
-        accent: { DEFAULT: '#C0183F' },
+      keyframes: {
+        'fade-in': {
+          '0%': { opacity: '0', transform: 'translateY(6px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+      },
+      animation: {
+        'fade-in': 'fade-in 0.2s ease-out forwards',
       },
     },
   },
