@@ -48,6 +48,16 @@ export default function App() {
               }
             />
 
+            <Route path="/cartographie/canevas-fiche" element={<ModulePlaceholderPage title="Canevas fiche" />} />
+            <Route path="/cartographie/processus" element={<ModulePlaceholderPage title="Processus" />} />
+            <Route path="/cartographie/interactions" element={<ModulePlaceholderPage title="Matrice d'interaction entre processus" />}/>
+            <Route path="/suivi" element={<ModulePlaceholderPage title="Suivi" />} />
+            <Route path="/audit/preaudit" element={<ModulePlaceholderPage title="Préaudit" />} />
+            <Route path="/audit/mes-audits" element={<ModulePlaceholderPage title="Mes audits" />} />
+            <Route path="/audit/audits-terrain" element={<ModulePlaceholderPage title="Audits terrain" />} />
+            <Route path="/dashboard-pilote" element={<ModulePlaceholderPage title="Dashboard Pilote" />} />
+<Route path="/dashboard-auditeur" element={<ModulePlaceholderPage title="Dashboard Auditeur" />} />
+
             <Route
               path="/planification"
               element={
