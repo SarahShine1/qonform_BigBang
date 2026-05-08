@@ -30,6 +30,16 @@ const normalizeOpt = (opt) =>
     ? { value: String(opt.valeur ?? opt.value ?? opt.id ?? ""), label: String(opt.libelle ?? opt.label ?? opt.nom ?? "") }
     : { value: String(opt), label: String(opt) };
 
+// handles both {key,label} and {id,libelle} column formats; idx prevents duplicate keys
+const normalizeCol = (col, idx = 0) =>
+  typeof col === "object" && col !== null
+    ? {
+        key:         String(col.key ?? col.id ?? col.nom ?? idx),
+        label:       String(col.label ?? col.libelle ?? col.nom ?? col.key ?? col.id ?? ""),
+        placeholder: col.placeholder ?? "",
+      }
+    : { key: String(col), label: String(col), placeholder: "" };
+
 // ── InfoItem ───────────────────────────────────────────────────────────────
 function InfoItem({ label, children }) {
   return (
@@ -44,7 +54,9 @@ function InfoItem({ label, children }) {
 
 // ── TableField ─────────────────────────────────────────────────────────────
 function TableField({ columns = [], value = [], onChange }) {
-  const emptyRow = () => Object.fromEntries(columns.map((c) => [c.key ?? c, ""]));
+  const cols = columns.map(normalizeCol);
+
+  const emptyRow = () => Object.fromEntries(cols.map(({ key }) => [key, ""]));
   const rows = value.length ? value : [emptyRow()];
 
   const updateCell = (ri, key, val) =>
@@ -57,13 +69,13 @@ function TableField({ columns = [], value = [], onChange }) {
       <table className="w-full text-[12px]">
         <thead>
           <tr style={{ backgroundColor: PURPLE_LIGHT }}>
-            {columns.map((col) => (
+            {cols.map(({ key, label }) => (
               <th
-                key={col.key ?? col}
+                key={key}
                 className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider"
                 style={{ color: PURPLE }}
               >
-                {col.label ?? col}
+                {label}
               </th>
             ))}
             <th className="w-8" />
@@ -72,13 +84,13 @@ function TableField({ columns = [], value = [], onChange }) {
         <tbody>
           {rows.map((row, ri) => (
             <tr key={ri} style={{ borderTop: `1px solid ${BORDER}` }}>
-              {columns.map((col) => (
-                <td key={col.key ?? col} className="px-3 py-1.5" style={{ borderRight: `1px solid ${BORDER}` }}>
+              {cols.map(({ key, placeholder }) => (
+                <td key={key} className="px-3 py-1.5" style={{ borderRight: `1px solid ${BORDER}` }}>
                   <input
                     type="text"
-                    value={row[col.key ?? col] ?? ""}
-                    onChange={(e) => updateCell(ri, col.key ?? col, e.target.value)}
-                    placeholder={col.placeholder ?? ""}
+                    value={row[key] ?? ""}
+                    onChange={(e) => updateCell(ri, key, e.target.value)}
+                    placeholder={placeholder}
                     className="w-full rounded bg-transparent px-1.5 py-1 text-[12px] text-slate-700 placeholder:text-slate-300 outline-none focus:bg-white"
                   />
                 </td>
@@ -106,13 +118,15 @@ function TableField({ columns = [], value = [], onChange }) {
 
 // ── FieldInput ─────────────────────────────────────────────────────────────
 function FieldInput({ champ, value, onChange }) {
-  const { type_champ, configuration = {}, placeholder } = champ;
+  const { type_champ, configuration: rawConf, placeholder } = champ;
+  // null-safe: destructuring default {} only fires for undefined, not null
+  const configuration = (rawConf !== null && rawConf !== undefined) ? rawConf : {};
   const inputCls = "w-full rounded-lg bg-white px-3 py-2 text-[13px] text-slate-700 placeholder:text-slate-300 outline-none transition focus:ring-1 focus:ring-[#58148E]/20";
   const inputStyle = { border: `1px solid ${BORDER}` };
 
   switch (type_champ) {
     case "text":
-      return configuration.multiline
+      return (configuration.multiline || configuration.multiligne)
         ? <textarea rows={3} value={value ?? ""} onChange={(e) => onChange(e.target.value)}
             placeholder={placeholder ?? ""} className={`${inputCls} resize-y`} style={inputStyle} />
         : <input type="text" value={value ?? ""} onChange={(e) => onChange(e.target.value)}
@@ -166,8 +180,16 @@ function FieldInput({ champ, value, onChange }) {
       );
     }
 
-    case "tableau":
-      return <TableField columns={configuration.columns ?? []} value={Array.isArray(value) ? value : []} onChange={onChange} />;
+    case "tableau": {
+      // eslint-disable-next-line no-console
+      console.log("[DEBUG tableau]", champ.libelle, "configuration=", JSON.stringify(configuration));
+      const rawCols =
+        configuration.columns ?? configuration.colonnes ??
+        configuration.cols   ?? configuration.champs   ?? [];
+      const cols = rawCols.map(normalizeCol);
+      console.log("[DEBUG tableau]", champ.libelle, "cols after normalize=", cols);
+      return <TableField columns={cols} value={Array.isArray(value) ? value : []} onChange={onChange} />;
+    }
 
     default:
       return <input type="text" value={value ?? ""} onChange={(e) => onChange(e.target.value)}
@@ -177,7 +199,7 @@ function FieldInput({ champ, value, onChange }) {
 
 // ── FieldRow ───────────────────────────────────────────────────────────────
 function FieldRow({ champ, value, onChange }) {
-  const isWide = champ.type_champ === "tableau" || champ.configuration?.multiline;
+  const isWide = champ.type_champ === "tableau" || champ.configuration?.multiline || champ.configuration?.multiligne;
   return (
     <div className={["py-4", isWide ? "space-y-2" : "grid items-start gap-5"].join(" ")}
       style={!isWide ? { gridTemplateColumns: "200px 1fr" } : undefined}>
