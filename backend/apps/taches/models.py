@@ -24,9 +24,8 @@ class TachePlanifiee(models.Model):
         ("Annulée", "Annulée"),
     ]
 
-    # Mettre à jour les clés étrangères pour faire référence à id_user dans utilisateur
+    # Utilisation de ForeignKey pour lier le responsable à la table Utilisateur
     responsable = models.ForeignKey('Utilisateur', on_delete=models.CASCADE, related_name='taches_responsables')
-    createur = models.ForeignKey('Utilisateur', on_delete=models.CASCADE, related_name='taches_createur')
 
     intitule = models.CharField(max_length=200)
     description = models.TextField(blank=True, null=True)

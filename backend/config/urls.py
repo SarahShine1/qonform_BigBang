@@ -15,7 +15,10 @@ def api_root(request):
 urlpatterns = [
     path('', api_root),
     path('admin/', admin.site.urls),
+    path('api/v1/auth/',       include('apps.accounts.urls')),
+    path('api/v1/organigramme/', include('apps.organigramme.urls')),
     path('api/v1/processus/',  include('apps.processus.urls')),
+    path('api/v1/fiches/',     include('apps.fiches.urls')),
     path('api/v1/audit/',      include('apps.audit.urls')),
     path('api/v1/documents/',  include('apps.documents.urls')),
     path('api/v1/pilotage/',   include('apps.pilotage.urls')),
@@ -23,6 +26,6 @@ urlpatterns = [
     path('api/v1/taches/',     include('apps.taches.urls')),
 ]
 
-if settings.DEBUG:
+if settings.DEBUG and 'debug_toolbar' in settings.INSTALLED_APPS:
     import debug_toolbar
     urlpatterns = [path('__debug__/', include(debug_toolbar.urls))] + urlpatterns
