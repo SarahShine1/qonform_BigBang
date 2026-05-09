@@ -9,9 +9,18 @@ import MesAudits from "./pages/audit/MesAudits";
 import GestionUtilisateurs from "./pages/users/GestionUtilisateurs";
 import MaturityPage from "./pages/maturity/MaturityPage";
 import ModulePlaceholderPage from "./pages/shared/ModulePlaceholderPage";
+import DocumentationPage from "./pages/Documentationpage";
+
 
 export default function App() {
   return (
+     /*
+    <BrowserRouter>
+      <Routes>
+        <Route path="*" element={<DocumentationPage />} />
+      </Routes>
+    </BrowserRouter>*/
+   
     <BrowserRouter>
       <AuthProvider>
         <Routes>
@@ -63,16 +72,7 @@ export default function App() {
             <Route path="/mes-audits/planifies" element={<MesAudits />} />
             <Route path="/mes-audits/clotures" element={<MesAudits />} />
 
-            <Route
-              path="/documents"
-              element={
-                <ModulePlaceholderPage
-                  pageTitle="Documents"
-                  title="Documents"
-                  description="Cette page accueillera la gestion documentaire et les references qualite partagees."
-                />
-              }
-            />
+            <Route path="/documents" element={<DocumentationPage />} />
 
             <Route
               path="/actions"

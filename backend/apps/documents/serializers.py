@@ -1,32 +1,87 @@
-# backend/apps/documents/serializers.py
-
 from rest_framework import serializers
 from .models import Document
 
 
-class DocumentSerializer(serializers.ModelSerializer):
-    publie_par_nom = serializers.SerializerMethodField()
+class DocumentListSerializer(serializers.ModelSerializer):
+    """Serializer léger pour la liste (tableau)."""
+
+    depose_par = serializers.SerializerMethodField()
+    processus_lie = serializers.SerializerMethodField()
+    type_support_display = serializers.CharField(
+        source="get_type_support_display", read_only=True
+    )
+    type_document_display = serializers.CharField(
+        source="get_type_document_display", read_only=True
+    )
 
     class Meta:
         model = Document
-        fields = ['id', 'titre', 'fichier', 'publie_par_nom', 'date_publication']
-        read_only_fields = ['date_publication', 'publie_par_nom']
+        fields = [
+            "id_document",
+            "nom_fichier",
+            "type_document",
+            "type_document_display",
+            "type_support",
+            "type_support_display",
+            "version_doc",
+            "date_upload",
+            "taille",
+            "description",
+            "depose_par",
+            "processus_lie",
+        ]
 
-    def get_publie_par_nom(self, obj):
-        if obj.publie_par:
-            nom = f"{obj.publie_par.first_name} {obj.publie_par.last_name}".strip()
-            return nom if nom else obj.publie_par.username
+    def get_depose_par(self, obj):
+        u = obj.id_uploader
+        return f"{u.prenom} {u.nom}".strip() if u else ""
+
+    def get_processus_lie(self, obj):
+        if obj.id_version:
+            return getattr(obj.id_version, "nom_processus", None)
         return None
 
 
+class DocumentDetailSerializer(DocumentListSerializer):
+    """Serializer complet pour le panneau de prévisualisation."""
+
+    class Meta(DocumentListSerializer.Meta):
+        fields = DocumentListSerializer.Meta.fields + ["chemin_stockage"]
+
+
 class DocumentUploadSerializer(serializers.ModelSerializer):
+    fichier = serializers.FileField(write_only=True)
+    type_document = serializers.ChoiceField(
+        choices=["BPMN", "Rapport", "Preuve"],
+        required=False,
+        default="BPMN"
+    )
+
     class Meta:
         model = Document
-        fields = ['titre', 'fichier']
+        fields = [
+            "nom_fichier",
+            "type_document",
+            "type_support",
+            "description",
+            "fichier",
+        ]
 
-    def validate_fichier(self, value):
-        if not value.name.lower().endswith('.pdf'):
-            raise serializers.ValidationError("Seuls les fichiers PDF sont acceptés.")
-        if value.size > 20 * 1024 * 1024:
-            raise serializers.ValidationError("Le fichier ne doit pas dépasser 20 Mo.")
+    def validate_type_support(self, value):
+        if value is None:
+            return value
+        allowed = ["Guide", "Reglementation", "Norme"]
+        if value not in allowed:
+            raise serializers.ValidationError(
+                f"Type de support invalide. Valeurs acceptées : {', '.join(allowed)}"
+            )
+        return value
+
+    def validate_type_support(self, value):
+        if value is None:
+            return value
+        allowed = ["Guide", "Reglementation", "Norme"]
+        if value not in allowed:
+            raise serializers.ValidationError(
+                f"Type de support invalide. Valeurs acceptées : {', '.join(allowed)}"
+            )
         return value

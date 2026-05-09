@@ -1,134 +1,234 @@
-// frontend/src/components/documents/UploadModal.jsx
+import { useRef, useState } from "react";
+import { X, Upload, FileText, AlertCircle, CheckCircle2 } from "lucide-react";
+import { TYPE_DOCUMENT_OPTIONS, TYPE_SUPPORT_OPTIONS } from "../../api/documents";
 
-import { useState } from 'react';
-import { X, Upload, AlertCircle, CheckCircle2 } from 'lucide-react';
-import { uploadDocument } from '../../api/documents';
+const INITIAL = {
+  nom_fichier: "",
+  type_support: "",
+  version_doc: "",
+  description: "",
+};
 
-export default function UploadModal({ onClose, onSuccess, primaryColor }) {
-  const [titre, setTitre] = useState('');
+export default function UploadModal({ onClose, onUpload }) {
+  const [form, setForm] = useState(INITIAL);
   const [file, setFile] = useState(null);
-  const [dragging, setDragging] = useState(false);
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(false);
+  const fileRef = useRef();
 
-  const validateAndSetFile = (f) => {
+  const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
+
+  const handleFile = (e) => {
+    const f = e.target.files?.[0];
     if (!f) return;
-
-    if (f.type !== 'application/pdf') {
-      setError('Seuls les fichiers PDF sont acceptés.');
-      return;
-    }
-
-    if (f.size > 20 * 1024 * 1024) {
-      setError('Le fichier ne doit pas dépasser 20 Mo.');
-      return;
-    }
-
     setFile(f);
-    setError('');
+    // Pré-remplir nom_fichier avec le nom du fichier (sans extension)
+    if (!form.nom_fichier) {
+      setForm((prev) => ({
+        ...prev,
+        nom_fichier: f.name.replace(/\.[^.]+$/, ""),
+      }));
+    }
   };
 
-  const handleDrop = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setDragging(false);
-    validateAndSetFile(e.dataTransfer.files?.[0]);
-  };
+    setError(null);
 
-  const handleSubmit = async () => {
-    if (!file) return setError('Veuillez sélectionner un fichier PDF.');
-    if (!titre.trim()) return setError('Le nom du document est requis.');
+    if (!file) return setError("Veuillez sélectionner un fichier.");
+    if (!form.nom_fichier.trim()) return setError("Le nom du fichier est requis.");
+   
 
+    const fd = new FormData();
+    fd.append("fichier", file);
+    Object.entries(form).forEach(([k, v]) => {
+      if (v) fd.append(k, v);
+    });
+
+    setLoading(true);
     try {
-      setLoading(true);
-
-      const fd = new FormData();
-      fd.append('file', file);
-      fd.append('titre', titre);
-
-      const res = await uploadDocument(fd);
-
-      onSuccess(res.data);
+      await onUpload(fd);
+      setSuccess(true);
+      setTimeout(onClose, 1200);
     } catch (err) {
-      setError("Erreur lors de l'upload.");
+      const detail = err?.response?.data;
+      if (typeof detail === "object") {
+        const msgs = Object.entries(detail)
+          .map(([k, v]) => `${k} : ${Array.isArray(v) ? v.join(", ") : v}`)
+          .join(" | ");
+        setError(msgs);
+      } else {
+        setError(detail || "Une erreur est survenue.");
+      }
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-[440px]">
+    /* Overlay */
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div className="w-full max-w-lg rounded-[20px] bg-white shadow-xl mx-4 max-h-[90vh] flex flex-col">
 
         {/* Header */}
-        <div className="flex justify-between px-6 py-5 border-b">
-          <h2 className="text-sm font-semibold">Uploader un document</h2>
-          <button onClick={onClose}>
-            <X size={16} />
+        <div className="flex items-center justify-between px-6 py-4 border-b">
+          <div>
+            <h2 className="text-[16px] font-semibold text-slate-900">
+              Importer un document
+            </h2>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              Réservé aux membres CAQ
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded-lg p-1.5 hover:bg-gray-100 text-gray-400"
+          >
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        <div className="p-6 flex flex-col gap-4">
+        {/* Body */}
+        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4 overflow-y-auto flex-1">
 
-          {/* Drop zone */}
-          <label
-            onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-            onDragLeave={() => setDragging(false)}
-            onDrop={handleDrop}
-            className={`border-2 border-dashed rounded-xl py-8 text-center cursor-pointer
-              ${dragging ? 'border-purple-400' : 'border-gray-200'}`}
+          {/* Zone de dépôt */}
+          <div
+            onClick={() => fileRef.current?.click()}
+            className={`flex flex-col items-center justify-center rounded-[14px] border-2 border-dashed p-6 cursor-pointer transition-colors ${
+              file
+                ? "border-purple-400 bg-purple-50"
+                : "border-gray-200 hover:border-purple-300 hover:bg-gray-50"
+            }`}
           >
-            {file ? (
-              <div>
-                <CheckCircle2 className="mx-auto text-green-500" />
-                <p className="text-sm">{file.name}</p>
-              </div>
-            ) : (
-              <div>
-                <Upload className="mx-auto text-gray-400" />
-                <p className="text-sm text-gray-500">Glisser ou cliquer</p>
-              </div>
-            )}
-
             <input
+              ref={fileRef}
               type="file"
-              accept="application/pdf"
               className="hidden"
-              onChange={(e) => validateAndSetFile(e.target.files?.[0])}
+              accept=".pdf,.docx,.png,.jpg,.jpeg,.xlsx"
+              onChange={handleFile}
             />
-          </label>
+            {file ? (
+              <>
+                <FileText className="w-8 h-8 text-purple-500 mb-2" />
+                <p className="text-[13px] font-medium text-purple-700">
+                  {file.name}
+                </p>
+                <p className="text-[11px] text-purple-400">
+                  {(file.size / 1024).toFixed(0)} Ko
+                </p>
+              </>
+            ) : (
+              <>
+                <Upload className="w-8 h-8 text-gray-300 mb-2" />
+                <p className="text-[13px] text-gray-400">
+                  Glisser-déposer ou{" "}
+                  <span className="text-purple-600 font-medium underline">
+                    choisir un fichier
+                  </span>
+                </p>
+                <p className="text-[11px] text-gray-300 mt-1">
+                  PDF, DOCX, images — max 20 Mo
+                </p>
+              </>
+            )}
+          </div>
 
-          {/* Titre */}
-          <input
-            value={titre}
-            onChange={(e) => setTitre(e.target.value)}
-            placeholder="Nom du document"
-            className="border rounded-lg px-3 py-2 text-sm"
-          />
+          {/* Nom du fichier */}
+          <div>
+            <label className="block text-[11px] font-medium text-slate-600 mb-1">
+              Nom du fichier <span className="text-red-400">*</span>
+            </label>
+            <input
+              value={form.nom_fichier}
+              onChange={set("nom_fichier")}
+              placeholder="ex : Norme_iso9001"
+              className="w-full rounded-[10px] border px-3 py-2 text-[13px] outline-none focus:border-purple-400 focus:ring-1 focus:ring-purple-200"
+            />
+          </div>
 
-          {/* Error */}
+          {/* Type de document + Type de support */}
+          <div className="grid grid-cols-2 gap-3">
+            
+
+            <div>
+              <label className="block text-[11px] font-medium text-slate-600 mb-1">
+                Type de support
+              </label>
+              <select
+                value={form.type_support}
+                onChange={set("type_support")}
+                className="w-full rounded-[10px] border px-3 py-2 text-[13px] outline-none focus:border-purple-400 bg-white"
+              >
+                <option value="">— Optionnel —</option>
+                {TYPE_SUPPORT_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+        
+
+          {/* Description */}
+          <div>
+            <label className="block text-[11px] font-medium text-slate-600 mb-1">
+              Description
+            </label>
+            <textarea
+              value={form.description}
+              onChange={set("description")}
+              rows={3}
+              placeholder="Brève description du contenu…"
+              className="w-full rounded-[10px] border px-3 py-2 text-[13px] outline-none focus:border-purple-400 focus:ring-1 focus:ring-purple-200 resize-none"
+            />
+          </div>
+
+          {/* Erreur / Succès */}
           {error && (
-            <div className="text-red-500 text-sm flex items-center gap-2">
-              <AlertCircle size={14} />
+            <div className="flex items-start gap-2 rounded-[10px] bg-red-50 border border-red-200 px-3 py-2 text-[12px] text-red-600">
+              <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
               {error}
             </div>
           )}
-        </div>
 
-        {/* Footer */}
-        <div className="flex gap-2 px-6 pb-6">
-          <button onClick={onClose} className="flex-1 border rounded-lg py-2">
-            Annuler
-          </button>
+          {success && (
+            <div className="flex items-center gap-2 rounded-[10px] bg-emerald-50 border border-emerald-200 px-3 py-2 text-[12px] text-emerald-700">
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
+              Document importé avec succès !
+            </div>
+          )}
 
-          <button
-            onClick={handleSubmit}
-            disabled={loading}
-            style={{ background: primaryColor }}
-            className="flex-1 text-white rounded-lg py-2"
-          >
-            {loading ? 'Upload...' : 'Uploader'}
-          </button>
-        </div>
+          {/* Footer */}
+          <div className="flex justify-end gap-2 pt-1">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-[10px] border px-4 py-2 text-[13px] hover:bg-gray-50"
+            >
+              Annuler
+            </button>
+            <button
+              type="submit"
+              disabled={loading || success}
+              className="inline-flex items-center gap-2 rounded-[10px] bg-purple-700 px-5 py-2 text-[13px] font-medium text-white hover:bg-purple-800 disabled:opacity-60"
+            >
+              {loading ? (
+                <>
+                  <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                  Import en cours…
+                </>
+              ) : (
+                <>
+                  <Upload className="w-4 h-4" />
+                  Importer
+                </>
+              )}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

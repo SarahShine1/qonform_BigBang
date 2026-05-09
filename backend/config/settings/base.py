@@ -1,4 +1,5 @@
 from pathlib import Path
+import os
 from decouple import config
 
 # ── Base paths ───────────────────────────────────────────
@@ -148,3 +149,7 @@ SPECTACULAR_SETTINGS = {
     'DESCRIPTION': 'SI de préparation à la certification ISO 9001:2015 — ESI',
     'VERSION':     '1.0.0',
 }
+
+
+MEDIA_URL = "/media/"
+MEDIA_ROOT = os.path.join(BASE_DIR, "media")

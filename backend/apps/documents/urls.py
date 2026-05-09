@@ -1,11 +1,13 @@
-﻿# backend/apps/documents/urls.py
+﻿from django.urls import path
+from .views import DocumentDetailView, DocumentDownloadView, DocumentListCreateView
 
-from django.urls import path
-from . import views
+app_name = "documents"
 
 urlpatterns = [
-    path('', views.DocumentListView.as_view(), name='document-list'),
-    path('upload/', views.DocumentUploadView.as_view(), name='document-upload'),
-    path('<int:pk>/', views.DocumentDetailView.as_view(), name='document-detail'),
-    path('<int:pk>/download/', views.DocumentDownloadView.as_view(), name='document-download'),
+    # Liste + création
+    path("", DocumentListCreateView.as_view(), name="document-list-create"),
+    # Détail + suppression
+    path("<int:pk>/", DocumentDetailView.as_view(), name="document-detail"),
+    # Téléchargement
+    path("<int:pk>/download/", DocumentDownloadView.as_view(), name="document-download"),
 ]
