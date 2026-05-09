@@ -1,5 +1,18 @@
-import { NavLink } from "react-router-dom";
-import { ChevronDown, LogOut } from "lucide-react";
+import { useState } from "react";
+import { NavLink, useLocation } from "react-router-dom";
+import {
+  BarChart3,
+  Calendar,
+  ChevronDown,
+  ClipboardList,
+  FolderOpen,
+  GitBranch,
+  LayoutDashboard,
+  LogOut,
+  Map,
+  Settings,
+  Users,
+} from "lucide-react";
 import qonformeLogo from "../../assets/icons/qonforme-logo.svg";
 import { useAuth } from "../../hooks/useAuth";
 import SidebarCalendar from "./SidebarCalendar";
@@ -61,10 +74,11 @@ function SidebarDropdown({ item }) {
               to={child.to}
               className={({ isActive }) =>
                 [
-                  "flex items-center gap-2 rounded-md px-2 py-[4px] transition-all",
-                  isActive
-                    ? "bg-white/10 text-[#F4B740]"
+
+                  "flex items-center gap-2.5 rounded-md px-2.5 py-[5px] transition-all",
+                  isActive  ? "bg-white/10 text-[#F4B740]"
                     : "text-violet-100/85 hover:bg-white/8 hover:text-white",
+
                 ].join(" ")
               }
             >

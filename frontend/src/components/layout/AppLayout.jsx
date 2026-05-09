@@ -11,7 +11,7 @@ export default function AppLayout({
 }) {
   return (
     <div
-      className="app-layout h-screen overflow-hidden bg-[#F8F7FC] transition-colors dark:bg-slate-950"
+      className="app-layout h-screen overflow-hidden bg-white transition-colors dark:bg-slate-950"
       style={{ "--navbar-height": `${TOPBAR_HEIGHT}px` }}
     >
       <Sidebar />
