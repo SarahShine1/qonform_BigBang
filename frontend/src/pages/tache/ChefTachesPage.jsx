@@ -272,10 +272,6 @@ function ChefTachesPage() {
   localStorage.getItem("id_user") ||
   localStorage.getItem("utilisateurId");
 
-const tachesFiltrees =
-  role === "CAQ"
-    ? taches
-    : taches.filter((tache) => String(tache.responsable) === String(utilisateurId));
 
   const [loading, setLoading] = useState(true);
   const [detailTache, setDetailTache] = useState(null);
@@ -287,6 +283,41 @@ const tachesFiltrees =
   const [form, setForm] = useState(initialForm);
   const [formError, setFormError] = useState("");
   const [utilisateurs, setUtilisateurs] = useState([]);
+const tachesFiltrees = (
+  role === "CAQ"
+    ? taches
+    : taches.filter(
+        (tache) => String(tache.responsable) === String(utilisateurId)
+      )
+).filter((tache) => {
+  const recherche = search.toLowerCase();
+
+  const intitule = tache.intitule?.toLowerCase() || "";
+  const type = tache.type?.toLowerCase() || tache.type_tache?.toLowerCase() || "";
+  const responsable = String(
+    tache.responsableNom ||
+      tache.responsable_nom ||
+      tache.responsable ||
+      ""
+  ).toLowerCase();
+
+  const matchSearch =
+    intitule.includes(recherche) ||
+    type.includes(recherche) ||
+    responsable.includes(recherche);
+
+  const matchPriorite =
+    prioriteFilter === "Toutes les priorités" ||
+    tache.priorite === prioriteFilter;
+
+  const statutAffiche = getStatutAutomatique(tache);
+
+  const matchStatut =
+    statutFilter === "Tous les statuts" ||
+    statutAffiche === statutFilter;
+
+  return matchSearch && matchPriorite && matchStatut;
+});
 
 
 useEffect(() => {
