@@ -11,7 +11,7 @@ import MaturityPage from "./pages/maturity/MaturityPage";
 import ModulePlaceholderPage from "./pages/shared/ModulePlaceholderPage";
 import FicheProcessusForm from "./pages/fiche_form/FicheProcessusForm";
 import ProcessusPage from "./pages/processus/ProcessusPage";
-
+import ChefTachesPage from "./pages/tache/ChefTachesPage";
 export default function App() {
   return (
     <BrowserRouter>
@@ -33,8 +33,7 @@ export default function App() {
                 />
               }
             />
-
-            <Route path="/organigram" element={<Organigramme />} />
+            <Route path="/taches-planifiees" element={<ChefTachesPage />} />            <Route path="/organigram" element={<Organigramme />} />
             <Route path="/organigramme" element={<Organigramme />} />
             <Route path="/gestion-utilisateurs" element={<GestionUtilisateurs />} />
 

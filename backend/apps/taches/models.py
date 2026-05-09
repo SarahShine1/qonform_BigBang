@@ -1,5 +1,6 @@
 from django.db import models
 
+
 class TachePlanifiee(models.Model):
     TYPE_CHOICES = [
         ("Audit", "Audit"),
@@ -24,12 +25,25 @@ class TachePlanifiee(models.Model):
         ("Annulée", "Annulée"),
     ]
 
-    # Utilisation de ForeignKey pour lier le responsable à la table Utilisateur
-    responsable = models.ForeignKey('Utilisateur', on_delete=models.CASCADE, related_name='taches_responsables')
+    id_tache = models.AutoField(primary_key=True, db_column="id_tache")
 
     intitule = models.CharField(max_length=200)
     description = models.TextField(blank=True, null=True)
     type_tache = models.CharField(max_length=50, choices=TYPE_CHOICES)
+
+    responsable = models.ForeignKey(
+        "accounts.Utilisateur",
+        on_delete=models.DO_NOTHING,
+        db_column="id_responsable",
+        related_name="taches_assignees",
+    )
+
+    createur = models.ForeignKey(
+        "accounts.Utilisateur",
+        on_delete=models.DO_NOTHING,
+        db_column="id_createur",
+        related_name="taches_creees",
+    )
 
     date_debut = models.DateField()
     date_fin = models.DateField()
@@ -37,21 +51,22 @@ class TachePlanifiee(models.Model):
     priorite = models.CharField(
         max_length=20,
         choices=PRIORITE_CHOICES,
-        default="Moyenne"
+        default="Moyenne",
     )
 
     statut = models.CharField(
         max_length=20,
         choices=STATUT_CHOICES,
-        default="Planifiée"
+        default="Planifiée",
     )
 
     observations = models.TextField(blank=True, null=True)
 
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(blank=True, null=True)
+    updated_at = models.DateTimeField(blank=True, null=True)
 
     class Meta:
+        managed = False
         db_table = "tache_planifiee"
         ordering = ["-created_at"]
 

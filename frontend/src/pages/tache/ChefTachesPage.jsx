@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from "react";
-import Navbar from "../components/Navbar";
+import Navbar from "../../components/Navbar";
 import {
   getTachesPlanifieesChef,
   createTachePlanifieeChef,
   updateTachePlanifieeChef,
   deleteTachePlanifieeChef,
+  getUtilisateurs,
+
 } from "./chefTacheService";
 
 function SearchIcon() {
@@ -168,7 +170,54 @@ function formatDate(dateString) {
   const date = new Date(dateString);
   return date.toLocaleDateString("fr-FR");
 }
+function getStatutAutomatique(tache) {
+  if (tache.statut === "Terminée" || tache.statut === "Annulée") {
+    return tache.statut;
+  }
 
+  if (!tache.dateDebut || !tache.dateFin) {
+    return "Planifiée";
+  }
+
+  const today = new Date();
+  const debut = new Date(tache.dateDebut);
+  const fin = new Date(tache.dateFin);
+
+  today.setHours(0, 0, 0, 0);
+  debut.setHours(0, 0, 0, 0);
+  fin.setHours(0, 0, 0, 0);
+
+  if (today < debut) {
+    return "Planifiée";
+  }
+
+  if (today > fin) {
+    return "En retard";
+  }
+
+  return "En cours";
+}
+function getStatutStyle(statut) {
+  switch (statut) {
+    case "Planifiée":
+      return "text-blue-700 border-blue-200 bg-blue-50";
+
+    case "En cours":
+      return "text-orange-700 border-orange-200 bg-orange-50";
+
+    case "En retard":
+      return "text-red-700 border-red-200 bg-red-50";
+
+    case "Terminée":
+      return "text-green-700 border-green-200 bg-green-50";
+
+    case "Annulée":
+      return "text-gray-700 border-gray-200 bg-gray-100";
+
+    default:
+      return "text-[#641ab5] border-[#d8b4fe] bg-[#faf5ff]";
+  }
+}
 function getDaysRemaining(dateFin) {
   const today = new Date();
   const end = new Date(dateFin);
@@ -270,7 +319,17 @@ function ChefTachesPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState(initialForm);
   const [formError, setFormError] = useState("");
+  const [utilisateurs, setUtilisateurs] = useState([]);
 
+useEffect(() => {
+  async function chargerUtilisateurs() {
+    const data = await getUtilisateurs();
+    console.log("UTILISATEURS CHARGÉS:", data);
+    setUtilisateurs(data);
+  }
+
+  chargerUtilisateurs();
+}, []);
   useEffect(() => {
     async function chargerTaches() {
       setLoading(true);
@@ -287,7 +346,9 @@ function ChefTachesPage() {
 
     const intitule = tache.intitule?.toLowerCase() || "";
     const type = tache.type?.toLowerCase() || "";
-    const responsable = tache.responsable?.toLowerCase() || "";
+    const responsable = String(
+        tache.responsableNom || tache.responsable || ""
+      ).toLowerCase();
 
     const matchSearch =
       intitule.includes(recherche) ||
@@ -298,9 +359,12 @@ function ChefTachesPage() {
       prioriteFilter === "Toutes les priorités" ||
       tache.priorite === prioriteFilter;
 
-    const matchStatut =
-      statutFilter === "Tous les statuts" || tache.statut === statutFilter;
+    const statutAutomatique = getStatutAutomatique(tache);
 
+const statutAffiche = getStatutAutomatique(tache);
+
+const matchStatut =
+  statutFilter === "Tous les statuts" || statutAffiche === statutFilter;  
     return matchSearch && matchPriorite && matchStatut;
   });
 
@@ -329,53 +393,68 @@ function ChefTachesPage() {
       setFormError("");
       setModalOpen(true);
     }
-  async function handleSubmit(e) {
-    e.preventDefault();
 
-    if (
-      !form.intitule ||
-      !form.type ||
-      !form.responsable ||
-      !form.dateDebut ||
-      !form.dateFin
-    ) {
-      setFormError("Veuillez remplir les champs obligatoires.");
-      return;
-    }
+ async function annulerTache(tache) {
+  const confirmation = window.confirm("Voulez-vous annuler cette tâche ?");
 
-    if (new Date(form.dateFin) < new Date(form.dateDebut)) {
-      setFormError("La date de fin doit être après la date de début.");
-      return;
-    }
+  if (!confirmation) return;
 
-    if (tacheEnModification) {
-      const tacheModifiee = await updateTachePlanifieeChef(
-        tacheEnModification.id,
-        {
-          ...tacheEnModification,
-          ...form,
-        }
-      );
+  const tacheModifiee = await updateTachePlanifieeChef(tache.id, {
+    ...tache,
+    statut: "Annulée",
+  });
 
-      setTaches((previousTaches) =>
-        previousTaches.map((tache) =>
-          tache.id === tacheEnModification.id ? tacheModifiee : tache
-        )
-      );
-    } else {
-      const nouvelleTache = await createTachePlanifieeChef({
-        ...form,
-        statut: "Planifiée",
-      });
+  setTaches((previousTaches) =>
+    previousTaches.map((item) =>
+      item.id === tache.id ? tacheModifiee : item
+    )
+  );
+}
 
-      setTaches((previousTaches) => [nouvelleTache, ...previousTaches]);
-    }
+ async function handleSubmit(e) {
+  e.preventDefault();
 
-    setForm(initialForm);
-    setFormError("");
-    setTacheEnModification(null);
-    setModalOpen(false);
+  if (
+    !form.intitule ||
+    !form.type ||
+    !form.responsable ||
+    !form.dateDebut ||
+    !form.dateFin
+  ) {
+    setFormError("Veuillez remplir les champs obligatoires.");
+    return;
   }
+
+  if (new Date(form.dateFin) < new Date(form.dateDebut)) {
+    setFormError("La date de fin doit être après la date de début.");
+    return;
+  }
+
+  const tache = {
+    ...form,
+    responsable: form.responsable, // L'ID du responsable
+  };
+
+  if (tacheEnModification) {
+    const tacheModifiee = await updateTachePlanifieeChef(
+      tacheEnModification.id,
+      tache
+    );
+    setTaches((previousTaches) =>
+      previousTaches.map((tache) =>
+        tache.id === tacheEnModification.id ? tacheModifiee : tache
+      )
+    );
+  } else {
+    const nouvelleTache = await createTachePlanifieeChef(tache);
+    setTaches((previousTaches) => [nouvelleTache, ...previousTaches]);
+  }
+
+  setForm(initialForm);
+  setFormError("");
+  setTacheEnModification(null);
+  setModalOpen(false);
+}
 
 async function supprimerTache(id) {
   const confirmation = window.confirm(
@@ -436,8 +515,8 @@ async function supprimerTache(id) {
   </div>
         </header>
 
-        <section className="px-9 py-7">
-          <div className="flex items-center justify-between mb-8">
+        <section className="px-9 ">
+          <div className="flex items-center justify-between ">
             <h1 className="text-[22px] font-bold text-[#000000]">
               Tâches planifiées
             </h1>
@@ -459,7 +538,7 @@ async function supprimerTache(id) {
           <div className="bg-white">
             
 
-            <div className="flex items-center gap-2 mb-6">
+            <div className="flex items-center gap-2 mb-4">
               <div className="w-[280px] h-8 border border-[#e6e6e9] rounded-md flex items-center gap-2 px-3 text-[#9ca3af]">
                 <SearchIcon />
 
@@ -488,10 +567,11 @@ async function supprimerTache(id) {
                 onChange={(e) => setStatutFilter(e.target.value)}
                 className="h-8 border border-[#e6e6e9] rounded-md bg-white text-[#444] text-[11px] px-3 outline-none"
               >
-                <option>Tous les statuts</option>
                 <option>Planifiée</option>
                 <option>En cours</option>
+                <option>En retard</option>
                 <option>Terminée</option>
+                <option>Annulée</option>
               </select>
             </div>
 
@@ -568,7 +648,7 @@ async function supprimerTache(id) {
                           
                           <td className="text-[12px] font-medium text-[#2c2c2c] py-3 px-3 align-top">
                             <WrappedCell
-                              value={tache.responsable}
+                             value={tache.responsableNom || tache.responsable}
                               maxWidth="max-w-[175px]"
                             />
                           </td>
@@ -613,14 +693,14 @@ async function supprimerTache(id) {
                             />
                           </td>
 
-                          <td className="py-3 px-3 align-top">
-                            <span
-                              className="inline-flex items-center justify-center rounded-md text-[12px] font-medium text-[#641ab5] border border-[#d8b4fe] bg-[#faf5ff] px-2 py-1 whitespace-normal break-words leading-[1.3]"
-                              title={tache.statut}
-                            >
-                              {tache.statut}
-                            </span>
-                          </td>
+                          <td className="py-3 px-2 align-top">
+                          <span
+                            className={`inline-flex items-center justify-center rounded-md text-[12px] font-medium border px-2 py-1 whitespace-normal break-words leading-[1.3] ${getStatutStyle(getStatutAutomatique(tache))}`}
+                            title={getStatutAutomatique(tache)}
+                          >
+                            {getStatutAutomatique(tache)}
+                          </span>
+                        </td>
 
                           <td className="py-3 px-3 align-top">
       <div className="flex items-center gap-2">
@@ -745,18 +825,25 @@ async function supprimerTache(id) {
                     <option value="Autre">Autre</option>
                   </select>
                 </div>
- <div>
-                <label className="block text-[12px] text-[#555] mb-1">
-                  Responsable *
-                </label>
-                <input
+                <div>
+                  <label className="block text-[12px] text-[#555] mb-1">
+                    Responsable *
+                  </label>
+               <select
                   name="responsable"
                   value={form.responsable}
                   onChange={handleChange}
-                  placeholder="Ex: Ahmed BENAUI"
-                  className="w-full h-9 border border-[#e6e6e9] rounded-md px-3 text-[12px] outline-none focus:border-[#641ab5]"
-                />
-              </div>
+                  className="w-full h-9 border border-[#e6e6e9] rounded-md px-3 text-[12px] bg-white text-[#111827] outline-none focus:border-[#641ab5]"
+                >
+                  <option value="">Sélectionner un responsable</option>
+
+                  {utilisateurs.map((user) => (
+                    <option key={user.id || user.id_user} value={user.id || user.id_user}>
+                      {user.prenom || user.first_name || ""} {user.nom || user.last_name || ""} {user.email ? `- ${user.email}` : ""}
+                    </option>
+                  ))}
+                </select>
+                </div>
                 
               </div>
 
@@ -883,7 +970,7 @@ async function supprimerTache(id) {
         <div>
           <p className="text-[11px] text-[#9ca3af] mb-1">Responsable</p>
           <p className="text-[13px] text-[#2c2c2c]">
-            {detailTache.responsable || "-"}
+            {detailTache.responsableNom || detailTache.responsable || "-"}
           </p>
         </div>
 
@@ -913,9 +1000,18 @@ async function supprimerTache(id) {
 
           <div>
             <p className="text-[11px] text-[#9ca3af] mb-1">Statut</p>
-            <span className="inline-flex items-center justify-center rounded-md text-[12px] font-medium text-[#641ab5] border border-[#d8b4fe] bg-[#faf5ff] px-2 py-1">
-              {detailTache.statut || "-"}
-            </span>
+            {(() => {
+                  const statutAffiche = getStatutAutomatique(tache);
+
+                  return (
+                    <span
+                      className={`inline-flex items-center justify-center rounded-md text-[12px] font-medium border px-2 py-1 whitespace-normal break-words leading-[1.3] ${getStatutStyle(statutAffiche)}`}
+                      title={statutAffiche}
+                    >
+                      {statutAffiche}
+                    </span>
+                  );
+             })()}
           </div>
         </div>
 

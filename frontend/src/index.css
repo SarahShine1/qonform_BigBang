@@ -146,3 +146,22 @@ code {
 .sidebar-scroll::-webkit-scrollbar {
   display: none; /* Chrome, Edge, Safari */
 }
+/* ---- Form controls fix ---- */
+input,
+textarea,
+select {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border-color: #e6e6e9;
+  color-scheme: light;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #9ca3af !important;
+}
+
+select option {
+  background-color: #ffffff;
+  color: #111827;
+}
