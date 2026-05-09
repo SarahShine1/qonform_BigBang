@@ -1,5 +1,8 @@
 import React, { useEffect, useState } from "react";
-import Navbar from "../../components/Navbar";
+import { useMemo } from "react";
+import { useAuth } from "../../hooks/useAuth";
+import AppLayout from "../../components/layout/AppLayout";
+
 import {
   getTachesPlanifieesChef,
   createTachePlanifieeChef,
@@ -8,7 +11,6 @@ import {
   getUtilisateurs,
 
 } from "./chefTacheService";
-
 function SearchIcon() {
   return (
     <svg className="w-[14px] h-[14px]" viewBox="0 0 24 24" fill="none">
@@ -22,62 +24,6 @@ function SearchIcon() {
         stroke="currentColor"
         strokeWidth="1.8"
         strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
-function UserIcon() {
-  return (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
-      <path
-        d="M12 12C14.7614 12 17 9.76142 17 7C17 4.23858 14.7614 2 12 2C9.23858 2 7 4.23858 7 7C7 9.76142 9.23858 12 12 12Z"
-        stroke="currentColor"
-        strokeWidth="1.7"
-      />
-      <path
-        d="M4 22C4 17.5817 7.58172 14 12 14C16.4183 14 20 17.5817 20 22"
-        stroke="currentColor"
-        strokeWidth="1.7"
-      />
-    </svg>
-  );
-}
-function NotificationIcon() {
-  return (
-    <svg className="w-[17px] h-[17px]" viewBox="0 0 24 24" fill="none">
-      <path
-        d="M18 8C18 6.4087 17.3679 4.88258 16.2426 3.75736C15.1174 2.63214 13.5913 2 12 2C10.4087 2 8.88258 2.63214 7.75736 3.75736C6.63214 4.88258 6 6.4087 6 8C6 15 3 17 3 17H21C21 17 18 15 18 8Z"
-        stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M13.73 21C13.5542 21.3031 13.3019 21.5547 12.9982 21.7295C12.6946 21.9044 12.3504 21.9965 12 21.9965C11.6496 21.9965 11.3054 21.9044 11.0018 21.7295C10.6981 21.5547 10.4458 21.3031 10.27 21"
-        stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function SettingsIcon() {
-  return (
-    <svg className="w-[17px] h-[17px]" viewBox="0 0 24 24" fill="none">
-      <path
-        d="M12 15.5C13.933 15.5 15.5 13.933 15.5 12C15.5 10.067 13.933 8.5 12 8.5C10.067 8.5 8.5 10.067 8.5 12C8.5 13.933 10.067 15.5 12 15.5Z"
-        stroke="currentColor"
-        strokeWidth="1.7"
-      />
-      <path
-        d="M19.4 15C19.2 15.45 19.14 15.95 19.23 16.43C19.32 16.91 19.55 17.35 19.9 17.7L20 17.8L18 20L17.86 19.9C17.51 19.55 17.07 19.32 16.59 19.23C16.11 19.14 15.61 19.2 15.16 19.4C14.72 19.59 14.34 19.9 14.07 20.3C13.8 20.7 13.65 21.18 13.65 21.66V22H10.35V21.66C10.35 21.18 10.2 20.7 9.93 20.3C9.66 19.9 9.28 19.59 8.84 19.4C8.39 19.2 7.89 19.14 7.41 19.23C6.93 19.32 6.49 19.55 6.14 19.9L6 20L4 17.8L4.1 17.7C4.45 17.35 4.68 16.91 4.77 16.43C4.86 15.95 4.8 15.45 4.6 15C4.41 14.56 4.1 14.18 3.7 13.91C3.3 13.64 2.82 13.5 2.34 13.5H2V10.5H2.34C2.82 10.5 3.3 10.36 3.7 10.09C4.1 9.82 4.41 9.44 4.6 9C4.8 8.55 4.86 8.05 4.77 7.57C4.68 7.09 4.45 6.65 4.1 6.3L4 6.2L6 4L6.14 4.1C6.49 4.45 6.93 4.68 7.41 4.77C7.89 4.86 8.39 4.8 8.84 4.6C9.28 4.41 9.66 4.1 9.93 3.7C10.2 3.3 10.35 2.82 10.35 2.34V2H13.65V2.34C13.65 2.82 13.8 3.3 14.07 3.7C14.34 4.1 14.72 4.41 15.16 4.6C15.61 4.8 16.11 4.86 16.59 4.77C17.07 4.68 17.51 4.45 17.86 4.1L18 4L20 6.2L19.9 6.3C19.55 6.65 19.32 7.09 19.23 7.57C19.14 8.05 19.2 8.55 19.4 9C19.59 9.44 19.9 9.82 20.3 10.09C20.7 10.36 21.18 10.5 21.66 10.5H22V13.5H21.66C21.18 13.5 20.7 13.64 20.3 13.91C19.9 14.18 19.59 14.56 19.4 15Z"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
       />
     </svg>
   );
@@ -309,7 +255,28 @@ function WrappedCell({ value, maxWidth = "max-w-[160px]" }) {
 }
 
 function ChefTachesPage() {
-  const [taches, setTaches] = useState([]);
+  const { user } = useAuth();
+
+  const [taches, setTaches] = useState([]); // Définir taches à un tableau vide
+
+  const userName = user
+    ? `${user.prenom || ""} ${user.nom || ""}`.trim() || user.email
+    : "";
+
+  const userRole = user?.roles?.[0] || "";
+  const role = userRole;
+
+ const utilisateurId =
+  user?.id_user ||
+  user?.utilisateur?.id_user ||
+  localStorage.getItem("id_user") ||
+  localStorage.getItem("utilisateurId");
+
+const tachesFiltrees =
+  role === "CAQ"
+    ? taches
+    : taches.filter((tache) => String(tache.responsable) === String(utilisateurId));
+
   const [loading, setLoading] = useState(true);
   const [detailTache, setDetailTache] = useState(null);
   const [search, setSearch] = useState("");
@@ -320,6 +287,7 @@ function ChefTachesPage() {
   const [form, setForm] = useState(initialForm);
   const [formError, setFormError] = useState("");
   const [utilisateurs, setUtilisateurs] = useState([]);
+
 
 useEffect(() => {
   async function chargerUtilisateurs() {
@@ -341,32 +309,32 @@ useEffect(() => {
     chargerTaches();
   }, []);
 
-  const tachesFiltrees = taches.filter((tache) => {
-    const recherche = search.toLowerCase();
+//   const tachesFiltrees = taches.filter((tache) => {
+//     const recherche = search.toLowerCase();
 
-    const intitule = tache.intitule?.toLowerCase() || "";
-    const type = tache.type?.toLowerCase() || "";
-    const responsable = String(
-        tache.responsableNom || tache.responsable || ""
-      ).toLowerCase();
+//     const intitule = tache.intitule?.toLowerCase() || "";
+//     const type = tache.type?.toLowerCase() || "";
+//     const responsable = String(
+//         tache.responsableNom || tache.responsable || ""
+//       ).toLowerCase();
 
-    const matchSearch =
-      intitule.includes(recherche) ||
-      type.includes(recherche) ||
-      responsable.includes(recherche);
+//     const matchSearch =
+//       intitule.includes(recherche) ||
+//       type.includes(recherche) ||
+//       responsable.includes(recherche);
 
-    const matchPriorite =
-      prioriteFilter === "Toutes les priorités" ||
-      tache.priorite === prioriteFilter;
+//     const matchPriorite =
+//       prioriteFilter === "Toutes les priorités" ||
+//       tache.priorite === prioriteFilter;
 
-    const statutAutomatique = getStatutAutomatique(tache);
+//     const statutAutomatique = getStatutAutomatique(tache);
 
-const statutAffiche = getStatutAutomatique(tache);
+// const statutAffiche = getStatutAutomatique(tache);
 
-const matchStatut =
-  statutFilter === "Tous les statuts" || statutAffiche === statutFilter;  
-    return matchSearch && matchPriorite && matchStatut;
-  });
+// const matchStatut =
+//   statutFilter === "Tous les statuts" || statutAffiche === statutFilter;  
+//     return matchSearch && matchPriorite && matchStatut;
+//   });
 
   function handleChange(e) {
     const { name, value } = e.target;
@@ -470,50 +438,10 @@ async function supprimerTache(id) {
   );
 }
   return (
-    <div className="w-full min-h-screen flex bg-white">
-      <Navbar />
+  <AppLayout pageTitle="Planification des tâches" userName={userName} userRole={userRole}>
 
       <main className="flex-1 min-h-screen bg-white overflow-hidden">
-       <header className="h-[58px] border-b border-[#efefef] flex items-center justify-between px-[21px] bg-white">
-        <div></div>
-
-  <div className="flex items-center gap-[14px]">
-    <button
-      type="button"
-      title="Notifications"
-      className="relative w-8 h-8 rounded-full  text-[#777783] flex items-center justify-center hover:bg-[#f7f7f8] hover:text-[#641ab5] transition"
-    >
-      <NotificationIcon />
-
-      <span className="absolute top-[6px] right-[7px] w-[7px] h-[7px] rounded-full bg-red-500 border border-white"></span>
-    </button>
-
-    <button
-      type="button"
-      title="Paramètres"
-      className="w-8 h-8 rounded-full  text-[#777783] flex items-center justify-center hover:bg-[#f7f7f8] hover:text-[#641ab5] transition"
-    >
-      <SettingsIcon />
-    </button>
-
-    <div className="w-px h-7 bg-[#eeeeee]"></div>
-
-    <div className="flex items-center gap-[10px]">
-      <div className="flex flex-col text-right leading-tight">
-        <strong className="text-[12px] text-[#111827] font-bold">
-          Ahmed BENAUI
-        </strong>
-        <span className="text-[10px] text-[#7b7b85] mt-[3px]">
-          Chef de projet qualité
-        </span>
-      </div>
-
-      <div className="w-7 h-7 rounded-full bg-[#e7fff0] text-[#10b981] flex items-center justify-center">
-        <UserIcon />
-      </div>
-    </div>
-  </div>
-        </header>
+      
 
         <section className="px-9 ">
           <div className="flex items-center justify-between ">
@@ -521,18 +449,29 @@ async function supprimerTache(id) {
               Tâches planifiées
             </h1>
 
-         <button
-            type="button"
-            onClick={() => {
-              setTacheEnModification(null);
-              setForm(initialForm);
-              setFormError("");
-              setModalOpen(true);
-            }}
-            className="h-[34px] px-4 rounded-[7px] bg-[#641ab5] text-white text-[13px] font-medium hover:bg-[#55169d] transition"
-          >
-            + Planifier une tâche
-          </button>
+      {role === "CAQ" && (
+  <button
+    type="button"
+    onClick={() => {
+      setTacheEnModification(null);
+      setForm({
+        intitule: "",
+        description: "",
+        type: "",
+        responsable: "",
+        dateDebut: "",
+        dateFin: "",
+        priorite: "Moyenne",
+        statut: "Planifiée",
+        observations: "",
+      });
+      setModalOpen(true);
+    }}
+    className="h-[34px] px-4 rounded-[7px] bg-[#641ab5] text-white text-[13px] font-medium hover:bg-[#55169d] transition"
+  >
+    + Planifier une tâche
+  </button>
+)}
           </div>
 
           <div className="bg-white">
@@ -613,7 +552,7 @@ async function supprimerTache(id) {
                       <th className="text-left text-[12px] font-medium text-[#c0c0c8] py-3 px-3 w-[11%]">
                         Deadline
                       </th>
-                      <th className="text-left text-[12px] font-medium text-[#c0c0c8] py-3 px-3 w-[6%]">
+                      <th className="text-left text-[12px] font-medium text-[#c0c0c8] py-3 px-3 w-[7%]">
                         Priorité
                       </th>
                       <th className="text-left text-[12px] font-medium text-[#c0c0c8] py-3 px-3 w-[7%]">
@@ -625,7 +564,7 @@ async function supprimerTache(id) {
                     </tr>
                   </thead>
 
-                  <tbody>
+                              <tbody>
                     {tachesFiltrees.map((tache) => {
                       const deadlineInfo = getDeadlineInfo(tache.dateFin);
 
@@ -1001,8 +940,7 @@ async function supprimerTache(id) {
           <div>
             <p className="text-[11px] text-[#9ca3af] mb-1">Statut</p>
             {(() => {
-                  const statutAffiche = getStatutAutomatique(tache);
-
+          const statutAffiche = getStatutAutomatique(detailTache);
                   return (
                     <span
                       className={`inline-flex items-center justify-center rounded-md text-[12px] font-medium border px-2 py-1 whitespace-normal break-words leading-[1.3] ${getStatutStyle(statutAffiche)}`}
@@ -1042,8 +980,10 @@ async function supprimerTache(id) {
     </div>
   </div>
 )}
-    </div>
+</AppLayout>
   );
 }
+
+
 
 export default ChefTachesPage;
