@@ -11,8 +11,15 @@ import MaturityPage from "./pages/maturity/MaturityPage";
 import ModulePlaceholderPage from "./pages/shared/ModulePlaceholderPage";
 import FicheProcessusForm from "./pages/fiche_form/FicheProcessusForm";
 import ProcessusPage from "./pages/processus/ProcessusPage";
+
 import ChefTachesPage from "./pages/tache/ChefTachesPage";
+
+import CanevasFichePage from "./pages/canevas/CanevasFichePage";
+import NormeTemplatePage from "./pages/canevas/NormeTemplatePage";
+
 import InteractionMapPage from "./pages/cartographie/InteractionMapPage";
+import AuditTerrainPage from "./pages/audit/AuditTerrainPage";
+import DocumentationPage from "./pages/Documentationpage";
 
 export default function App() {
   return (
@@ -50,13 +57,14 @@ export default function App() {
               }
             />
 
-            <Route path="/cartographie/canevas-fiche" element={<ModulePlaceholderPage title="Canevas fiche" />} />
+            <Route path="/cartographie/canevas-fiche" element={<CanevasFichePage />} />
+            <Route path="/cartographie/canevas-fiche/:id" element={<NormeTemplatePage />} />
             <Route path="/cartographie/processus" element={<ProcessusPage />} />
             <Route path="/cartographie/interactions" element={<InteractionMapPage />} />
             <Route path="/suivi" element={<ModulePlaceholderPage title="Suivi" />} />
             <Route path="/audit/preaudit" element={<ModulePlaceholderPage title="Préaudit" />} />
             <Route path="/audit/mes-audits" element={<ModulePlaceholderPage title="Mes audits" />} />
-            <Route path="/audit/audits-terrain" element={<ModulePlaceholderPage title="Audits terrain" />} />
+            <Route path="/audit/audits-terrain" element={<AuditTerrainPage />} />
             <Route path="/dashboard-pilote" element={<ModulePlaceholderPage title="Dashboard Pilote" />} />
             <Route path="/dashboard-auditeur" element={<ModulePlaceholderPage title="Dashboard Auditeur" />} />
 
@@ -70,11 +78,7 @@ export default function App() {
             <Route
               path="/documents"
               element={
-                <ModulePlaceholderPage
-                  pageTitle="Documents"
-                  title="Documents"
-                  description="Cette page accueillera la gestion documentaire et les references qualite partagees."
-                />
+                < DocumentationPage/>
               }
             />
 
