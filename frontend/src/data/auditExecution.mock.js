@@ -1,4 +1,4 @@
-export const auditExecutionMock = {
+﻿export const auditExecutionMock = {
   audit: {
     id: "AUD-2026-001",
     code: "AUD-2026-001",
@@ -200,3 +200,4 @@ export const complianceStatuses = [
   { value: "non_conforme", label: "Non conforme", score: 0 },
   { value: "non_applicable", label: "Non applicable", score: null },
 ];
+
