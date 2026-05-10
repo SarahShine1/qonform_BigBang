@@ -16,6 +16,7 @@ class Document(models.Model):
     ]
 
     id_document = models.AutoField(primary_key=True)
+    id_audit_field = models.IntegerField(null=True, blank=True, db_column="id_audit_field")
 
     id_version = models.IntegerField(null=True, blank=True, db_column="id_version")
 
