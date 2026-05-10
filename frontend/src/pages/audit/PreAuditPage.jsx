@@ -161,11 +161,7 @@ export default function PreAuditPage() {
   return (
     <AppLayout pageTitle="Pre-audit" userName={userName} userRole={userRole}>
       <div className="mx-auto flex min-h-full max-w-[1180px] flex-col gap-2.5">
-        <div>
-          <h1 className="text-[17px] font-semibold text-[#121942]">Pre-audit - Identification des processus</h1>
-          
-        </div>
-
+    
         <PreAuditSteps />
 
         {error && (
