@@ -284,7 +284,306 @@ function WrappedCell({ value, maxWidth = "max-w-[160px]" }) {
     </div>
   );
 }
+function TachesYearCalendar({ taches }) {
+  const [year, setYear] = useState(new Date().getFullYear());
 
+  const colors = [
+    { dark: "bg-purple-500", light: "bg-purple-100", text: "text-purple-700" },
+    { dark: "bg-blue-500", light: "bg-blue-100", text: "text-blue-700" },
+    { dark: "bg-green-500", light: "bg-green-100", text: "text-green-700" },
+    { dark: "bg-orange-400", light: "bg-orange-100", text: "text-orange-700" },
+    { dark: "bg-pink-500", light: "bg-pink-100", text: "text-pink-700" },
+    { dark: "bg-red-500", light: "bg-red-100", text: "text-red-700" },
+  ];
+
+  const months = Array.from({ length: 12 }, (_, i) => i);
+  const weekDays = ["LUN", "MAR", "MER", "JEU", "VEN", "SAM", "DIM"];
+
+  function normalize(date) {
+    const d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+
+  function getDaysInMonth(month) {
+    const first = new Date(year, month, 1);
+    const last = new Date(year, month + 1, 0);
+    const startDay = first.getDay() === 0 ? 6 : first.getDay() - 1;
+
+    const days = [];
+
+    for (let i = 0; i < startDay; i++) days.push(null);
+
+    for (let d = 1; d <= last.getDate(); d++) {
+      days.push(new Date(year, month, d));
+    }
+
+    return days;
+  }
+
+  function getTachesForDay(day) {
+    if (!day) return [];
+
+    return taches
+      .map((tache, index) => ({ ...tache, color: colors[index % colors.length] }))
+      .filter((tache) => {
+        if (!tache.dateDebut || !tache.dateFin) return false;
+
+        const current = normalize(day);
+        const debut = normalize(tache.dateDebut);
+        const fin = normalize(tache.dateFin);
+
+        return current >= debut && current <= fin;
+      });
+  }
+
+  function isStart(day, tache) {
+    return normalize(day).getTime() === normalize(tache.dateDebut).getTime();
+  }
+
+  function isEnd(day, tache) {
+    return normalize(day).getTime() === normalize(tache.dateFin).getTime();
+  }
+
+  return (
+    <div className="mb-8 rounded-2xl border border-[#eee] bg-white p-5 shadow-sm">
+      <div className="mb-5 flex items-center justify-between">
+        <h2 className="text-[18px] font-bold text-[#111827]">
+          Calendrier des tâches
+        </h2>
+
+        <select
+          value={year}
+          onChange={(e) => setYear(Number(e.target.value))}
+          className="h-9 rounded-md border border-[#e6e6e9] bg-white px-3 text-[12px] outline-none"
+        >
+          {[2024, 2025, 2026, 2027, 2028].map((y) => (
+            <option key={y} value={y}>
+              {y}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="mb-5 flex flex-wrap gap-4">
+        {taches.map((tache, index) => {
+          const color = colors[index % colors.length];
+
+          return (
+            <div key={tache.id} className="flex items-center gap-2 text-[11px]">
+              <span className={`h-3 w-3 rounded-full ${color.dark}`} />
+              <span className="text-[#444]">
+                {tache.intitule} : {formatDate(tache.dateDebut)} →{" "}
+                {formatDate(tache.dateFin)}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+          <div className="grid grid-cols-6 gap-2">
+          {months.map((month) => (
+          <div key={month} className="rounded-xl border border-[#f0f0f0] p-2">
+            <h3 className="mb-3 text-center text-[13px] font-bold text-[#111827]">
+              {new Date(year, month).toLocaleDateString("fr-FR", {
+                month: "long",
+              })}
+            </h3>
+
+            <div className="mb-2 grid grid-cols-7 text-center text-[7px] font-semibold text-[#9ca3af]">
+              {weekDays.map((day) => (
+                <div key={day}>{day}</div>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-7 gap-y-2">
+              {getDaysInMonth(month).map((day, index) => {
+                const tachesDuJour = getTachesForDay(day);
+                const mainTache = tachesDuJour[0];
+
+                return (
+                  <div
+                    key={index}
+                    className="relative flex h-6 items-center justify-center"
+                  >
+                    {day && mainTache && (
+                      <div
+                        className={`absolute left-0 right-0 h-6 ${
+                          mainTache.color.light
+                        } ${
+                          isStart(day, mainTache) ? "rounded-l-full" : ""
+                        } ${isEnd(day, mainTache) ? "rounded-r-full" : ""}`}
+                      />
+                    )}
+
+                    {day && (
+                      <div
+                        title={
+                          mainTache
+                            ? `${mainTache.intitule} : ${formatDate(
+                                mainTache.dateDebut
+                              )} → ${formatDate(mainTache.dateFin)}`
+                            : ""
+                        }
+                        className={`relative z-10 flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-semibold ${
+                          mainTache
+                            ? isStart(day, mainTache) || isEnd(day, mainTache)
+                              ? `${mainTache.color.dark} text-white shadow-sm`
+                              : `${mainTache.color.text}`
+                            : "text-[#4b5563]"
+                        }`}
+                      >
+                        {day.getDate()}
+                      </div>
+                    )}
+
+                    {tachesDuJour.length > 1 && (
+                      <span className="absolute -bottom-1 right-1 z-20 h-1.5 w-1.5 rounded-full bg-[#111827]" />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+function TachesGantt({ taches }) {
+  const [startDate, setStartDate] = useState(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  });
+
+  const colors = [
+    "bg-pink-400",
+    "bg-blue-400",
+    "bg-orange-400",
+    "bg-green-400",
+    "bg-cyan-400",
+    "bg-purple-400",
+  ];
+
+  const jours = Array.from({ length: 14 }, (_, index) => {
+    const date = new Date(startDate);
+    date.setDate(startDate.getDate() + index);
+    return date;
+  });
+
+  function normalize(date) {
+    const d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+
+  function changerSemaine(value) {
+    const d = new Date(startDate);
+    d.setDate(d.getDate() + value);
+    setStartDate(d);
+  }
+
+  return (
+    <div className="mb-8 rounded-2xl border border-[#eee] bg-white p-5 shadow-sm">
+      <div className="mb-5 flex items-center justify-between">
+        <h2 className="text-[18px] font-bold text-[#111827]">
+          Planning des tâches
+        </h2>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => changerSemaine(-14)}
+            className="h-8 rounded-md border border-[#e6e6e9] px-3 text-[12px]"
+          >
+            ◀
+          </button>
+
+          <span className="text-[12px] font-medium text-[#555]">
+            {formatDate(jours[0])} → {formatDate(jours[jours.length - 1])}
+          </span>
+
+          <button
+            type="button"
+            onClick={() => changerSemaine(14)}
+            className="h-8 rounded-md border border-[#e6e6e9] px-3 text-[12px]"
+          >
+            ▶
+          </button>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto">
+        <div className="min-w-[1050px]">
+          <div className="grid grid-cols-[180px_repeat(14,1fr)] border-b border-[#eee] pb-3">
+            <div className="text-[12px] font-semibold text-[#9ca3af]">
+              Tâches
+            </div>
+
+            {jours.map((jour) => (
+              <div key={jour.toISOString()} className="text-center">
+                <div className="text-[10px] font-semibold text-[#9ca3af]">
+                  {jour.toLocaleDateString("fr-FR", { weekday: "short" })}
+                </div>
+                <div className="text-[12px] font-bold text-[#111827]">
+                  {jour.getDate()}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="max-h-[360px] overflow-y-auto pr-2 thin-scrollbar">
+            {taches.map((tache, index) => {
+              const debut = normalize(tache.dateDebut);
+              const fin = normalize(tache.dateFin);
+              const color = colors[index % colors.length];
+
+              return (
+                <div
+                  key={tache.id}
+                  className="grid grid-cols-[180px_repeat(14,1fr)] items-center border-b border-[#f4f4f4] py-4"
+                >
+                  <div className="pr-4">
+                    <div className="truncate text-[12px] font-semibold text-[#111827]">
+                      {tache.intitule}
+                    </div>
+                    <div className="text-[10px] text-[#9ca3af]">
+                      {formatDate(tache.dateDebut)} → {formatDate(tache.dateFin)}
+                    </div>
+                  </div>
+
+                  {jours.map((jour) => {
+  const current = normalize(jour);
+  const active = current >= debut && current <= fin;
+  const start = current.getTime() === debut.getTime();
+  const end = current.getTime() === fin.getTime();
+
+  return (
+    <div
+      key={jour.toISOString()}
+      className="relative h-12 "
+    >
+      {active && (
+        <div
+          className={`absolute top-1/2 h-7 -translate-y-1/2 ${color}
+          ${start ? "left-1 rounded-l-md" : "left-0"}
+          ${end ? "right-1 rounded-r-md" : "right-0"}
+          `}
+        />
+      )}
+    </div>
+  );
+})}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 function ChefTachesPage() {
   const { user } = useAuth();
 
@@ -558,8 +857,12 @@ async function supprimerTache(id) {
   </button>
 )}
           </div>
-
-          <div className="bg-white">
+          {role === "CAQ" ? (
+            <TachesGantt taches={tachesFiltrees} />
+          ) : (
+            <TachesYearCalendar taches={tachesFiltrees} />
+          )} 
+         <div className="bg-white">
             
 
             <div className="flex items-center gap-2 mb-4">
