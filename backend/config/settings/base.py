@@ -38,8 +38,10 @@ THIRD_PARTY_APPS = [
 
 LOCAL_APPS = [
     'apps.accounts',
+    'apps.messaging',
     'apps.organigramme',
     'apps.processus',
+    'apps.fiches',
     'apps.audit',
     'apps.documents',
     'apps.pilotage',

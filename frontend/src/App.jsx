@@ -9,19 +9,14 @@ import MesAudits from "./pages/audit/MesAudits";
 import GestionUtilisateurs from "./pages/users/GestionUtilisateurs";
 import MaturityPage from "./pages/maturity/MaturityPage";
 import ModulePlaceholderPage from "./pages/shared/ModulePlaceholderPage";
-import DocumentationPage from "./pages/Documentationpage";
+import FicheProcessusForm from "./pages/fiche_form/FicheProcessusForm";
+import ProcessusPage from "./pages/processus/ProcessusPage";
+import InteractionMapPage from "./pages/cartographie/InteractionMapPage";
 import AuditTerrainPage from "./pages/audit/AuditTerrainPage";
-
+import DocumentationPage from "./pages/Documentationpage";
 
 export default function App() {
   return (
-     /*
-    <BrowserRouter>
-      <Routes>
-        <Route path="*" element={<DocumentationPage />} />
-      </Routes>
-    </BrowserRouter>*/
-   
     <BrowserRouter>
       <AuthProvider>
         <Routes>
@@ -57,6 +52,16 @@ export default function App() {
               }
             />
 
+            <Route path="/cartographie/canevas-fiche" element={<ModulePlaceholderPage title="Canevas fiche" />} />
+            <Route path="/cartographie/processus" element={<ProcessusPage />} />
+            <Route path="/cartographie/interactions" element={<InteractionMapPage />} />
+            <Route path="/suivi" element={<ModulePlaceholderPage title="Suivi" />} />
+            <Route path="/audit/preaudit" element={<ModulePlaceholderPage title="Préaudit" />} />
+            <Route path="/audit/mes-audits" element={<ModulePlaceholderPage title="Mes audits" />} />
+            <Route path="/audit/audits-terrain" element={<AuditTerrainPage />} />
+            <Route path="/dashboard-pilote" element={<ModulePlaceholderPage title="Dashboard Pilote" />} />
+<Route path="/dashboard-auditeur" element={<ModulePlaceholderPage title="Dashboard Auditeur" />} />
+
             <Route
               path="/planification"
               element={
@@ -73,8 +78,12 @@ export default function App() {
             <Route path="/mes-audits/planifies" element={<MesAudits />} />
             <Route path="/mes-audits/clotures" element={<MesAudits />} />
 
-            
-            <Route path="/documents" element={<AuditTerrainPage />} />
+            <Route
+              path="/documents"
+              element={
+                < DocumentationPage/>
+              }
+            />
 
             <Route
               path="/actions"
@@ -86,6 +95,10 @@ export default function App() {
                 />
               }
             />
+
+            {/* Gestion processus */}
+            <Route path="/gestion-processus/fiches/nouveau" element={<FicheProcessusForm />} />
+            <Route path="/gestion-processus/fiches/:id/modifier" element={<FicheProcessusForm />} />
 
             <Route
               path="/niveau-maturite"

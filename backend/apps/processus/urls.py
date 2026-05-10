@@ -1,4 +1,11 @@
-﻿from django.urls import path
-from . import views
+from rest_framework.routers import DefaultRouter
+from django.urls import path, include
+from .views import ProcessInteractionsAPIView, ProcessusViewSet
 
-urlpatterns = []
+router = DefaultRouter()
+router.register(r"", ProcessusViewSet, basename="processus")
+
+urlpatterns = [
+    path("interactions/", ProcessInteractionsAPIView.as_view(), name="processus-interactions"),
+    path("", include(router.urls)),
+]
