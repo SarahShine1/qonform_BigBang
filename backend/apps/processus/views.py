@@ -1,3 +1,5 @@
+import re
+
 from django.db.models import Q
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
@@ -12,9 +14,49 @@ from .serializers import (
 )
 from apps.accounts.models import Departement, Utilisateur
 from apps.fiches.models import VersionFiche
+from apps.organigramme.models import OrganizationUnit
+from apps.organigramme.serializers import unpack_unit_metadata
+from apps.organigramme.services import sync_departements_from_organigramme
 
 
-class ProcessusViewSet(viewsets.ReadOnlyModelViewSet):
+TYPE_CODE_MAP = {
+    "Management": "MNG",
+    "Realisation": "REA",
+    "Support": "SUP",
+}
+
+
+def _next_process_code(departement_id, type_process):
+    departement = Departement.objects.filter(id_departement=departement_id).first()
+    organization_unit = OrganizationUnit.objects.filter(pk=departement_id, is_active=True).first()
+    metadata = unpack_unit_metadata(getattr(organization_unit, "description", ""))
+    department_code = (
+        metadata.get("displayCode")
+        or getattr(departement, "code", "")
+        or getattr(organization_unit, "code", "")
+        or f"DEP{departement_id}"
+    )
+    type_code = TYPE_CODE_MAP.get(type_process, "GEN")
+    prefix = f"{department_code}-{type_code}-"
+
+    matching_codes = Processus.objects.filter(
+        id_departement=departement_id,
+        type_process=type_process,
+    ).values_list("code_process", flat=True)
+
+    next_number = 1
+    for code in matching_codes:
+        normalized_code = str(code or "").strip()
+        match = re.search(rf"^{re.escape(prefix)}(\d+)$", normalized_code)
+        if not match:
+            match = re.search(r"(\d+)$", normalized_code)
+        if match:
+            next_number = max(next_number, int(match.group(1)) + 1)
+
+    return f"{prefix}{next_number:03d}"
+
+
+class ProcessusViewSet(viewsets.ModelViewSet):
     """
     GET /api/v1/processus/       – liste des processus
     GET /api/v1/processus/{id}/  – détail d'un processus
@@ -29,6 +71,18 @@ class ProcessusViewSet(viewsets.ReadOnlyModelViewSet):
         if dept:
             qs = qs.filter(id_departement=dept)
         return qs.order_by("nom")
+
+    def create(self, request, *args, **kwargs):
+        sync_departements_from_organigramme()
+        return super().create(request, *args, **kwargs)
+
+    def perform_create(self, serializer):
+        departement_id = serializer.validated_data["id_departement"]
+        type_process = serializer.validated_data.get("type_process") or "Support"
+        serializer.save(
+            code_process=serializer.validated_data.get("code_process") or _next_process_code(departement_id, type_process),
+            type_process=type_process,
+        )
 
 
 def _effective_version_date(version):

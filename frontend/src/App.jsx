@@ -20,6 +20,8 @@ import NormeTemplatePage from "./pages/canevas/NormeTemplatePage";
 import InteractionMapPage from "./pages/cartographie/InteractionMapPage";
 import AuditTerrainPage from "./pages/audit/AuditTerrainPage";
 import DocumentationPage from "./pages/Documentationpage";
+import PreAuditPage from "./pages/audit/PreAuditPage";
+
 
 export default function App() {
   return (
@@ -62,7 +64,8 @@ export default function App() {
             <Route path="/cartographie/processus" element={<ProcessusPage />} />
             <Route path="/cartographie/interactions" element={<InteractionMapPage />} />
             <Route path="/suivi" element={<ModulePlaceholderPage title="Suivi" />} />
-            <Route path="/audit/preaudit" element={<ModulePlaceholderPage title="Préaudit" />} />
+            <Route path="/audit/preaudit" element={<PreAuditPage  />} />
+            <Route path="/audit/pre-audit" element={<PreAuditPage />} />
             <Route path="/audit/mes-audits" element={<ModulePlaceholderPage title="Mes audits" />} />
             <Route path="/audit/audits-terrain" element={<AuditTerrainPage />} />
             <Route path="/dashboard-pilote" element={<ModulePlaceholderPage title="Dashboard Pilote" />} />
