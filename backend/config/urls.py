@@ -16,6 +16,7 @@ urlpatterns = [
     path('', api_root),
     path('admin/', admin.site.urls),
     path('api/v1/auth/',       include('apps.accounts.urls')),
+    path('api/v1/messaging/',  include('apps.messaging.urls')),
     path('api/v1/organigramme/', include('apps.organigramme.urls')),
     path('api/v1/processus/',  include('apps.processus.urls')),
     path('api/v1/fiches/',     include('apps.fiches.urls')),

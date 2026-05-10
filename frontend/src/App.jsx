@@ -12,6 +12,8 @@ import ModulePlaceholderPage from "./pages/shared/ModulePlaceholderPage";
 import FicheProcessusForm from "./pages/fiche_form/FicheProcessusForm";
 import ProcessusPage from "./pages/processus/ProcessusPage";
 import ChefTachesPage from "./pages/tache/ChefTachesPage";
+import InteractionMapPage from "./pages/cartographie/InteractionMapPage";
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -50,7 +52,7 @@ export default function App() {
 
             <Route path="/cartographie/canevas-fiche" element={<ModulePlaceholderPage title="Canevas fiche" />} />
             <Route path="/cartographie/processus" element={<ProcessusPage />} />
-            <Route path="/cartographie/interactions" element={<ModulePlaceholderPage title="Matrice d'interaction entre processus" />}/>
+            <Route path="/cartographie/interactions" element={<InteractionMapPage />} />
             <Route path="/suivi" element={<ModulePlaceholderPage title="Suivi" />} />
             <Route path="/audit/preaudit" element={<ModulePlaceholderPage title="Préaudit" />} />
             <Route path="/audit/mes-audits" element={<ModulePlaceholderPage title="Mes audits" />} />
