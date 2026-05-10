@@ -45,7 +45,19 @@ function EditIcon() {
     </svg>
   );
 }
-
+function PlayIcon() {
+  return (
+    <svg className="w-[15px] h-[15px]" viewBox="0 0 24 24" fill="none">
+      <path
+        d="M8 5L19 12L8 19V5Z"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinejoin="round"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
 function DeleteIcon() {
   return (
     <svg className="w-[15px] h-[15px]" viewBox="0 0 24 24" fill="none">
@@ -99,7 +111,22 @@ function EyeIcon() {
     </svg>
   );
 }
+function CheckIcon() {
+  return (
+    <svg className="w-[15px] h-[15px]" viewBox="0 0 24 24" fill="none">
+      <path d="M5 13L9 17L19 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
 
+function CancelIcon() {
+  return (
+    <svg className="w-[15px] h-[15px]" viewBox="0 0 24 24" fill="none">
+      <path d="M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <path d="M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
 const initialForm = {
   intitule: "",
   description: "",
@@ -122,7 +149,7 @@ function getStatutAutomatique(tache) {
   }
 
   if (!tache.dateDebut || !tache.dateFin) {
-    return "Planifiée";
+    return tache.statut || "Planifiée";
   }
 
   const today = new Date();
@@ -133,12 +160,16 @@ function getStatutAutomatique(tache) {
   debut.setHours(0, 0, 0, 0);
   fin.setHours(0, 0, 0, 0);
 
-  if (today < debut) {
-    return "Planifiée";
-  }
-
   if (today > fin) {
     return "En retard";
+  }
+
+  if (tache.statut === "En cours") {
+    return "En cours";
+  }
+
+  if (today < debut) {
+    return "Planifiée";
   }
 
   return "En cours";
@@ -392,7 +423,30 @@ useEffect(() => {
       setFormError("");
       setModalOpen(true);
     }
+async function demarrerTache(tache) {
+  const tacheModifiee = await updateTachePlanifieeChef(tache.id, {
+    ...tache,
+    statut: "En cours",
+  });
 
+  setTaches((previousTaches) =>
+    previousTaches.map((item) =>
+      item.id === tache.id ? tacheModifiee : item
+    )
+  );
+}
+async function terminerTache(tache) {
+  const tacheModifiee = await updateTachePlanifieeChef(tache.id, {
+    ...tache,
+    statut: "Terminée",
+  });
+
+  setTaches((previousTaches) =>
+    previousTaches.map((item) =>
+      item.id === tache.id ? tacheModifiee : item
+    )
+  );
+}
  async function annulerTache(tache) {
   const confirmation = window.confirm("Voulez-vous annuler cette tâche ?");
 
@@ -537,6 +591,7 @@ async function supprimerTache(id) {
                 onChange={(e) => setStatutFilter(e.target.value)}
                 className="h-8 border border-[#e6e6e9] rounded-md bg-white text-[#444] text-[11px] px-3 outline-none"
               >
+                <option>Tous les statuts</option>
                 <option>Planifiée</option>
                 <option>En cours</option>
                 <option>En retard</option>
@@ -673,34 +728,74 @@ async function supprimerTache(id) {
                         </td>
 
                           <td className="py-3 px-3 align-top">
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          title="Voir détails"
-          onClick={() => setDetailTache(tache)}
-          className="text-[#111827] hover:text-[#641ab5]"
-        >
-          <EyeIcon />
-        </button>
+   <div className="flex items-center gap-2">
+  <button
+    type="button"
+    title="Voir détails"
+    onClick={() => setDetailTache(tache)}
+    className="text-[#111827] hover:text-[#641ab5]"
+  >
+    <EyeIcon />
+  </button>
 
+  {role === "CAQ" ? (
+    <>
+      <button
+        type="button"
+        title="Modifier"
+        onClick={() => ouvrirModification(tache)}
+        className="text-[#111827] hover:text-[#641ab5]"
+      >
+        <EditIcon />
+      </button>
+
+      <button
+        type="button"
+        title="Supprimer"
+        onClick={() => supprimerTache(tache.id)}
+        className="text-[#111827] hover:text-red-500"
+      >
+        <DeleteIcon />
+      </button>
+    </>
+  ) : (
+    <>
+      {getStatutAutomatique(tache) === "Planifiée" && (
+        <button
+        type="button"
+        title="Démarrer la tâche"
+        onClick={() => demarrerTache(tache)}
+        className="text-red-600 hover:text-red-500"
+      >
+        <PlayIcon />
+      </button>
+      )}
+
+      {getStatutAutomatique(tache) === "En cours" && (
        <button
           type="button"
-          title="Modifier"
-          onClick={() => ouvrirModification(tache)}
-          className="text-[#111827] hover:text-[#641ab5]"
+          title="Terminer la tâche"
+          onClick={() => terminerTache(tache)}
+          className="text-black hover:text-blue-800"
         >
-          <EditIcon />
+          <CheckIcon />
         </button>
+      )}
 
-        <button
-          type="button"
-          title="Supprimer"
-          onClick={() => supprimerTache(tache.id)}
-          className="text-[#111827] hover:text-red-500"
-        >
-          <DeleteIcon />
-        </button>
-      </div>
+      {getStatutAutomatique(tache) !== "Terminée" &&
+        getStatutAutomatique(tache) !== "Annulée" && (
+          <button
+              type="button"
+              title="Annuler la tâche"
+              onClick={() => annulerTache(tache)}
+              className="text-black hover:text-blue-800"
+            >
+              <CancelIcon />
+            </button>
+        )}
+    </>
+  )}
+</div>
                           </td>
                         </tr>
                       );
