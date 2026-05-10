@@ -1,5 +1,11 @@
-import { Navigate } from "react-router-dom";
+import ModulePlaceholderPage from "../shared/ModulePlaceholderPage";
 
 export default function MesAudits() {
-  return <Navigate to="/mes-audits/execution/AUD-2026-001" replace />;
+  return (
+    <ModulePlaceholderPage
+      pageTitle="Mes audits"
+      title="Mes audits"
+      description="Cette section sera developpee plus tard pour suivre les audits assignes a l'auditeur."
+    />
+  );
 }

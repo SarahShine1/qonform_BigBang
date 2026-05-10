@@ -17,14 +17,14 @@ const chefProjetItems = [
   { label: "Tableau de bord", icon: LayoutDashboard, to: "/dashboard" },
   { label: "Organigramme", icon: GitBranch, to: "/organigramme" },
   {
-  label: "Cartographie",
-  icon: Map,
-  children: [
-    { label: "Canevas fiche", icon: FileText, to: "/cartographie/canevas-fiche" },
-    { label: "Processus", icon: Network, to: "/cartographie/processus" },
-    { label: "Interactions", icon: GitBranch, to: "/cartographie/interactions" },
-  ],
-   },
+    label: "Cartographie",
+    icon: Map,
+    children: [
+      { label: "Canevas fiche", icon: FileText, to: "/cartographie/canevas-fiche" },
+      { label: "Processus", icon: Network, to: "/cartographie/processus" },
+      { label: "Interactions", icon: GitBranch, to: "/cartographie/interactions" },
+    ],
+  },
   {
     label: "Planif et suivi",
     icon: Calendar,
@@ -43,13 +43,13 @@ const piloteItems = [
   { label: "Tableau de bord", icon: LayoutDashboard, to: "/dashboard-pilote" },
   { label: "Organigramme", icon: GitBranch, to: "/organigramme" },
   {
-  label: "Cartographie",
-  icon: Map,
-  children: [
-    { label: "Processus", icon: Network, to: "/cartographie/processus" },
-    { label: "Interactions", icon: GitBranch, to: "/cartographie/interactions" },
-  ],
-},
+    label: "Cartographie",
+    icon: Map,
+    children: [
+      { label: "Processus", icon: Network, to: "/cartographie/processus" },
+      { label: "Interactions", icon: GitBranch, to: "/cartographie/interactions" },
+    ],
+  },
   {
     label: "Planif et suivi",
     icon: Calendar,
@@ -67,19 +67,29 @@ const auditeurItems = [
   { label: "Tableau de bord", icon: LayoutDashboard, to: "/dashboard-auditeur" },
   { label: "Organigramme", icon: GitBranch, to: "/organigramme" },
   {
-  label: "Cartographie",
-  icon: Map,
-  children: [
-    { label: "Processus", icon: Network, to: "/cartographie/processus" },
-    { label: "Interactions", icon: GitBranch, to: "/cartographie/interactions" },
-  ],
-},
+    label: "Cartographie",
+    icon: Map,
+    children: [
+      { label: "Processus", icon: Network, to: "/cartographie/processus" },
+      { label: "Interactions", icon: GitBranch, to: "/cartographie/interactions" },
+    ],
+  },
   {
     label: "Audit",
     icon: ClipboardCheck,
     children: [
-      { label: "Pré-audit", icon: FileText, to: "/audit/preaudit" },
-      { label: "Mes audits", icon: ClipboardList, to: "/audit/mes-audits" },
+      {
+        label: "Audit des fiches",
+        icon: FileText,
+        to: "/auditeur/audit-fiches",
+        activePaths: [
+          "/auditeur/audit-fiches",
+          "/auditeur/execution-audit",
+          "/auditeur/audit-execution",
+          "/auditeur/fiches-auditees",
+        ],
+      },
+      { label: "Mes audits", icon: ClipboardList, to: "/mes-audits" },
       { label: "Audits terrain", icon: Map, to: "/audit/audits-terrain" },
     ],
   },
@@ -102,7 +112,7 @@ function normalizeRoles(roles = []) {
       .trim()
       .toUpperCase()
       .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, ""),
+      .replace(/[\u0300-\u036f]/g, "")
   );
 }
 

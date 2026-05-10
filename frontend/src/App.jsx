@@ -6,6 +6,9 @@ import Login from "./pages/auth/Login";
 import AccueilPage from "./pages/accueil/AccueilPage";
 import Organigramme from "./pages/organigram/Organigramme";
 import MesAudits from "./pages/audit/MesAudits";
+import AuditFiches from "./pages/audit/AuditFiches";
+import AuditExecution from "./pages/audit/AuditExecution";
+import AuditPublishedDetail from "./pages/audit/AuditPublishedDetail";
 import GestionUtilisateurs from "./pages/users/GestionUtilisateurs";
 import MaturityPage from "./pages/maturity/MaturityPage";
 import ModulePlaceholderPage from "./pages/shared/ModulePlaceholderPage";
@@ -119,6 +122,14 @@ export default function App() {
                 />
               }
             />
+          </Route>
+
+          <Route element={<RoleProtectedRoute roles={["AUDITEUR", "Auditeur"]} />}>
+            <Route path="/auditeur/audit-fiches" element={<AuditFiches />} />
+            <Route path="/auditeur/execution-audit/:auditId" element={<AuditExecution />} />
+            <Route path="/auditeur/audit-execution/:auditId" element={<AuditExecution />} />
+            <Route path="/auditeur/fiches-auditees/:idVersion" element={<AuditPublishedDetail />} />
+            <Route path="/mes-audits/execution/:auditId" element={<AuditExecution />} />
           </Route>
 
           <Route element={<RoleProtectedRoute roles={["CAQ", "ADMIN", "Admin"]} />}>
