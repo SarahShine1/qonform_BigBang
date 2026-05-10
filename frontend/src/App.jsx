@@ -11,6 +11,8 @@ import MaturityPage from "./pages/maturity/MaturityPage";
 import ModulePlaceholderPage from "./pages/shared/ModulePlaceholderPage";
 import FicheProcessusForm from "./pages/fiche_form/FicheProcessusForm";
 import ProcessusPage from "./pages/processus/ProcessusPage";
+import CanevasFichePage from "./pages/canevas/CanevasFichePage";
+import NormeTemplatePage from "./pages/canevas/NormeTemplatePage";
 
 export default function App() {
   return (
@@ -49,7 +51,8 @@ export default function App() {
               }
             />
 
-            <Route path="/cartographie/canevas-fiche" element={<ModulePlaceholderPage title="Canevas fiche" />} />
+            <Route path="/cartographie/canevas-fiche" element={<CanevasFichePage />} />
+            <Route path="/cartographie/canevas-fiche/:id" element={<NormeTemplatePage />} />
             <Route path="/cartographie/processus" element={<ProcessusPage />} />
             <Route path="/cartographie/interactions" element={<ModulePlaceholderPage title="Matrice d'interaction entre processus" />}/>
             <Route path="/suivi" element={<ModulePlaceholderPage title="Suivi" />} />
