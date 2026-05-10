@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Norme, SectionTemplate, ChampTemplate, ColonneTemplate, OptionChamp, VersionFiche, ChampFiche
+from .models import Norme, SectionTemplate, ChampTemplate, ColonneTemplate, OptionChamp, VersionFiche, ChampFiche, ProcessusLiaison
 
 # champ_template utilise 'text'/'checklist'/'tableau'
 # mais la contrainte DB de champ_fiche n'accepte que 'texte'/'liste'
@@ -71,13 +71,29 @@ class ChampTemplateSerializer(serializers.ModelSerializer):
 
 
 class VersionFicheSerializer(serializers.ModelSerializer):
+    liaisons_amont = serializers.SerializerMethodField()
+    liaisons_aval  = serializers.SerializerMethodField()
+
+    def get_liaisons_amont(self, obj):
+        return list(
+            ProcessusLiaison.objects.filter(id_processus_aval=obj.id_processus)
+            .values_list("id_processus_amont", flat=True)
+        )
+
+    def get_liaisons_aval(self, obj):
+        return list(
+            ProcessusLiaison.objects.filter(id_processus_amont=obj.id_processus)
+            .values_list("id_processus_aval", flat=True)
+        )
+
     class Meta:
         model = VersionFiche
         fields = [
             "id_version", "id_processus", "statut", "id_redacteur",
             "numero_version", "commentaire_version",
             "date_creation", "date_derniere_modif", "date_validation",
-            "id_processus_amont", "id_processus_aval",
+            "revue", "commit",
+            "liaisons_amont", "liaisons_aval",
         ]
         read_only_fields = ["id_version", "id_redacteur", "date_creation"]
 

@@ -106,8 +106,8 @@ class VersionFiche(models.Model):
     date_creation = models.DateTimeField(auto_now_add=True)
     date_derniere_modif = models.DateTimeField(blank=True, null=True)
     date_validation = models.DateTimeField(blank=True, null=True)
-    id_processus_amont = models.IntegerField(blank=True, null=True)
-    id_processus_aval = models.IntegerField(blank=True, null=True)
+    revue = models.BooleanField(default=False)
+    commit = models.IntegerField(default=0)
 
     class Meta:
         managed = False
@@ -115,6 +115,17 @@ class VersionFiche(models.Model):
 
     def __str__(self):
         return f"Fiche v{self.numero_version} (processus {self.id_processus})"
+
+
+class ProcessusLiaison(models.Model):
+    id = models.AutoField(primary_key=True)
+    id_processus_amont = models.IntegerField()
+    id_processus_aval = models.IntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        managed = False
+        db_table = "processus_liaison"
 
 
 class ColonneTemplate(models.Model):

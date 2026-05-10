@@ -4,7 +4,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.db.models import Q
 
-from .models import Norme, SectionTemplate, ChampTemplate, VersionFiche, ChampFiche
+from .models import Norme, SectionTemplate, ChampTemplate, VersionFiche, ChampFiche, ProcessusLiaison
 from .serializers import (
     NormeSerializer,
     SectionTemplateSerializer,
@@ -112,12 +112,23 @@ class ChampTemplateViewSet(viewsets.ModelViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+def _sync_liaisons(id_processus, amont_ids, aval_ids):
+    """Replace all liaisons for this processus with the provided lists."""
+    ProcessusLiaison.objects.filter(id_processus_aval=id_processus).delete()
+    ProcessusLiaison.objects.filter(id_processus_amont=id_processus).delete()
+    for pid in amont_ids:
+        ProcessusLiaison.objects.create(id_processus_amont=int(pid), id_processus_aval=id_processus)
+    for pid in aval_ids:
+        ProcessusLiaison.objects.create(id_processus_amont=id_processus, id_processus_aval=int(pid))
+
+
 class VersionFicheViewSet(viewsets.ModelViewSet):
     """
-    POST /api/v1/fiches/                   – créer une fiche
-    GET  /api/v1/fiches/{id}/              – détail d'une fiche
-    GET  /api/v1/fiches/{id}/champs/       – lire les champs remplis
-    POST /api/v1/fiches/{id}/champs/       – sauvegarder les champs (bulk upsert)
+    POST  /api/v1/fiches/                  – créer une fiche
+    PATCH /api/v1/fiches/{id}/             – modifier une fiche
+    GET   /api/v1/fiches/{id}/             – détail d'une fiche
+    GET   /api/v1/fiches/{id}/champs/      – lire les champs remplis
+    POST  /api/v1/fiches/{id}/champs/      – sauvegarder les champs (bulk upsert)
     """
 
     serializer_class = VersionFicheSerializer
@@ -130,12 +141,35 @@ class VersionFicheViewSet(viewsets.ModelViewSet):
             qs = qs.filter(id_processus=id_processus)
         return qs
 
+    def _get_liaison_ids(self, key):
+        val = self.request.data.get(key, [])
+        if isinstance(val, str):
+            import json
+            try:
+                val = json.loads(val)
+            except Exception:
+                val = []
+        return [v for v in val if v]
+
     def perform_create(self, serializer):
         try:
             id_redacteur = self.request.user.utilisateur.id_user
         except Exception:
             id_redacteur = self.request.data.get("id_redacteur")
-        serializer.save(id_redacteur=id_redacteur)
+        instance = serializer.save(id_redacteur=id_redacteur)
+        _sync_liaisons(
+            instance.id_processus,
+            self._get_liaison_ids("amont_ids"),
+            self._get_liaison_ids("aval_ids"),
+        )
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        _sync_liaisons(
+            instance.id_processus,
+            self._get_liaison_ids("amont_ids"),
+            self._get_liaison_ids("aval_ids"),
+        )
 
     @action(detail=True, methods=["get", "post"], url_path="champs")
     def champs(self, request, pk=None):
