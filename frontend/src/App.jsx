@@ -11,6 +11,7 @@ import MaturityPage from "./pages/maturity/MaturityPage";
 import ModulePlaceholderPage from "./pages/shared/ModulePlaceholderPage";
 import FicheProcessusForm from "./pages/fiche_form/FicheProcessusForm";
 import ProcessusPage from "./pages/processus/ProcessusPage";
+import ChefTachesPage from "./pages/tache/ChefTachesPage";
 import InteractionMapPage from "./pages/cartographie/InteractionMapPage";
 
 export default function App() {
@@ -34,8 +35,7 @@ export default function App() {
                 />
               }
             />
-
-            <Route path="/organigram" element={<Organigramme />} />
+            {/* <Route path="/taches-planifiees" element={<ChefTachesPage />} />            <Route path="/organigram" element={<Organigramme />} /> */}
             <Route path="/organigramme" element={<Organigramme />} />
             <Route path="/gestion-utilisateurs" element={<GestionUtilisateurs />} />
 
@@ -58,18 +58,9 @@ export default function App() {
             <Route path="/audit/mes-audits" element={<ModulePlaceholderPage title="Mes audits" />} />
             <Route path="/audit/audits-terrain" element={<ModulePlaceholderPage title="Audits terrain" />} />
             <Route path="/dashboard-pilote" element={<ModulePlaceholderPage title="Dashboard Pilote" />} />
-<Route path="/dashboard-auditeur" element={<ModulePlaceholderPage title="Dashboard Auditeur" />} />
+            <Route path="/dashboard-auditeur" element={<ModulePlaceholderPage title="Dashboard Auditeur" />} />
 
-            <Route
-              path="/planification"
-              element={
-                <ModulePlaceholderPage
-                  pageTitle="Planification"
-                  title="Planification"
-                  description="Cette section pourra accueillir la planification qualite, les echeances et les jalons de preparation."
-                />
-              }
-            />
+             <Route path="/planification" element={<ChefTachesPage />} />
 
             <Route path="/audits" element={<MesAudits />} />
             <Route path="/mes-audits" element={<MesAudits />} />

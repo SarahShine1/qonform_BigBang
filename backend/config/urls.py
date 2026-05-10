@@ -24,6 +24,7 @@ urlpatterns = [
     path('api/v1/documents/',  include('apps.documents.urls')),
     path('api/v1/pilotage/',   include('apps.pilotage.urls')),
     path('api/v1/diagnostic/', include('apps.diagnostic.urls')),
+    path('api/v1/taches/',     include('apps.taches.urls')),
 ]
 
 if settings.DEBUG and 'debug_toolbar' in settings.INSTALLED_APPS:
