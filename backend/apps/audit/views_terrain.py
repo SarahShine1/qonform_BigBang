@@ -89,7 +89,7 @@ class AuditTerrainListCreateView(APIView):
                 taille=fichier.size,
                 date_upload=timezone.now(),
                 id_uploader=utilisateur.id_user,
-                id_audit_field=None,
+                id_audit_field=audit.id_audit_field,
                 description=f"Rapport audit terrain — {audit.date_audit}",
             )
             print("Document créé:", doc.id_document)  # ← et ça
