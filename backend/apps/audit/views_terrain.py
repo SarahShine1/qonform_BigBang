@@ -81,15 +81,15 @@ class AuditTerrainListCreateView(APIView):
                 for chunk in fichier.chunks():
                     dest.write(chunk)
 
-            doc=Document.objects.create(
+            doc = Document.objects.create(
                 nom_fichier=request.data.get("nom_rapport") or fichier.name,
                 type_document="Rapport",
                 type_support=None,
-                chemin_stockage=os.path.join("documents", unique_name),
+                chemin_stockage=f"documents/{unique_name}",
                 taille=fichier.size,
                 date_upload=timezone.now(),
-                id_uploader=utilisateur,
-                id_audit_field=audit.id_audit_field,  # ✅ nom exact du champ
+                id_uploader=utilisateur.id_user,
+                id_audit_field=None,
                 description=f"Rapport audit terrain — {audit.date_audit}",
             )
             print("Document créé:", doc.id_document)  # ← et ça

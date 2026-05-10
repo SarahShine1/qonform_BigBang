@@ -10,7 +10,7 @@ export const fetchDocuments = (params = {}) => {
   ).toString();
 
   return apiClient
-    .get(`/documents/${qs ? `?${qs}` : ""}`)
+    .get(`/documents/support/${qs ? `?${qs}` : ""}`)
     .then((response) => response.data);
 };
 
@@ -26,7 +26,7 @@ export const fetchDocument = (id) =>
  */
 export const uploadDocument = (formData) =>
   apiClient
-    .post("/documents/", formData, {
+    .post("/documents/support/", formData, {
       headers: { "Content-Type": "multipart/form-data" },
     })
     .then((response) => response.data);
