@@ -3,6 +3,13 @@ from .models import Processus
 from apps.accounts.models import Utilisateur, Departement
 
 
+TYPE_LABELS = {
+    "Management": "Pilotage",
+    "Realisation": "Realisation",
+    "Support": "Support",
+}
+
+
 class ProcessusSerializer(serializers.ModelSerializer):
     pilote_nom = serializers.SerializerMethodField()
     departement_nom = serializers.SerializerMethodField()
@@ -32,3 +39,32 @@ class ProcessusSerializer(serializers.ModelSerializer):
             "id_pilote", "pilote_nom", "created_at",
         ]
         read_only_fields = ["id_processus", "created_at", "pilote_nom", "departement_nom"]
+
+
+class InteractionProcessRefSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    code = serializers.CharField()
+    name = serializers.CharField()
+    type = serializers.CharField()
+
+
+class ProcessInteractionVersionSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    numero = serializers.CharField()
+    statut = serializers.CharField()
+
+
+class ProcessInteractionSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    code = serializers.CharField()
+    name = serializers.CharField()
+    description = serializers.CharField(allow_blank=True, allow_null=True)
+    type = serializers.CharField()
+    typeLabel = serializers.CharField()
+    responsable = serializers.CharField(allow_blank=True, allow_null=True)
+    department = serializers.CharField(allow_blank=True, allow_null=True)
+    upstream = InteractionProcessRefSerializer(many=True)
+    downstream = InteractionProcessRefSerializer(many=True)
+    inputs = serializers.ListField(child=serializers.CharField(), allow_empty=True)
+    outputs = serializers.ListField(child=serializers.CharField(), allow_empty=True)
+    version = ProcessInteractionVersionSerializer(allow_null=True)
