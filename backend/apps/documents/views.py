@@ -1,16 +1,28 @@
 import mimetypes
+import os
 import re
+import uuid
 import requests
 from django.conf import settings
+from django.db.models import Q
+from django.utils import timezone
 from rest_framework import status
+from rest_framework.exceptions import PermissionDenied
+from rest_framework.pagination import PageNumberPagination
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import Document
-from .serializers import DocumentSerializer
+from .serializers import (
+    DocumentSerializer,
+    DocumentListSerializer,
+    DocumentDetailSerializer,
+    DocumentUploadSerializer,
+)
 
-# ── Accepted MIME types ───────────────────────────────────────────────────────
+# ── Constants ─────────────────────────────────────────────────────────────────
 ALLOWED_MIME = {
     "image/png", "image/jpeg", "image/svg+xml", "image/gif",
     "application/pdf",
@@ -19,8 +31,11 @@ ALLOWED_MIME = {
 }
 MAX_SIZE_BYTES = 20 * 1024 * 1024  # 20 MB
 
+# Documents stored locally (not in Supabase)
+LOCAL_TYPES = {"Support"}
 
-# ── Supabase Storage helpers ──────────────────────────────────────────────────
+
+# ── Helpers — Supabase Storage ────────────────────────────────────────────────
 
 def _storage_headers():
     key = settings.SUPABASE_SERVICE_ROLE_KEY
@@ -55,7 +70,7 @@ def _signed_url(storage_path: str, expires_in: int = 3600) -> str:
     return f"{settings.SUPABASE_URL}/storage/v1{signed}" if signed else ""
 
 
-def _delete(storage_path: str):
+def _delete_supabase(storage_path: str):
     url = f"{settings.SUPABASE_URL}/storage/v1/object/{settings.SUPABASE_STORAGE_BUCKET}"
     r = requests.delete(url, json={"prefixes": [storage_path]}, headers=_storage_headers())
     r.raise_for_status()
@@ -71,10 +86,48 @@ def _serialize_with_urls(docs):
     return DocumentSerializer(docs, many=True, context={"urls": urls}).data
 
 
+# ── Helpers — permissions ─────────────────────────────────────────────────────
+
+def _is_caq(user):
+    if not user or not user.is_authenticated:
+        return False
+    try:
+        from apps.accounts.models import Utilisateur, UserRole
+        utilisateur = Utilisateur.objects.get(email=user.email)
+        return UserRole.objects.filter(
+            utilisateur=utilisateur,
+            role__libelle="CAQ",
+        ).exists()
+    except Exception:
+        return False
+
+
+# ── Pagination ────────────────────────────────────────────────────────────────
+
+class DocumentPagination(PageNumberPagination):
+    page_size = 8
+    page_size_query_param = "page_size"
+    max_page_size = 50
+
+    def get_paginated_response(self, data):
+        return Response({
+            "results": data,
+            "pagination": {
+                "page":        self.page.number,
+                "page_size":   self.page.paginator.per_page,
+                "total_items": self.page.paginator.count,
+                "total_pages": self.page.paginator.num_pages,
+            },
+        })
+
+
 # ── Views ─────────────────────────────────────────────────────────────────────
 
 class DocumentListView(APIView):
-    """GET /api/v1/documents/?id_version=X"""
+    """
+    GET /api/v1/documents/?id_version=X
+    Returns fiche documents (BPMN, Preuve, etc.) with Supabase signed URLs.
+    """
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -86,7 +139,10 @@ class DocumentListView(APIView):
 
 
 class DocumentUploadView(APIView):
-    """POST /api/v1/documents/upload/"""
+    """
+    POST /api/v1/documents/upload/
+    Uploads a fiche document (BPMN, Preuve, Rapport_audit_fiche) to Supabase Storage.
+    """
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
@@ -109,14 +165,12 @@ class DocumentUploadView(APIView):
         if not id_version:
             return Response({"detail": "id_version manquant."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Size check
         if file.size > MAX_SIZE_BYTES:
             return Response(
-                {"detail": f"Fichier trop volumineux. Maximum autorisé : 20 Mo."},
+                {"detail": "Fichier trop volumineux. Maximum autorisé : 20 Mo."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # MIME check
         mime = file.content_type or mimetypes.guess_type(file.name)[0] or "application/octet-stream"
         if mime not in ALLOWED_MIME:
             return Response(
@@ -131,11 +185,13 @@ class DocumentUploadView(APIView):
             _upload(storage_path, file.read(), mime)
         except requests.HTTPError as e:
             body = e.response.text if e.response is not None else str(e)
-            return Response({"detail": f"Supabase Storage error: {e.response.status_code if e.response is not None else '?'} — {body}"}, status=status.HTTP_502_BAD_GATEWAY)
+            return Response(
+                {"detail": f"Supabase Storage error: {e.response.status_code if e.response is not None else '?'} — {body}"},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
         except Exception as e:
             return Response({"detail": f"Erreur lors de l'upload : {e}"}, status=status.HTTP_502_BAD_GATEWAY)
 
-        # Resolve uploader id — prefer value sent by frontend
         try:
             uploader_id = int(request.data.get("id_uploader") or request.user.utilisateur.id_user)
         except Exception:
@@ -162,20 +218,130 @@ class DocumentUploadView(APIView):
         return Response(data, status=status.HTTP_201_CREATED)
 
 
-class DocumentDeleteView(APIView):
-    """DELETE /api/v1/documents/{id}/"""
+class DocumentListCreateView(APIView):
+    """
+    GET  /api/v1/documents/support/   — paginated Support document list
+    POST /api/v1/documents/support/   — upload Support document (CAQ only, local storage)
+    """
+    parser_classes = [MultiPartParser, FormParser]
     permission_classes = [IsAuthenticated]
 
+    def get(self, request):
+        qs = Document.objects.filter(type_document="Support").order_by("-date_upload")
+
+        search       = request.query_params.get("search", "").strip()
+        type_support = request.query_params.get("type_support", "").strip()
+
+        if search:
+            qs = qs.filter(
+                Q(nom_fichier__icontains=search) | Q(description__icontains=search)
+            )
+        if type_support:
+            qs = qs.filter(type_support=type_support)
+
+        paginator = DocumentPagination()
+        page      = paginator.paginate_queryset(qs, request)
+        return paginator.get_paginated_response(DocumentListSerializer(page, many=True).data)
+
+    def post(self, request):
+        if not _is_caq(request.user):
+            raise PermissionDenied("Seuls les membres CAQ peuvent importer des documents.")
+
+        serializer = DocumentUploadSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        fichier = data.pop("fichier")
+        ext         = os.path.splitext(fichier.name)[1]
+        unique_name = f"{uuid.uuid4().hex}{ext}"
+        upload_dir  = os.path.join(settings.MEDIA_ROOT, "documents")
+        os.makedirs(upload_dir, exist_ok=True)
+        file_path = os.path.join(upload_dir, unique_name)
+
+        with open(file_path, "wb+") as dest:
+            for chunk in fichier.chunks():
+                dest.write(chunk)
+
+        try:
+            from apps.accounts.models import Utilisateur
+            uploader_id = Utilisateur.objects.get(email=request.user.email).id_user
+        except Exception:
+            uploader_id = request.user.pk
+
+        doc = Document.objects.create(
+            **data,
+            type_document   = "Support",
+            id_uploader     = uploader_id,
+            chemin_stockage = f"documents/{unique_name}",
+            taille          = fichier.size,
+            date_upload     = timezone.now(),
+        )
+        return Response(DocumentDetailSerializer(doc).data, status=status.HTTP_201_CREATED)
+
+
+class DocumentDetailView(APIView):
+    """
+    GET    /api/v1/documents/<id>/  — document detail
+    DELETE /api/v1/documents/<id>/  — delete (Supabase for fiche docs, local for Support)
+    """
+    permission_classes = [IsAuthenticated]
+
+    def _get_doc(self, pk):
+        try:
+            return Document.objects.get(pk=pk)
+        except Document.DoesNotExist:
+            return None
+
+    def get(self, request, pk):
+        doc = self._get_doc(pk)
+        if doc is None:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        if doc.type_document in LOCAL_TYPES:
+            return Response(DocumentDetailSerializer(doc).data)
+        urls = {}
+        try:
+            urls[doc.id_document] = _signed_url(doc.chemin_stockage)
+        except Exception:
+            urls[doc.id_document] = ""
+        return Response(DocumentSerializer(doc, context={"urls": urls}).data)
+
     def delete(self, request, pk):
+        doc = self._get_doc(pk)
+        if doc is None:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        if doc.type_document in LOCAL_TYPES:
+            if not _is_caq(request.user):
+                raise PermissionDenied("Seuls les membres CAQ peuvent supprimer des documents Support.")
+            file_path = os.path.join(settings.MEDIA_ROOT, doc.chemin_stockage)
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        else:
+            try:
+                _delete_supabase(doc.chemin_stockage)
+            except Exception:
+                pass  # still delete the DB record
+
+        doc.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class DocumentDownloadView(APIView):
+    """GET /api/v1/documents/<id>/download/ — returns download URL for Support docs."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
         try:
             doc = Document.objects.get(pk=pk)
         except Document.DoesNotExist:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
-        try:
-            _delete(doc.chemin_stockage)
-        except Exception:
-            pass  # Still delete DB record even if storage fails
+        if doc.type_document not in LOCAL_TYPES:
+            try:
+                url = _signed_url(doc.chemin_stockage)
+            except Exception:
+                url = ""
+        else:
+            url = request.build_absolute_uri(settings.MEDIA_URL + doc.chemin_stockage)
 
-        doc.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response({"url": url, "nom_fichier": doc.nom_fichier})
