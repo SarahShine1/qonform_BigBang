@@ -1,4 +1,5 @@
 from pathlib import Path
+import os
 from decouple import config
 
 # ── Base paths ───────────────────────────────────────────
@@ -138,6 +139,15 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 MEDIA_URL   = '/media/'
 MEDIA_ROOT  = BASE_DIR / 'media'
 
+# ── Supabase Storage ─────────────────────────────────────
+SUPABASE_URL              = config('SUPABASE_URL', default='')
+SUPABASE_SERVICE_ROLE_KEY = config('SUPABASE_SERVICE_ROLE_KEY', default='')
+SUPABASE_STORAGE_BUCKET   = config('SUPABASE_STORAGE_BUCKET', default='fiche-documents')
+
+# Accept files up to 25 MB in Django (client-side limit is 20 MB)
+DATA_UPLOAD_MAX_MEMORY_SIZE = 25 * 1024 * 1024
+FILE_UPLOAD_MAX_MEMORY_SIZE = 25 * 1024 * 1024
+
 # ── Misc ─────────────────────────────────────────────────
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LANGUAGE_CODE = 'fr-fr'
@@ -151,3 +161,7 @@ SPECTACULAR_SETTINGS = {
     'DESCRIPTION': 'SI de préparation à la certification ISO 9001:2015 — ESI',
     'VERSION':     '1.0.0',
 }
+
+
+MEDIA_URL = "/media/"
+MEDIA_ROOT = os.path.join(BASE_DIR, "media")
