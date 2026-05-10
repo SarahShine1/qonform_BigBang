@@ -19,14 +19,13 @@ import {
 import AppLayout from "../../components/layout/AppLayout";
 import { useAuth } from "../../hooks/useAuth";
 import AuditTerrainModal from "../../components/audit/AuditTerrainModal";
+import { apiClient } from "../../api/auth";
 import {
   fetchAuditsTerrain,
   fetchDepartements,
   createAuditTerrain,
   deleteAuditTerrain,
 } from "../../api/auditTerrain";
-
-const BASE_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000/api/v1";
 
 function formatDate(iso) {
   if (!iso) return "—";
@@ -126,11 +125,7 @@ export default function AuditTerrainPage() {
   const handleDownload = async (doc) => {
     setDownloading(true);
     try {
-      const token = localStorage.getItem("access_token");
-      const res = await fetch(`${BASE_URL}/documents/${doc.id_document}/download/`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
+      const { data } = await apiClient.get(`/documents/${doc.id_document}/download/`);
       const a = document.createElement("a");
       a.href = data.url;
       a.download = data.nom_fichier;
