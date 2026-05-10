@@ -50,17 +50,13 @@ class DocumentDetailSerializer(DocumentListSerializer):
 
 class DocumentUploadSerializer(serializers.ModelSerializer):
     fichier = serializers.FileField(write_only=True)
-    type_document = serializers.ChoiceField(
-        choices=["BPMN", "Rapport", "Preuve"],
-        required=False,
-        default="BPMN"
-    )
+    
 
     class Meta:
         model = Document
         fields = [
             "nom_fichier",
-            "type_document",
+            
             "type_support",
             "description",
             "fichier",
@@ -76,12 +72,4 @@ class DocumentUploadSerializer(serializers.ModelSerializer):
             )
         return value
 
-    def validate_type_support(self, value):
-        if value is None:
-            return value
-        allowed = ["Guide", "Reglementation", "Norme"]
-        if value not in allowed:
-            raise serializers.ValidationError(
-                f"Type de support invalide. Valeurs acceptées : {', '.join(allowed)}"
-            )
-        return value
+   

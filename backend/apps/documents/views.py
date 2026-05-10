@@ -62,29 +62,27 @@ class DocumentPagination(PageNumberPagination):
 
 class DocumentListCreateView(APIView):
     """
-    GET  /api/documents/          → liste paginée + filtres
-    POST /api/documents/          → upload (CAQ seulement)
+    GET  /api/documents/   → liste paginée (type_document=Support uniquement)
+    POST /api/documents/   → upload (CAQ seulement)
     """
 
     parser_classes = [MultiPartParser, FormParser]
 
     def get(self, request):
-        qs = Document.objects.select_related("id_uploader").order_by("-date_upload")
+        # Uniquement les documents de type Support
+        qs = Document.objects.select_related("id_uploader").filter(
+            type_document="Support"
+        ).order_by("-date_upload")
 
         # --- Filtres ---
         search = request.query_params.get("search", "").strip()
-        type_document = request.query_params.get("type_document", "").strip()
         type_support = request.query_params.get("type_support", "").strip()
 
         if search:
             qs = qs.filter(
                 Q(nom_fichier__icontains=search)
                 | Q(description__icontains=search)
-                | Q(type_document__icontains=search)
             )
-
-        if type_document:
-            qs = qs.filter(type_document=type_document)
 
         if type_support:
             qs = qs.filter(type_support=type_support)
@@ -121,12 +119,14 @@ class DocumentListCreateView(APIView):
 
         from apps.accounts.models import Utilisateur
         utilisateur = Utilisateur.objects.get(email=request.user.email)
+
         doc = Document.objects.create(
-        **serializer.validated_data,
-        id_uploader=utilisateur,
-        chemin_stockage=relative_path,
-        taille=fichier.size,
-        date_upload=timezone.now(),
+            **serializer.validated_data,
+            type_document="Support",   # forcé côté serveur
+            id_uploader=utilisateur,
+            chemin_stockage=relative_path,
+            taille=fichier.size,
+            date_upload=timezone.now(),
         )
 
         return Response(
@@ -142,9 +142,7 @@ class DocumentDetailView(APIView):
 
     def _get_doc(self, pk):
         try:
-            return Document.objects.select_related(
-                "id_uploader"
-            ).get(pk=pk)
+            return Document.objects.select_related("id_uploader").get(pk=pk)
         except Document.DoesNotExist:
             return None
 
