@@ -157,6 +157,8 @@ class Migration(migrations.Migration):
                 ('date_creation', models.DateTimeField(auto_now_add=True)),
                 ('date_derniere_modif', models.DateTimeField(blank=True, null=True)),
                 ('date_validation', models.DateTimeField(blank=True, null=True)),
+                ('id_processus_amont', models.IntegerField(blank=True, null=True)),
+                ('id_processus_aval', models.IntegerField(blank=True, null=True)),
                 ('revue', models.BooleanField(default=False)),
                 ('commit', models.IntegerField(default=0)),
             ],
