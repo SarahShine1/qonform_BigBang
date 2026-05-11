@@ -1,4 +1,4 @@
-from django.urls import path
+﻿from django.urls import path, include
 from . import views
 
 urlpatterns = [
@@ -9,4 +9,6 @@ urlpatterns = [
     path("fiches/<int:id_version>/complete/", views.complete_audit_execution, name="audit-fiche-complete"),
     path("fiches/<int:id_version>/nc/", views.create_nc, name="audit-fiche-nc-create"),
     path("nc/<int:id_nc>/actions-correctives/", views.create_action_corrective, name="audit-nc-action-create"),
+
+    path("", include("apps.audit.urls_terrain")),
 ]
