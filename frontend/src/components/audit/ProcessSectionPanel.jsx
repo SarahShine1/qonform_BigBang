@@ -31,7 +31,7 @@ function Rows({ fields }) {
   return (
     <div className="divide-y divide-gray-100">
       {fields.map((field) => {
-        const valid = isFieldValid(field.value);
+        const valid = field.valid ?? isFieldValid(field.value);
         return (
           <div key={field.label} className="grid grid-cols-[220px_1fr_32px] items-start gap-5 py-2.5">
             <div className="text-xs font-bold text-[#5b1fa8]">{field.label}</div>
@@ -62,7 +62,7 @@ function DocumentedInfoView({ fields }) {
           <div key={field.label} className="grid grid-cols-[220px_1fr_32px] items-start gap-4 border-t border-gray-100 px-4 py-3">
             <div className="text-xs font-bold uppercase tracking-[0.06em] text-slate-500">{field.label}</div>
             <div className="text-sm italic text-slate-500">{field.value}</div>
-            <FieldStatusIcon valid={isFieldValid(field.value)} />
+            <FieldStatusIcon valid={field.valid ?? isFieldValid(field.value)} />
           </div>
         ))}
       </div>
@@ -82,7 +82,7 @@ function FlowView({ fields }) {
           {steps.map((field) => (
             <div key={field.label} className="grid grid-cols-[1fr_32px] items-center gap-4 rounded-lg border border-gray-100 px-3 py-2">
               <div className="text-sm italic text-slate-500">{field.value}</div>
-              <FieldStatusIcon valid={isFieldValid(field.value)} />
+              <FieldStatusIcon valid={field.valid ?? isFieldValid(field.value)} />
             </div>
           ))}
         </div>
@@ -94,7 +94,7 @@ function FlowView({ fields }) {
           <div className="text-sm italic text-slate-400">
             {bpmn?.value || "Inserer ici l'image du logigramme ou le lien vers le schema BPMN"}
           </div>
-          <FieldStatusIcon valid={isFieldValid(bpmn?.value)} />
+          <FieldStatusIcon valid={bpmn?.valid ?? isFieldValid(bpmn?.value)} />
         </div>
       </div>
     </div>

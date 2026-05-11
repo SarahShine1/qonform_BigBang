@@ -5,6 +5,7 @@ export default function AuditSummaryStep({
   sections,
   evaluations,
   complianceRate,
+  auditMetrics,
   recommendations,
   correctiveActions,
   nonConformities: auditNonConformities = [],
@@ -37,6 +38,8 @@ export default function AuditSummaryStep({
   const requirementNonConformities = requirements.filter(
     (requirement) => requirement.status === "non_conforme"
   );
+  const partialRequirements = requirements.filter((requirement) => requirement.status === "partiel");
+  const weakRequirements = [...requirementNonConformities, ...partialRequirements];
   const ratedRequirements = requirements.filter((requirement) => requirement.status);
   const notRatedCount = requirements.length - ratedRequirements.length;
   const statusCounts = {
@@ -75,18 +78,29 @@ export default function AuditSummaryStep({
           <Metric label="Actions correctives" value={correctiveActions.length} tone="purple" />
         </div>
 
+        {auditMetrics && (
+          <div className="mt-3 grid grid-cols-4 gap-3">
+            <Metric label="Completude" value={`${auditMetrics.tauxCompletudeMoyen}%`} tone="purple" />
+            <Metric label="Checklist" value={`${auditMetrics.scoreChecklist}%`} tone="purple" />
+            <Metric label="BPMN" value={`${auditMetrics.scoreBpmn}%`} tone="purple" />
+            <Metric label="Preuves" value={`${auditMetrics.scorePreuves}%`} tone="purple" />
+          </div>
+        )}
+
         <div className="mt-4 rounded-lg border border-gray-100 bg-gray-50 p-3">
           <h3 className="text-sm font-bold text-gray-900">Non-conformités détectées</h3>
-          {requirementNonConformities.length === 0 && auditNonConformities.length === 0 ? (
+          {weakRequirements.length === 0 && auditNonConformities.length === 0 ? (
             <p className="mt-2 text-sm text-slate-500">Aucune non-conformité détectée.</p>
           ) : (
             <ul className="mt-3 space-y-2">
-              {requirementNonConformities.map((item) => (
+              {weakRequirements.map((item) => (
                 <li key={item.id} className="rounded-md bg-white px-3 py-2 text-sm text-slate-700">
                   <span className="font-semibold text-red-700">{item.clause}</span>
                   {" - "}
                   {item.label}
-                  <span className="ml-2 text-xs text-slate-400">({item.sectionTitle})</span>
+                  <span className="ml-2 text-xs text-slate-400">
+                    ({item.sectionTitle} - {item.status === "partiel" ? "Partiel" : "Non conforme"})
+                  </span>
                 </li>
               ))}
               {auditNonConformities.map((item) => (

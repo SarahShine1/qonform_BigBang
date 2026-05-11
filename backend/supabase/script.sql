@@ -33,7 +33,7 @@ CREATE TABLE public.accounts_user_user_permissions (
 );
 CREATE TABLE public.action_corrective (
   id_action integer NOT NULL DEFAULT nextval('action_corrective_id_action_seq'::regclass),
-  id_nc integer,
+  id_nc integer NOT NULL,
   id_responsable integer,
   description text NOT NULL,
   statut character varying NOT NULL DEFAULT 'Planifiee'::character varying CHECK (statut::text = ANY (ARRAY['Planifiee'::character varying, 'En_cours'::character varying, 'Realisee'::character varying, 'Verifiee'::character varying]::text[])),
@@ -42,21 +42,22 @@ CREATE TABLE public.action_corrective (
   CONSTRAINT action_corrective_id_responsable_fkey FOREIGN KEY (id_responsable) REFERENCES public.utilisateur(id_user),
   CONSTRAINT action_corrective_id_nc_fkey FOREIGN KEY (id_nc) REFERENCES public.nc(id_nc)
 );
-CREATE TABLE public.article (
-  id_article integer NOT NULL DEFAULT nextval('article_id_article_seq'::regclass),
-  id_norme integer NOT NULL,
-  code_article character varying NOT NULL,
-  titre character varying NOT NULL,
-  ponderation numeric DEFAULT 1.0,
-  CONSTRAINT article_pkey PRIMARY KEY (id_article),
-  CONSTRAINT article_id_norme_fkey FOREIGN KEY (id_norme) REFERENCES public.norme(id_norme)
+CREATE TABLE public.audit_field (
+  id_audit_field integer NOT NULL DEFAULT nextval('audit_field_id_audit_field_seq'::regclass),
+  id_auditeur integer NOT NULL,
+  id_departement integer NOT NULL,
+  date_audit date NOT NULL,
+  observation text,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT audit_field_pkey PRIMARY KEY (id_audit_field),
+  CONSTRAINT audit_field_id_auditeur_fkey FOREIGN KEY (id_auditeur) REFERENCES public.utilisateur(id_user),
+  CONSTRAINT audit_field_id_departement_fkey FOREIGN KEY (id_departement) REFERENCES public.departement(id_departement)
 );
 CREATE TABLE public.audit_terrain (
   id_audit integer NOT NULL DEFAULT nextval('audit_terrain_id_audit_seq'::regclass),
   id_processus integer NOT NULL,
   id_auditeur integer NOT NULL,
   titre character varying NOT NULL,
-  statut character varying NOT NULL DEFAULT 'Planifie'::character varying CHECK (statut::text = ANY (ARRAY['Planifie'::character varying, 'En_cours'::character varying, 'Cloture'::character varying]::text[])),
   date_planifiee date,
   date_realisation date,
   rapport_pdf character varying,
@@ -98,8 +99,8 @@ CREATE TABLE public.champ_fiche (
   id_champ_template integer,
   valeur_json jsonb,
   CONSTRAINT champ_fiche_pkey PRIMARY KEY (id_champ),
-  CONSTRAINT champ_fiche_id_champ_template_fkey FOREIGN KEY (id_champ_template) REFERENCES public.champ_template(id_champ_template),
-  CONSTRAINT champ_fiche_id_version_fkey FOREIGN KEY (id_version) REFERENCES public.version_fiche(id_version)
+  CONSTRAINT champ_fiche_id_version_fkey FOREIGN KEY (id_version) REFERENCES public.version_fiche(id_version),
+  CONSTRAINT champ_fiche_id_champ_template_fkey FOREIGN KEY (id_champ_template) REFERENCES public.champ_template(id_champ_template)
 );
 CREATE TABLE public.champ_template (
   id_champ_template integer NOT NULL DEFAULT nextval('champ_template_id_champ_template_seq'::regclass),
@@ -121,14 +122,16 @@ CREATE TABLE public.checklist_evaluation (
   id_evaluation integer NOT NULL DEFAULT nextval('checklist_evaluation_id_evaluation_seq'::regclass),
   id_version integer NOT NULL,
   id_auditeur integer NOT NULL,
-  id_exigence integer NOT NULL,
   resultat character varying CHECK (resultat::text = ANY (ARRAY['Conforme'::character varying, 'Non_conforme'::character varying, 'Partiel'::character varying, 'NA'::character varying]::text[])),
   commentaire text,
   date_evaluation timestamp with time zone DEFAULT now(),
+  id_section_template integer,
+  id_critere integer,
   CONSTRAINT checklist_evaluation_pkey PRIMARY KEY (id_evaluation),
-  CONSTRAINT checklist_evaluation_id_version_fkey FOREIGN KEY (id_version) REFERENCES public.version_fiche(id_version),
   CONSTRAINT checklist_evaluation_id_auditeur_fkey FOREIGN KEY (id_auditeur) REFERENCES public.utilisateur(id_user),
-  CONSTRAINT checklist_evaluation_id_exigence_fkey FOREIGN KEY (id_exigence) REFERENCES public.exigence(id_exigence)
+  CONSTRAINT checklist_evaluation_id_section_template_fkey FOREIGN KEY (id_section_template) REFERENCES public.section_template(id_section_template),
+  CONSTRAINT checklist_evaluation_id_critere_fkey FOREIGN KEY (id_critere) REFERENCES public.critere_evaluation(id_critere),
+  CONSTRAINT checklist_evaluation_id_version_fkey FOREIGN KEY (id_version) REFERENCES public.version_fiche(id_version)
 );
 CREATE TABLE public.colonne_template (
   id integer NOT NULL DEFAULT nextval('colonne_template_id_seq'::regclass),
@@ -139,6 +142,13 @@ CREATE TABLE public.colonne_template (
   ordre integer NOT NULL DEFAULT 1,
   CONSTRAINT colonne_template_pkey PRIMARY KEY (id),
   CONSTRAINT colonne_template_id_champ_fkey FOREIGN KEY (id_champ) REFERENCES public.champ_template(id_champ_template)
+);
+CREATE TABLE public.critere_evaluation (
+  id_critere integer NOT NULL DEFAULT nextval('critere_evaluation_id_critere_seq'::regclass),
+  nom text NOT NULL,
+  est_actif boolean NOT NULL DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT critere_evaluation_pkey PRIMARY KEY (id_critere)
 );
 CREATE TABLE public.departement (
   id_departement integer NOT NULL DEFAULT nextval('departement_id_departement_seq'::regclass),
@@ -184,17 +194,22 @@ CREATE TABLE public.django_session (
 );
 CREATE TABLE public.document (
   id_document integer NOT NULL DEFAULT nextval('document_id_document_seq'::regclass),
-  id_version integer NOT NULL,
+  id_version integer,
   id_uploader integer NOT NULL,
   nom_fichier character varying NOT NULL,
-  type_document character varying NOT NULL CHECK (type_document::text = ANY (ARRAY['BPMN'::character varying, 'PDF'::character varying, 'Preuve'::character varying, 'Rapport'::character varying, 'Autre'::character varying]::text[])),
+  type_document character varying NOT NULL CHECK (type_document::text = ANY (ARRAY['BPMN'::character varying, 'Rapport'::character varying, 'Preuve'::character varying, 'Support'::character varying, 'Rapport_audit_fiche'::character varying]::text[])),
   chemin_stockage character varying NOT NULL,
   taille integer,
   version_doc character varying,
   date_upload timestamp with time zone DEFAULT now(),
+  description text,
+  type_support character varying,
+  id_audit_field integer,
+  evaluation character varying CHECK (evaluation IS NULL OR (evaluation::text = ANY (ARRAY['Conforme'::character varying, 'Non_conforme'::character varying, 'Partiel'::character varying, 'NA'::character varying]::text[]))),
   CONSTRAINT document_pkey PRIMARY KEY (id_document),
-  CONSTRAINT document_id_version_fkey FOREIGN KEY (id_version) REFERENCES public.version_fiche(id_version),
-  CONSTRAINT document_id_uploader_fkey FOREIGN KEY (id_uploader) REFERENCES public.utilisateur(id_user)
+  CONSTRAINT document_id_uploader_fkey FOREIGN KEY (id_uploader) REFERENCES public.utilisateur(id_user),
+  CONSTRAINT document_id_audit_field_fkey FOREIGN KEY (id_audit_field) REFERENCES public.audit_field(id_audit_field),
+  CONSTRAINT document_id_version_fkey FOREIGN KEY (id_version) REFERENCES public.version_fiche(id_version)
 );
 CREATE TABLE public.documents_document (
   id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
@@ -205,28 +220,40 @@ CREATE TABLE public.documents_document (
   CONSTRAINT documents_document_pkey PRIMARY KEY (id),
   CONSTRAINT documents_document_publie_par_id_dbbb9f91_fk_accounts_user_id FOREIGN KEY (publie_par_id) REFERENCES public.accounts_user(id)
 );
-CREATE TABLE public.exigence (
-  id_exigence integer NOT NULL DEFAULT nextval('exigence_id_exigence_seq'::regclass),
-  id_article integer NOT NULL,
-  description text NOT NULL,
-  ponderation numeric DEFAULT 1.0,
-  est_obligatoire boolean DEFAULT true,
-  CONSTRAINT exigence_pkey PRIMARY KEY (id_exigence),
-  CONSTRAINT exigence_id_article_fkey FOREIGN KEY (id_article) REFERENCES public.article(id_article)
+CREATE TABLE public.messaging_conversation (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  created_at timestamp with time zone NOT NULL,
+  updated_at timestamp with time zone NOT NULL,
+  auditeur_id bigint NOT NULL,
+  utilisateur_id bigint NOT NULL,
+  CONSTRAINT messaging_conversation_pkey PRIMARY KEY (id),
+  CONSTRAINT messaging_conversation_auditeur_id_32f1eb6e_fk_accounts_user_id FOREIGN KEY (auditeur_id) REFERENCES public.accounts_user(id),
+  CONSTRAINT messaging_conversati_utilisateur_id_29a16639_fk_accounts_ FOREIGN KEY (utilisateur_id) REFERENCES public.accounts_user(id)
+);
+CREATE TABLE public.messaging_message (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  content text NOT NULL,
+  is_read boolean NOT NULL,
+  created_at timestamp with time zone NOT NULL,
+  conversation_id bigint NOT NULL,
+  sender_id bigint NOT NULL,
+  CONSTRAINT messaging_message_pkey PRIMARY KEY (id),
+  CONSTRAINT messaging_message_conversation_id_3db4d3d1_fk_messaging FOREIGN KEY (conversation_id) REFERENCES public.messaging_conversation(id),
+  CONSTRAINT messaging_message_sender_id_7a7088e6_fk_accounts_user_id FOREIGN KEY (sender_id) REFERENCES public.accounts_user(id)
 );
 CREATE TABLE public.nc (
   id_nc integer NOT NULL DEFAULT nextval('nc_id_nc_seq'::regclass),
   id_version integer NOT NULL,
   id_auditeur integer NOT NULL,
-  id_exigence integer,
   titre character varying NOT NULL,
   description text,
   date_detection timestamp with time zone DEFAULT now(),
   date_cloture timestamp with time zone,
+  id_section_template integer,
   CONSTRAINT nc_pkey PRIMARY KEY (id_nc),
-  CONSTRAINT nc_id_version_fkey FOREIGN KEY (id_version) REFERENCES public.version_fiche(id_version),
+  CONSTRAINT nc_id_section_template_fkey FOREIGN KEY (id_section_template) REFERENCES public.section_template(id_section_template),
   CONSTRAINT nc_id_auditeur_fkey FOREIGN KEY (id_auditeur) REFERENCES public.utilisateur(id_user),
-  CONSTRAINT nc_id_exigence_fkey FOREIGN KEY (id_exigence) REFERENCES public.exigence(id_exigence)
+  CONSTRAINT nc_id_version_fkey FOREIGN KEY (id_version) REFERENCES public.version_fiche(id_version)
 );
 CREATE TABLE public.norme (
   id_norme integer NOT NULL DEFAULT nextval('norme_id_norme_seq'::regclass),
@@ -235,6 +262,7 @@ CREATE TABLE public.norme (
   titre character varying NOT NULL,
   date_publication date,
   created_at timestamp with time zone DEFAULT now(),
+  est_active boolean NOT NULL DEFAULT false,
   CONSTRAINT norme_pkey PRIMARY KEY (id_norme)
 );
 CREATE TABLE public.option_champ (
@@ -275,6 +303,15 @@ CREATE TABLE public.processus (
   CONSTRAINT processus_id_departement_fkey FOREIGN KEY (id_departement) REFERENCES public.departement(id_departement),
   CONSTRAINT processus_id_pilote_fkey FOREIGN KEY (id_pilote) REFERENCES public.utilisateur(id_user)
 );
+CREATE TABLE public.processus_liaison (
+  id integer NOT NULL DEFAULT nextval('processus_liaison_id_seq'::regclass),
+  id_processus_amont integer NOT NULL,
+  id_processus_aval integer NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT processus_liaison_pkey PRIMARY KEY (id),
+  CONSTRAINT processus_liaison_amont_fkey FOREIGN KEY (id_processus_amont) REFERENCES public.processus(id_processus),
+  CONSTRAINT processus_liaison_aval_fkey FOREIGN KEY (id_processus_aval) REFERENCES public.processus(id_processus)
+);
 CREATE TABLE public.role (
   id_role integer NOT NULL DEFAULT nextval('role_id_role_seq'::regclass),
   libelle character varying NOT NULL UNIQUE,
@@ -289,7 +326,9 @@ CREATE TABLE public.section_template (
   est_actif boolean DEFAULT true,
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
-  CONSTRAINT section_template_pkey PRIMARY KEY (id_section_template)
+  id_norme integer,
+  CONSTRAINT section_template_pkey PRIMARY KEY (id_section_template),
+  CONSTRAINT section_template_id_norme_fkey FOREIGN KEY (id_norme) REFERENCES public.norme(id_norme)
 );
 CREATE TABLE public.statut_fiche (
   id_statut integer NOT NULL DEFAULT nextval('statut_fiche_id_statut_seq'::regclass),
@@ -349,12 +388,10 @@ CREATE TABLE public.version_fiche (
   date_creation timestamp with time zone DEFAULT now(),
   date_derniere_modif timestamp with time zone,
   date_validation timestamp with time zone,
-  id_processus_amont integer,
-  id_processus_aval integer,
   statut character varying NOT NULL DEFAULT 'Brouillon'::character varying CHECK (statut::text = ANY (ARRAY['Brouillon'::character varying, 'Soumise'::character varying, 'En_revision'::character varying, 'Publiee'::character varying, 'Archivee'::character varying]::text[])),
+  revue boolean NOT NULL DEFAULT false,
+  commit integer NOT NULL DEFAULT 0,
   CONSTRAINT version_fiche_pkey PRIMARY KEY (id_version),
-  CONSTRAINT version_fiche_id_processus_aval_fkey FOREIGN KEY (id_processus_aval) REFERENCES public.processus(id_processus),
   CONSTRAINT version_fiche_id_processus_fkey FOREIGN KEY (id_processus) REFERENCES public.processus(id_processus),
-  CONSTRAINT version_fiche_id_redacteur_fkey FOREIGN KEY (id_redacteur) REFERENCES public.utilisateur(id_user),
-  CONSTRAINT version_fiche_id_processus_amont_fkey FOREIGN KEY (id_processus_amont) REFERENCES public.processus(id_processus)
+  CONSTRAINT version_fiche_id_redacteur_fkey FOREIGN KEY (id_redacteur) REFERENCES public.utilisateur(id_user)
 );

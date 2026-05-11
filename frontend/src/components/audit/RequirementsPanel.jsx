@@ -24,9 +24,15 @@ export default function RequirementsPanel({
     [section.requirements]
   );
 
-  const autoTotal = section.processFields.length;
-  const autoCompleted = section.processFields.filter((field) => isFieldValid(field.value)).length;
-  const autoRate = autoTotal === 0 ? 0 : Math.round((autoCompleted / autoTotal) * 100);
+  const autoTotal = section.completionTotal ?? section.processFields.length;
+  const autoCompleted =
+    section.completionDone ?? section.processFields.filter((field) => isFieldValid(field.value)).length;
+  const autoRate =
+    typeof section.completionRate === "number"
+      ? section.completionRate
+      : autoTotal === 0
+        ? 0
+        : Math.round((autoCompleted / autoTotal) * 100);
 
   const [ncOpen, setNcOpen] = useState(false);
   const [ncForm, setNcForm] = useState(createNcForm(section, manualRequirements[0]?.id || ""));
@@ -117,6 +123,7 @@ export default function RequirementsPanel({
       </div>
 
       <div className="space-y-4 p-4">
+        {!section.isDocumentStep && (
         <section className="rounded-xl border border-[#E8E1F5] bg-[#FBFAFE] p-3.5">
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-2">
@@ -140,13 +147,14 @@ export default function RequirementsPanel({
             />
           </div>
         </section>
+        )}
 
         <section className="space-y-3">
           <div className="flex items-center gap-2">
             <Target className="h-4 w-4 text-[#5b1fa8]" />
             <div>
               <h3 className="text-xs font-bold uppercase tracking-[0.08em] text-gray-950">
-                Checklist manuelle ISO 9001
+                {section.isDocumentStep ? "Evaluation du document" : "Checklist manuelle ISO 9001"}
               </h3>
               <p className="text-xs text-slate-500">
                 Ces critères sont évalués uniquement par l&apos;auditeur.
