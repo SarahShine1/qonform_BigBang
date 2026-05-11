@@ -16,6 +16,7 @@ import NormeTemplatePage from "./pages/canevas/NormeTemplatePage";
 import InteractionMapPage from "./pages/cartographie/InteractionMapPage";
 import AuditTerrainPage from "./pages/audit/AuditTerrainPage";
 import DocumentationPage from "./pages/Documentationpage";
+import DossierProcessusPage from "./pages/processus/DossierProcessusPage";
 
 export default function App() {
   return (
@@ -41,7 +42,10 @@ export default function App() {
 
             <Route path="/organigram" element={<Organigramme />} />
             <Route path="/organigramme" element={<Organigramme />} />
-            <Route path="/gestion-utilisateurs" element={<GestionUtilisateurs />} />
+            <Route
+              path="/gestion-utilisateurs"
+              element={<GestionUtilisateurs />}
+            />
 
             <Route
               path="/cartographie"
@@ -54,16 +58,43 @@ export default function App() {
               }
             />
 
-            <Route path="/cartographie/canevas-fiche" element={<CanevasFichePage />} />
-            <Route path="/cartographie/canevas-fiche/:id" element={<NormeTemplatePage />} />
+            <Route
+              path="/cartographie/canevas-fiche"
+              element={<CanevasFichePage />}
+            />
+            <Route
+              path="/cartographie/canevas-fiche/:id"
+              element={<NormeTemplatePage />}
+            />
             <Route path="/cartographie/processus" element={<ProcessusPage />} />
-            <Route path="/cartographie/interactions" element={<InteractionMapPage />} />
-            <Route path="/suivi" element={<ModulePlaceholderPage title="Suivi" />} />
-            <Route path="/audit/preaudit" element={<ModulePlaceholderPage title="Préaudit" />} />
-            <Route path="/audit/mes-audits" element={<ModulePlaceholderPage title="Mes audits" />} />
-            <Route path="/audit/audits-terrain" element={<AuditTerrainPage />} />
-            <Route path="/dashboard-pilote" element={<ModulePlaceholderPage title="Dashboard Pilote" />} />
-<Route path="/dashboard-auditeur" element={<ModulePlaceholderPage title="Dashboard Auditeur" />} />
+            <Route
+              path="/cartographie/interactions"
+              element={<InteractionMapPage />}
+            />
+            <Route
+              path="/suivi"
+              element={<ModulePlaceholderPage title="Suivi" />}
+            />
+            <Route
+              path="/audit/preaudit"
+              element={<ModulePlaceholderPage title="Préaudit" />}
+            />
+            <Route
+              path="/audit/mes-audits"
+              element={<ModulePlaceholderPage title="Mes audits" />}
+            />
+            <Route
+              path="/audit/audits-terrain"
+              element={<AuditTerrainPage />}
+            />
+            <Route
+              path="/dashboard-pilote"
+              element={<ModulePlaceholderPage title="Dashboard Pilote" />}
+            />
+            <Route
+              path="/dashboard-auditeur"
+              element={<ModulePlaceholderPage title="Dashboard Auditeur" />}
+            />
 
             <Route
               path="/planification"
@@ -81,12 +112,7 @@ export default function App() {
             <Route path="/mes-audits/planifies" element={<MesAudits />} />
             <Route path="/mes-audits/clotures" element={<MesAudits />} />
 
-            <Route
-              path="/documents"
-              element={
-                < DocumentationPage/>
-              }
-            />
+            <Route path="/documents" element={<DocumentationPage />} />
 
             <Route
               path="/actions"
@@ -100,15 +126,20 @@ export default function App() {
             />
 
             {/* Gestion processus */}
-            <Route path="/gestion-processus/fiches/nouveau" element={<FicheProcessusForm />} />
-            <Route path="/gestion-processus/fiches/:id/modifier" element={<FicheProcessusForm />} />
-
             <Route
-              path="/niveau-maturite"
-              element={
-                <MaturityPage />
-              }
+              path="/gestion-processus/dossier/:id"
+              element={<DossierProcessusPage />}
             />
+            <Route
+              path="/gestion-processus/fiches/nouveau"
+              element={<FicheProcessusForm />}
+            />
+            <Route
+              path="/gestion-processus/fiches/:id/modifier"
+              element={<FicheProcessusForm />}
+            />
+
+            <Route path="/niveau-maturite" element={<MaturityPage />} />
 
             <Route
               path="/parametres"
@@ -122,7 +153,9 @@ export default function App() {
             />
           </Route>
 
-          <Route element={<RoleProtectedRoute roles={["CAQ", "ADMIN", "Admin"]} />}>
+          <Route
+            element={<RoleProtectedRoute roles={["CAQ", "ADMIN", "Admin"]} />}
+          >
             <Route path="/caq/organigramme" element={<Organigramme />} />
           </Route>
 
