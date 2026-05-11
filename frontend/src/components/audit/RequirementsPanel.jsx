@@ -73,10 +73,6 @@ export default function RequirementsPanel({
         .map((action) => ({
           id: action.id,
           description: action.description.trim(),
-          responsible: action.responsible.trim(),
-          dueDate: action.dueDate,
-          priority: action.priority,
-          status: action.status,
         })),
     });
 
@@ -234,7 +230,7 @@ export default function RequirementsPanel({
                               <div className="text-xs font-bold text-slate-800">
                                 {action.description}
                               </div>
-                              <div className="mt-1 flex flex-wrap gap-2 text-[11px] text-slate-500">
+                              <div className="hidden">
                                 {action.responsible && <span>Responsable: {action.responsible}</span>}
                                 {action.dueDate && <span>Échéance: {action.dueDate}</span>}
                                 {action.priority && <span>Priorité: {action.priority}</span>}
@@ -277,7 +273,7 @@ export default function RequirementsPanel({
                           className="rounded-md border border-gray-100 bg-gray-50 px-3 py-2"
                         >
                           <p className="text-xs font-semibold text-slate-800">{action.description}</p>
-                          <div className="mt-1 flex flex-wrap gap-2 text-[11px] text-slate-500">
+                          <div className="hidden">
                             {action.responsible && <span>{action.responsible}</span>}
                             {action.priority && <span>{action.priority}</span>}
                             {action.dueDate && <span>{action.dueDate}</span>}
@@ -432,7 +428,7 @@ export default function RequirementsPanel({
                             />
                           </label>
 
-                          <div className="grid gap-3 md:grid-cols-2">
+                          <div className="hidden">
                             <label className="block">
                               <span className="text-xs font-semibold text-gray-900">Responsable</span>
                               <input
@@ -458,7 +454,7 @@ export default function RequirementsPanel({
                             </label>
                           </div>
 
-                          <div className="grid gap-3 md:grid-cols-2">
+                          <div className="hidden">
                             <label className="block">
                               <span className="text-xs font-semibold text-gray-900">Priorité</span>
                               <select

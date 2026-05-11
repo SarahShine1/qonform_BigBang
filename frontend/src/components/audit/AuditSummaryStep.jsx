@@ -162,7 +162,7 @@ export default function AuditSummaryStep({
                         </p>
                       ) : (
                         ncActions.map((action, index) => (
-                          <div key={action.id} className="grid grid-cols-[1fr_120px_34px] gap-2 rounded-md bg-white p-2">
+                          <div key={action.id} className="grid grid-cols-[1fr_34px] gap-2 rounded-md bg-white p-2">
                             <input
                               value={action.description}
                               onChange={(event) =>
@@ -171,18 +171,6 @@ export default function AuditSummaryStep({
                               placeholder={`Action corrective ${index + 1}`}
                               className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs"
                             />
-                            <select
-                              value={action.priority || "Moyenne"}
-                              onChange={(event) =>
-                                onUpdateAction(action.id, { priority: event.target.value })
-                              }
-                              className="rounded-md border border-gray-200 bg-white px-2 py-1.5 text-xs"
-                            >
-                              <option>Basse</option>
-                              <option>Moyenne</option>
-                              <option>Haute</option>
-                              <option>Critique</option>
-                            </select>
                             <button
                               type="button"
                               onClick={() => onRemoveAction(action.id)}
@@ -417,9 +405,6 @@ export default function AuditSummaryStep({
                         >
                           <span className="font-bold text-purple-700">{nc?.title || "NC"}</span> -{" "}
                           {action.description || "Action à préciser"}
-                          <span className="ml-2 rounded-full bg-purple-50 px-2 py-0.5 text-xs font-bold text-purple-700">
-                            {action.priority || "Moyenne"}
-                          </span>
                         </li>
                       );
                     })}
@@ -448,10 +433,6 @@ export default function AuditSummaryStep({
                               <div key={action.id} className="rounded-md bg-white px-3 py-2 text-xs text-slate-700">
                                 <div className="font-semibold text-slate-800">{action.description}</div>
                                 <div className="mt-1 flex flex-wrap gap-2 text-[11px] text-slate-500">
-                                  {action.responsible && <span>Responsable: {action.responsible}</span>}
-                                  {action.dueDate && <span>Échéance: {action.dueDate}</span>}
-                                  {action.priority && <span>Priorité: {action.priority}</span>}
-                                  {action.status && <span>Statut: {action.status}</span>}
                                 </div>
                               </div>
                             ))}

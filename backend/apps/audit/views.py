@@ -221,6 +221,22 @@ def fiche_audit_report(request, id_version):
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
+def start_audit_execution(request, id_version):
+    auditeur_id = get_auditeur_id(request)
+    if not auditeur_id:
+        return Response({"detail": "Auditeur introuvable."}, status=status.HTTP_400_BAD_REQUEST)
+
+    payload = request.data or {}
+    with transaction.atomic(), connection.cursor() as cursor:
+        update_version_status(cursor, id_version, "En_revision")
+        update_version_commit(cursor, id_version, payload.get("currentIndex", 0))
+        upsert_audit_terrain(cursor, id_version, auditeur_id, "En_cours", "")
+
+    return Response({"ok": True, "id_version": id_version, "status": "En_revision"})
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
 def save_audit_draft(request, id_version):
     auditeur_id = get_auditeur_id(request)
     if not auditeur_id:
@@ -231,6 +247,7 @@ def save_audit_draft(request, id_version):
 
     with transaction.atomic(), connection.cursor() as cursor:
         update_version_status(cursor, id_version, "En_revision")
+        update_version_commit(cursor, id_version, payload.get("currentIndex"))
         upsert_audit_terrain(cursor, id_version, auditeur_id, "En_cours", payload.get("recommendations", ""))
         replace_evaluations(cursor, id_version, auditeur_id, evaluations)
         replace_non_conformities(
@@ -378,6 +395,7 @@ def load_fiche_audit_detail(id_version):
                 vf.id_version,
                 vf.numero_version,
                 vf.statut,
+                vf."commit" AS audit_commit,
                 vf.date_creation,
                 vf.date_derniere_modif,
                 vf.date_validation,
@@ -701,6 +719,7 @@ def load_fiche_audit_detail(id_version):
         "id_version": fiche["id_version"],
         "numero_version": fiche["numero_version"],
         "statut": fiche["statut"],
+        "commit": fiche.get("audit_commit") or 0,
         "date_creation": fiche["date_creation"],
         "date_derniere_modif": fiche.get("date_derniere_modif"),
         "date_validation": fiche.get("date_validation"),
@@ -997,6 +1016,18 @@ def update_version_status(cursor, id_version, statut, revue=None):
             "UPDATE version_fiche SET statut = %s WHERE id_version = %s",
             [statut, id_version],
         )
+
+
+def update_version_commit(cursor, id_version, commit_value):
+    if commit_value is None or not table_has_column(cursor, "version_fiche", "commit"):
+        return
+    current_index = coerce_int(commit_value)
+    if current_index is None:
+        return
+    cursor.execute(
+        'UPDATE version_fiche SET "commit" = %s WHERE id_version = %s',
+        [max(current_index, 0), id_version],
+    )
 
 
 def upsert_audit_terrain(cursor, id_version, auditeur_id, statut, observations, rapport_pdf=None):

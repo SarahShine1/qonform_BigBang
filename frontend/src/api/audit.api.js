@@ -23,6 +23,11 @@ export const auditApi = {
     return mapFicheDetailToExecution(data);
   },
 
+  startExecution: async (idVersion, currentIndex = 0) => {
+    const { data } = await apiClient.post(`/audit/fiches/${idVersion}/start/`, { currentIndex });
+    return data;
+  },
+
   saveDraft: async (payload) => {
     const { data } = await apiClient.post(`/audit/fiches/${payload.auditId}/draft/`, payload);
     return data;
@@ -43,6 +48,14 @@ export const auditApi = {
 
   createCorrectiveAction: async (idNc, payload) => {
     const { data } = await apiClient.post(`/audit/nc/${idNc}/actions-correctives/`, payload);
+    return data;
+  },
+
+  openDocument: async (idDocument) => {
+    const { data } = await apiClient.get(`/documents/${idDocument}/download/`);
+    if (data?.url) {
+      window.open(data.url, "_blank", "noopener,noreferrer");
+    }
     return data;
   },
 
@@ -148,6 +161,7 @@ function mapFicheDetailToExecution(fiche) {
         fiche.date_creation ||
         new Date().toISOString().slice(0, 10),
       status: mapVersionStatusToUi(fiche.statut),
+      observations: fiche.audit?.observations || "",
     },
     sections,
     initialEvaluations: {
@@ -174,6 +188,7 @@ function mapFicheDetailToExecution(fiche) {
       })),
     })),
     complianceRate: fiche.taux_conformite || 0,
+    initialIndex: Number(fiche.commit || 0),
     metrics: fiche.metrics || null,
     documents,
     sourceFiche: fiche,
@@ -212,8 +227,13 @@ function buildDocumentSection({ id, title, shortTitle, emptyLabel, documents }) 
       safeDocuments.length > 0
         ? safeDocuments.map((document) => ({
             label: document.nom_fichier || `Document ${document.id_document}`,
-            value: document.chemin_stockage || document.description || "Document lie a la fiche",
+            value: [document.type_document, document.description || document.chemin_stockage]
+              .filter(Boolean)
+              .join(" - ") || "Document lie a la fiche",
             valid: true,
+            documentId: document.id_document,
+            type: document.type_document,
+            url: document.url,
           }))
         : [{ label: "Documents", value: emptyLabel, valid: false }],
     requirements: safeDocuments.map((document) => ({
@@ -223,6 +243,7 @@ function buildDocumentSection({ id, title, shortTitle, emptyLabel, documents }) 
       clause: document.type_document || "Document",
       type: "document",
       articleTitle: document.chemin_stockage || document.description || "",
+      url: document.url,
     })),
   };
 }

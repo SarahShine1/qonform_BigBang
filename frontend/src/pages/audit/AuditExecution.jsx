@@ -39,11 +39,21 @@ export default function AuditExecution() {
       .then((payload) => {
         if (!active) return;
         setData(payload);
+        setCurrentIndex(Math.min(payload.initialIndex || 0, Math.max((payload.sections || []).length - 1, 0)));
         setEvaluations(buildInitialEvaluations(payload));
         setNonConformities(mapInitialNonConformities(payload));
         setCorrectiveActions(mapInitialCorrectiveActions(payload));
-        setAuditStatus(payload.audit.status || "Soumise");
+        setRecommendations(payload.audit.observations || "");
+        const initialStatus = payload.audit.status || "Soumise";
+        setAuditStatus(initialStatus);
         setReportMeta(payload.report || null);
+        if (initialStatus === "Soumise") {
+          auditApi.startExecution(payload.audit.id, payload.initialIndex || 0).then((response) => {
+            if (active && response?.status) {
+              setAuditStatus(mapAuditStatus(response.status));
+            }
+          }).catch(() => {});
+        }
       })
       .catch((error) => {
         if (!active) return;
@@ -109,6 +119,7 @@ export default function AuditExecution() {
   const buildPayload = () => ({
     auditId: audit.id,
     currentSectionId: currentSection.id,
+    currentIndex,
     evaluations,
     recommendations,
     correctiveActions,
@@ -218,10 +229,6 @@ export default function AuditExecution() {
       id: crypto.randomUUID(),
       ncId,
       description: "",
-      priority: "Moyenne",
-      responsible: "",
-      dueDate: "",
-      status: "A faire",
     };
 
     setCorrectiveActions((current) => [...current, action]);
@@ -285,6 +292,18 @@ export default function AuditExecution() {
     await auditApi.downloadReport(audit.id, filename);
   };
 
+  const openDocument = async (documentId) => {
+    if (!documentId) return;
+    try {
+      await auditApi.openDocument(documentId);
+    } catch (error) {
+      setFeedback({
+        type: "error",
+        message: extractApiError(error, "Impossible d'ouvrir ce document."),
+      });
+    }
+  };
+
   return (
     <AppLayout
       pageTitle="Execution de l'audit interne"
@@ -338,7 +357,11 @@ export default function AuditExecution() {
           />
         ) : (
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:[grid-template-columns:minmax(0,1fr)_minmax(0,1fr)]">
-            <ProcessSectionPanel section={currentSection} sectionIndex={currentIndex} />
+            <ProcessSectionPanel
+              section={currentSection}
+              sectionIndex={currentIndex}
+              onOpenDocument={openDocument}
+            />
             <RequirementsPanel
               section={currentSection}
               evaluations={evaluations}
@@ -519,5 +542,6 @@ function extractApiError(error, fallbackMessage) {
 function mapAuditStatus(status) {
   if (status === "Publiee") return "Publié";
   if (status === "En_revision") return "En revision";
+  if (status === "Brouillon") return "Brouillon";
   return status || "";
 }
