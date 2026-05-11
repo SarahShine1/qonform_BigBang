@@ -1,69 +1,78 @@
-import { FileText } from "lucide-react";
+import { CheckCircle2, CircleX, ExternalLink, FileText } from "lucide-react";
 
-export default function ProcessSectionPanel({ section, sectionIndex }) {
+export default function ProcessSectionPanel({ section, sectionIndex, onOpenDocument }) {
   return (
-    <section className="min-h-[600px] overflow-hidden rounded-md border border-gray-200 bg-white shadow-sm">
-      <div className="flex items-center justify-center bg-[#5b1fa8] px-5 py-4">
+    <section className="min-h-[520px] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+      <div className="flex items-center justify-center bg-[#5b1fa8] px-5 py-3.5">
         <div className="text-base font-bold text-white">Fiche Processus</div>
       </div>
-      <div className="flex items-center gap-3 border-b border-gray-200 bg-gray-50 px-6 py-4">
-        <span className="flex h-8 w-8 items-center justify-center rounded-md bg-[#5b1fa8] text-sm font-bold text-white">
+      <div className="flex items-center gap-3 border-b border-gray-200 bg-gray-50 px-5 py-3.5">
+        <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#5b1fa8] text-xs font-bold text-white">
           {sectionIndex + 1}
         </span>
-        <div className="text-sm font-bold uppercase tracking-[0.08em] text-[#202044]">{section.title}</div>
+        <div className="text-xs font-bold uppercase tracking-[0.08em] text-[#202044]">{section.title}</div>
         <FileText className="ml-auto h-4 w-4 text-slate-400" />
       </div>
 
-      <div className="px-7 py-4">
+      <div className="px-5 py-3.5">
         {section.id === "flow" ? (
           <FlowView fields={section.processFields} />
         ) : section.id === "documents" ? (
           <DocumentedInfoView fields={section.processFields} />
         ) : (
-          <Rows fields={section.processFields} />
+          <Rows fields={section.processFields} onOpenDocument={onOpenDocument} />
         )}
       </div>
     </section>
   );
 }
 
-function Rows({ fields }) {
+function Rows({ fields, onOpenDocument }) {
   return (
     <div className="divide-y divide-gray-100">
-      {fields.map((field) => (
-        <div key={field.label} className="grid grid-cols-[260px_1fr] items-start gap-8 py-4">
-          <div className="text-sm font-bold text-[#5b1fa8]">{field.label}</div>
-          <div className="min-h-[24px] border-b border-gray-100 pb-1 text-sm italic text-slate-500">
-            {field.value}
+      {fields.map((field) => {
+        const valid = field.valid ?? isFieldValid(field.value);
+        return (
+          <div key={field.label} className="grid grid-cols-[220px_1fr_32px] items-start gap-5 py-2.5">
+            <div className="text-xs font-bold text-[#5b1fa8]">{field.label}</div>
+            <div className="min-h-[22px] border-b border-gray-100 pb-1 text-sm text-slate-500">
+              <div className="italic">{field.value}</div>
+              {field.documentId && (
+                <button
+                  type="button"
+                  onClick={() => onOpenDocument?.(field.documentId)}
+                  className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-purple-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-purple-700 hover:bg-purple-50"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  Voir
+                </button>
+              )}
+            </div>
+            <FieldStatusIcon valid={valid} />
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
 
 function DocumentedInfoView({ fields }) {
   return (
-    <div className="overflow-hidden border border-gray-100">
+    <div className="overflow-hidden rounded-lg border border-gray-100">
       <div className="grid grid-cols-2 bg-gray-50">
-        <div className="border-r border-gray-100 px-5 py-3 text-xs font-bold uppercase tracking-[0.08em] text-slate-500">
-          Documents de référence
+        <div className="border-r border-gray-100 px-4 py-3 text-xs font-bold uppercase tracking-[0.08em] text-slate-500">
+          Documents de reference
         </div>
-        <div className="px-5 py-3 text-xs font-bold uppercase tracking-[0.08em] text-slate-500">
+        <div className="px-4 py-3 text-xs font-bold uppercase tracking-[0.08em] text-slate-500">
           Enregistrements
         </div>
       </div>
-      <div className="grid grid-cols-4 bg-gray-50">
-        {fields.slice(1, 5).map((field) => (
-          <div key={field.label} className="border-t border-r border-gray-100 px-5 py-4 text-xs font-bold uppercase tracking-[0.08em] text-slate-500 last:border-r-0">
-            {field.label}
-          </div>
-        ))}
-      </div>
-      <div className="grid grid-cols-4">
-        {fields.slice(1, 5).map((field) => (
-          <div key={field.label} className="min-h-[74px] border-t border-r border-gray-100 px-5 py-4 text-sm italic text-slate-500 last:border-r-0">
-            {field.value}
+      <div className="space-y-0">
+        {fields.map((field) => (
+          <div key={field.label} className="grid grid-cols-[220px_1fr_32px] items-start gap-4 border-t border-gray-100 px-4 py-3">
+            <div className="text-xs font-bold uppercase tracking-[0.06em] text-slate-500">{field.label}</div>
+            <div className="text-sm italic text-slate-500">{field.value}</div>
+            <FieldStatusIcon valid={field.valid ?? isFieldValid(field.value)} />
           </div>
         ))}
       </div>
@@ -72,29 +81,45 @@ function DocumentedInfoView({ fields }) {
 }
 
 function FlowView({ fields }) {
-  const steps = fields.filter((field) => field.label.startsWith("Étape"));
+  const steps = fields.filter((field) => field.label.toLowerCase().startsWith("etape") || field.label.toLowerCase().startsWith("étape"));
   const bpmn = fields.find((field) => field.label.includes("BPMN"));
 
   return (
     <div className="space-y-5">
       <div>
-        <div className="mb-3 text-sm font-bold text-[#202044]">Tâches - Grandes étapes chronologiques</div>
-        <div className="divide-y divide-gray-100">
+        <div className="mb-3 text-xs font-bold text-[#202044]">Taches - Grandes etapes chronologiques</div>
+        <div className="space-y-2">
           {steps.map((field) => (
-            <div key={field.label} className="flex items-center gap-3 py-3 text-sm italic text-slate-500">
-              <span className="h-2 w-2 rounded-full bg-slate-300" />
-              <span>{field.value}</span>
+            <div key={field.label} className="grid grid-cols-[1fr_32px] items-center gap-4 rounded-lg border border-gray-100 px-3 py-2">
+              <div className="text-sm italic text-slate-500">{field.value}</div>
+              <FieldStatusIcon valid={field.valid ?? isFieldValid(field.value)} />
             </div>
           ))}
         </div>
       </div>
 
       <div>
-        <div className="mb-3 text-sm font-bold text-[#202044]">Cartographie - BPMN</div>
-        <div className="flex min-h-[150px] items-center justify-center rounded-md border-2 border-dashed border-gray-200 text-sm italic text-slate-400">
-          {bpmn?.value || "Insérer ici l'image du logigramme ou le lien vers le schéma BPMN"}
+        <div className="mb-3 text-xs font-bold text-[#202044]">Cartographie - BPMN</div>
+        <div className="grid grid-cols-[1fr_32px] items-center gap-4 rounded-lg border-2 border-dashed border-gray-200 px-4 py-8">
+          <div className="text-sm italic text-slate-400">
+            {bpmn?.value || "Inserer ici l'image du logigramme ou le lien vers le schema BPMN"}
+          </div>
+          <FieldStatusIcon valid={bpmn?.valid ?? isFieldValid(bpmn?.value)} />
         </div>
       </div>
     </div>
   );
+}
+
+function FieldStatusIcon({ valid }) {
+  return valid ? (
+    <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+  ) : (
+    <CircleX className="h-5 w-5 text-red-500" />
+  );
+}
+
+function isFieldValid(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return Boolean(normalized) && normalized !== "non renseigne" && normalized !== "non renseigné";
 }

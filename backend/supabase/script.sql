@@ -1,348 +1,397 @@
--- =============================================
--- QONFORM — ISO 9001 | Supabase Schema
--- =============================================
--- Pour exécuter : Supabase Dashboard > SQL Editor > Coller et Run
--- =============================================
+-- WARNING: This schema is for context only and is not meant to be run.
+-- Table order and constraints may not be valid for execution.
 
-
--- ── NORMES & EXIGENCES ──────────────────────
-
-CREATE TABLE IF NOT EXISTS norme (
-  id_norme   SERIAL PRIMARY KEY,
-  code       VARCHAR(20)  NOT NULL UNIQUE,
-  version    VARCHAR(10)  NOT NULL,
-  titre      VARCHAR(200) NOT NULL,
-  date_publication DATE,
-  created_at TIMESTAMPTZ  DEFAULT NOW()
+CREATE TABLE public.accounts_user (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  password character varying NOT NULL,
+  last_login timestamp with time zone,
+  is_superuser boolean NOT NULL,
+  username character varying NOT NULL UNIQUE,
+  first_name character varying NOT NULL,
+  last_name character varying NOT NULL,
+  email character varying NOT NULL UNIQUE,
+  is_staff boolean NOT NULL,
+  is_active boolean NOT NULL,
+  date_joined timestamp with time zone NOT NULL,
+  CONSTRAINT accounts_user_pkey PRIMARY KEY (id)
 );
-
-CREATE TABLE IF NOT EXISTS article (
-  id_article  SERIAL PRIMARY KEY,
-  id_norme    INTEGER NOT NULL REFERENCES norme(id_norme) ON DELETE CASCADE,
-  code_article VARCHAR(20)  NOT NULL,
-  titre       VARCHAR(200) NOT NULL,
-  ponderation DECIMAL(4,2) DEFAULT 1.0
+CREATE TABLE public.accounts_user_groups (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  user_id bigint NOT NULL,
+  group_id integer NOT NULL,
+  CONSTRAINT accounts_user_groups_pkey PRIMARY KEY (id),
+  CONSTRAINT accounts_user_groups_user_id_52b62117_fk_accounts_user_id FOREIGN KEY (user_id) REFERENCES public.accounts_user(id),
+  CONSTRAINT accounts_user_groups_group_id_bd11a704_fk_auth_group_id FOREIGN KEY (group_id) REFERENCES public.auth_group(id)
 );
-
-CREATE TABLE IF NOT EXISTS exigence (
-  id_exigence    SERIAL PRIMARY KEY,
-  id_article     INTEGER NOT NULL REFERENCES article(id_article) ON DELETE CASCADE,
-  description    TEXT    NOT NULL,
-  ponderation    DECIMAL(4,2) DEFAULT 1.0,
-  est_obligatoire BOOLEAN DEFAULT TRUE
+CREATE TABLE public.accounts_user_user_permissions (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  user_id bigint NOT NULL,
+  permission_id integer NOT NULL,
+  CONSTRAINT accounts_user_user_permissions_pkey PRIMARY KEY (id),
+  CONSTRAINT accounts_user_user_p_user_id_e4f0a161_fk_accounts_ FOREIGN KEY (user_id) REFERENCES public.accounts_user(id),
+  CONSTRAINT accounts_user_user_p_permission_id_113bb443_fk_auth_perm FOREIGN KEY (permission_id) REFERENCES public.auth_permission(id)
 );
-
-
--- ── ORGANISATION ────────────────────────────
-
-CREATE TABLE IF NOT EXISTS departement (
-  id_departement       SERIAL PRIMARY KEY,
-  nom                  VARCHAR(150) NOT NULL,
-  code                 VARCHAR(20)  NOT NULL UNIQUE,
-  id_parent            INTEGER REFERENCES departement(id_departement),
-  niveau_hierarchique  INTEGER NOT NULL DEFAULT 1,
-  created_at           TIMESTAMPTZ DEFAULT NOW()
+CREATE TABLE public.action_corrective (
+  id_action integer NOT NULL DEFAULT nextval('action_corrective_id_action_seq'::regclass),
+  id_nc integer NOT NULL,
+  id_responsable integer,
+  description text NOT NULL,
+  statut character varying NOT NULL DEFAULT 'Planifiee'::character varying CHECK (statut::text = ANY (ARRAY['Planifiee'::character varying, 'En_cours'::character varying, 'Realisee'::character varying, 'Verifiee'::character varying]::text[])),
+  date_echeance date,
+  CONSTRAINT action_corrective_pkey PRIMARY KEY (id_action),
+  CONSTRAINT action_corrective_id_responsable_fkey FOREIGN KEY (id_responsable) REFERENCES public.utilisateur(id_user),
+  CONSTRAINT action_corrective_id_nc_fkey FOREIGN KEY (id_nc) REFERENCES public.nc(id_nc)
 );
-
-
--- ── UTILISATEURS & RÔLES ────────────────────
--- auth_id lie chaque ligne à l'utilisateur Supabase Auth (auth.users.id).
--- mot_de_passe est géré par Supabase Auth ; la colonne est conservée pour
--- compatibilité mais doit rester NULL en production.
-
-CREATE TABLE IF NOT EXISTS utilisateur (
-  id_user        SERIAL PRIMARY KEY,
-  auth_id        UUID UNIQUE REFERENCES auth.users(id) ON DELETE SET NULL,
-  nom            VARCHAR(100) NOT NULL,
-  prenom         VARCHAR(100) NOT NULL,
-  email          VARCHAR(150) NOT NULL UNIQUE,
-  est_actif      BOOLEAN DEFAULT TRUE,
-  id_departement INTEGER REFERENCES departement(id_departement),
-  created_at     TIMESTAMPTZ DEFAULT NOW()
+CREATE TABLE public.audit_field (
+  id_audit_field integer NOT NULL DEFAULT nextval('audit_field_id_audit_field_seq'::regclass),
+  id_auditeur integer NOT NULL,
+  id_departement integer NOT NULL,
+  date_audit date NOT NULL,
+  observation text,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT audit_field_pkey PRIMARY KEY (id_audit_field),
+  CONSTRAINT audit_field_id_auditeur_fkey FOREIGN KEY (id_auditeur) REFERENCES public.utilisateur(id_user),
+  CONSTRAINT audit_field_id_departement_fkey FOREIGN KEY (id_departement) REFERENCES public.departement(id_departement)
 );
-
-CREATE TABLE IF NOT EXISTS role (
-  id_role     SERIAL PRIMARY KEY,
-  libelle     VARCHAR(50) NOT NULL UNIQUE,
-  description TEXT
+CREATE TABLE public.audit_terrain (
+  id_audit integer NOT NULL DEFAULT nextval('audit_terrain_id_audit_seq'::regclass),
+  id_processus integer NOT NULL,
+  id_auditeur integer NOT NULL,
+  titre character varying NOT NULL,
+  date_planifiee date,
+  date_realisation date,
+  rapport_pdf character varying,
+  observations text,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT audit_terrain_pkey PRIMARY KEY (id_audit),
+  CONSTRAINT audit_terrain_id_processus_fkey FOREIGN KEY (id_processus) REFERENCES public.processus(id_processus),
+  CONSTRAINT audit_terrain_id_auditeur_fkey FOREIGN KEY (id_auditeur) REFERENCES public.utilisateur(id_user)
 );
-
-CREATE TABLE IF NOT EXISTS user_role (
-  id_user          INTEGER NOT NULL REFERENCES utilisateur(id_user) ON DELETE CASCADE,
-  id_role          INTEGER NOT NULL REFERENCES role(id_role)        ON DELETE CASCADE,
-  date_attribution DATE    NOT NULL DEFAULT CURRENT_DATE,
-  date_expiration  DATE,
-  PRIMARY KEY (id_user, id_role)
+CREATE TABLE public.auth_group (
+  id integer GENERATED ALWAYS AS IDENTITY NOT NULL,
+  name character varying NOT NULL UNIQUE,
+  CONSTRAINT auth_group_pkey PRIMARY KEY (id)
 );
-
-
--- ── PROCESSUS ───────────────────────────────
-
-CREATE TABLE IF NOT EXISTS processus (
-  id_processus  SERIAL PRIMARY KEY,
-  code_process  VARCHAR(30)  NOT NULL UNIQUE,
-  nom           VARCHAR(200) NOT NULL,
-  description   TEXT,
-  type_process  VARCHAR(20)  NOT NULL
-    CHECK (type_process IN ('Management', 'Realisation', 'Support')),
-  id_departement INTEGER NOT NULL REFERENCES departement(id_departement),
-  id_pilote      INTEGER      REFERENCES utilisateur(id_user),
-  created_at     TIMESTAMPTZ  DEFAULT NOW()
+CREATE TABLE public.auth_group_permissions (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  group_id integer NOT NULL,
+  permission_id integer NOT NULL,
+  CONSTRAINT auth_group_permissions_pkey PRIMARY KEY (id),
+  CONSTRAINT auth_group_permissions_group_id_b120cbf9_fk_auth_group_id FOREIGN KEY (group_id) REFERENCES public.auth_group(id),
+  CONSTRAINT auth_group_permissio_permission_id_84c5c92e_fk_auth_perm FOREIGN KEY (permission_id) REFERENCES public.auth_permission(id)
 );
-
-
--- ── STATUT FICHE (workflow) ──────────────────
-
-CREATE TABLE IF NOT EXISTS statut_fiche (
-  id_statut  SERIAL PRIMARY KEY,
-  libelle    VARCHAR(50) NOT NULL UNIQUE,
-  ordre      INTEGER     NOT NULL,
-  couleur    VARCHAR(10),
-  est_final  BOOLEAN DEFAULT FALSE
+CREATE TABLE public.auth_permission (
+  id integer GENERATED ALWAYS AS IDENTITY NOT NULL,
+  name character varying NOT NULL,
+  content_type_id integer NOT NULL,
+  codename character varying NOT NULL,
+  CONSTRAINT auth_permission_pkey PRIMARY KEY (id),
+  CONSTRAINT auth_permission_content_type_id_2f476e4b_fk_django_co FOREIGN KEY (content_type_id) REFERENCES public.django_content_type(id)
 );
-
-INSERT INTO statut_fiche (libelle, ordre, couleur, est_final) VALUES ('Brouillon',   1, '#9CA3AF', FALSE);
-INSERT INTO statut_fiche (libelle, ordre, couleur, est_final) VALUES ('Soumis',      2, '#3B82F6', FALSE);
-INSERT INTO statut_fiche (libelle, ordre, couleur, est_final) VALUES ('En_revision', 3, '#F59E0B', FALSE);
-INSERT INTO statut_fiche (libelle, ordre, couleur, est_final) VALUES ('Valide',      4, '#10B981', TRUE);
-INSERT INTO statut_fiche (libelle, ordre, couleur, est_final) VALUES ('Publie',      5, '#6366F1', TRUE);
-
-
--- ── VERSION FICHE ───────────────────────────
-
-CREATE TABLE IF NOT EXISTS version_fiche (
-  id_version           SERIAL PRIMARY KEY,
-  id_processus         INTEGER NOT NULL REFERENCES processus(id_processus)   ON DELETE CASCADE,
-  id_statut            INTEGER NOT NULL REFERENCES statut_fiche(id_statut)   DEFAULT 1,
-  id_redacteur         INTEGER NOT NULL REFERENCES utilisateur(id_user),
-  numero_version       VARCHAR(10) NOT NULL,
-  commentaire_version  TEXT,
-  date_creation        TIMESTAMPTZ DEFAULT NOW(),
-  date_derniere_modif  TIMESTAMPTZ,
-  date_validation      TIMESTAMPTZ
+CREATE TABLE public.champ_fiche (
+  id_champ integer NOT NULL DEFAULT nextval('champ_fiche_id_champ_seq'::regclass),
+  id_version integer NOT NULL,
+  libelle character varying NOT NULL,
+  type_champ character varying NOT NULL CHECK (type_champ::text = ANY (ARRAY['texte'::character varying, 'nombre'::character varying, 'date'::character varying, 'booleen'::character varying, 'liste'::character varying]::text[])),
+  valeur text,
+  est_obligatoire boolean DEFAULT false,
+  ordre integer NOT NULL DEFAULT 1,
+  id_champ_template integer,
+  valeur_json jsonb,
+  CONSTRAINT champ_fiche_pkey PRIMARY KEY (id_champ),
+  CONSTRAINT champ_fiche_id_version_fkey FOREIGN KEY (id_version) REFERENCES public.version_fiche(id_version),
+  CONSTRAINT champ_fiche_id_champ_template_fkey FOREIGN KEY (id_champ_template) REFERENCES public.champ_template(id_champ_template)
 );
-
-
--- ── CHAMPS FICHE ────────────────────────────
-
-CREATE TABLE IF NOT EXISTS champ_fiche (
-  id_champ       SERIAL PRIMARY KEY,
-  id_version     INTEGER NOT NULL REFERENCES version_fiche(id_version) ON DELETE CASCADE,
-  libelle        VARCHAR(200) NOT NULL,
-  type_champ     VARCHAR(20)  NOT NULL
-    CHECK (type_champ IN ('texte', 'nombre', 'date', 'booleen', 'liste')),
-  valeur         TEXT,
-  est_obligatoire BOOLEAN DEFAULT FALSE,
-  ordre          INTEGER NOT NULL DEFAULT 1
+CREATE TABLE public.champ_template (
+  id_champ_template integer NOT NULL DEFAULT nextval('champ_template_id_champ_template_seq'::regclass),
+  id_section_template integer NOT NULL,
+  libelle character varying NOT NULL,
+  type_champ character varying NOT NULL CHECK (type_champ::text = ANY (ARRAY['text'::character varying, 'nombre'::character varying, 'date'::character varying, 'booleen'::character varying, 'checklist'::character varying, 'liste'::character varying, 'tableau'::character varying]::text[])),
+  configuration jsonb DEFAULT '{}'::jsonb,
+  est_obligatoire boolean DEFAULT false,
+  placeholder character varying,
+  aide text,
+  ordre integer NOT NULL DEFAULT 1,
+  est_actif boolean DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT champ_template_pkey PRIMARY KEY (id_champ_template),
+  CONSTRAINT champ_template_id_section_template_fkey FOREIGN KEY (id_section_template) REFERENCES public.section_template(id_section_template)
 );
-
-
--- ── DOCUMENTS ───────────────────────────────
-
-CREATE TABLE IF NOT EXISTS document (
-  id_document     SERIAL PRIMARY KEY,
-  id_version      INTEGER NOT NULL REFERENCES version_fiche(id_version) ON DELETE CASCADE,
-  id_uploader     INTEGER NOT NULL REFERENCES utilisateur(id_user),
-  nom_fichier     VARCHAR(255) NOT NULL,
-  type_document   VARCHAR(30)  NOT NULL
-    CHECK (type_document IN ('BPMN', 'PDF', 'Preuve', 'Rapport', 'Autre')),
-  chemin_stockage VARCHAR(500) NOT NULL,
-  taille          INTEGER,
-  version_doc     VARCHAR(10),
-  date_upload     TIMESTAMPTZ DEFAULT NOW()
+CREATE TABLE public.checklist_evaluation (
+  id_evaluation integer NOT NULL DEFAULT nextval('checklist_evaluation_id_evaluation_seq'::regclass),
+  id_version integer NOT NULL,
+  id_auditeur integer NOT NULL,
+  resultat character varying CHECK (resultat::text = ANY (ARRAY['Conforme'::character varying, 'Non_conforme'::character varying, 'Partiel'::character varying, 'NA'::character varying]::text[])),
+  commentaire text,
+  date_evaluation timestamp with time zone DEFAULT now(),
+  id_section_template integer,
+  id_critere integer,
+  CONSTRAINT checklist_evaluation_pkey PRIMARY KEY (id_evaluation),
+  CONSTRAINT checklist_evaluation_id_auditeur_fkey FOREIGN KEY (id_auditeur) REFERENCES public.utilisateur(id_user),
+  CONSTRAINT checklist_evaluation_id_section_template_fkey FOREIGN KEY (id_section_template) REFERENCES public.section_template(id_section_template),
+  CONSTRAINT checklist_evaluation_id_critere_fkey FOREIGN KEY (id_critere) REFERENCES public.critere_evaluation(id_critere),
+  CONSTRAINT checklist_evaluation_id_version_fkey FOREIGN KEY (id_version) REFERENCES public.version_fiche(id_version)
 );
-
-
--- ── CHECKLIST AUDIT ─────────────────────────
-
-CREATE TABLE IF NOT EXISTS checklist_evaluation (
-  id_evaluation  SERIAL PRIMARY KEY,
-  id_version     INTEGER NOT NULL REFERENCES version_fiche(id_version)  ON DELETE CASCADE,
-  id_auditeur    INTEGER NOT NULL REFERENCES utilisateur(id_user),
-  id_exigence    INTEGER NOT NULL REFERENCES exigence(id_exigence),
-  resultat       VARCHAR(20)
-    CHECK (resultat IN ('Conforme', 'Non_conforme', 'Partiel', 'NA')),
-  commentaire    TEXT,
-  date_evaluation TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE (id_version, id_exigence)
+CREATE TABLE public.colonne_template (
+  id integer NOT NULL DEFAULT nextval('colonne_template_id_seq'::regclass),
+  id_champ integer NOT NULL,
+  cle character varying NOT NULL,
+  libelle character varying NOT NULL,
+  placeholder character varying,
+  ordre integer NOT NULL DEFAULT 1,
+  CONSTRAINT colonne_template_pkey PRIMARY KEY (id),
+  CONSTRAINT colonne_template_id_champ_fkey FOREIGN KEY (id_champ) REFERENCES public.champ_template(id_champ_template)
 );
-
-
--- ── NON-CONFORMITÉS ─────────────────────────
-
-CREATE TABLE IF NOT EXISTS nc (
-  id_nc          SERIAL PRIMARY KEY,
-  id_version     INTEGER NOT NULL REFERENCES version_fiche(id_version) ON DELETE CASCADE,
-  id_auditeur    INTEGER NOT NULL REFERENCES utilisateur(id_user),
-  id_exigence    INTEGER      REFERENCES exigence(id_exigence),
-  titre          VARCHAR(200) NOT NULL,
-  description    TEXT,
-  gravite        VARCHAR(20)  NOT NULL
-    CHECK (gravite IN ('Majeure', 'Mineure', 'Observation')),
-  statut         VARCHAR(20)  NOT NULL DEFAULT 'Ouverte'
-    CHECK (statut IN ('Ouverte', 'En_cours', 'Cloturee')),
-  date_detection TIMESTAMPTZ DEFAULT NOW(),
-  date_cloture   TIMESTAMPTZ
+CREATE TABLE public.critere_evaluation (
+  id_critere integer NOT NULL DEFAULT nextval('critere_evaluation_id_critere_seq'::regclass),
+  nom text NOT NULL,
+  est_actif boolean NOT NULL DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT critere_evaluation_pkey PRIMARY KEY (id_critere)
 );
-
-
--- ── ACTIONS CORRECTIVES ─────────────────────
-
-CREATE TABLE IF NOT EXISTS action_corrective (
-  id_action          SERIAL PRIMARY KEY,
-  id_nc              INTEGER NOT NULL REFERENCES nc(id_nc) ON DELETE CASCADE,
-  id_responsable     INTEGER REFERENCES utilisateur(id_user),
-  description        TEXT    NOT NULL,
-  type_action        VARCHAR(20)
-    CHECK (type_action IN ('Corrective', 'Preventive', 'Amelioration')),
-  statut             VARCHAR(20) NOT NULL DEFAULT 'Planifiee'
-    CHECK (statut IN ('Planifiee', 'En_cours', 'Realisee', 'Verifiee')),
-  date_echeance      DATE,
-  date_realisation   DATE,
-  efficacite_verifiee BOOLEAN DEFAULT FALSE
+CREATE TABLE public.departement (
+  id_departement integer NOT NULL DEFAULT nextval('departement_id_departement_seq'::regclass),
+  nom character varying NOT NULL,
+  code character varying NOT NULL UNIQUE,
+  id_parent integer,
+  niveau_hierarchique integer NOT NULL DEFAULT 1,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT departement_pkey PRIMARY KEY (id_departement),
+  CONSTRAINT departement_id_parent_fkey FOREIGN KEY (id_parent) REFERENCES public.departement(id_departement)
 );
-
-
--- ── AUDIT TERRAIN ───────────────────────────
-
-CREATE TABLE IF NOT EXISTS audit_terrain (
-  id_audit        SERIAL PRIMARY KEY,
-  id_processus    INTEGER NOT NULL REFERENCES processus(id_processus),
-  id_auditeur     INTEGER NOT NULL REFERENCES utilisateur(id_user),
-  titre           VARCHAR(200) NOT NULL,
-  statut          VARCHAR(20)  NOT NULL DEFAULT 'Planifie'
-    CHECK (statut IN ('Planifie', 'En_cours', 'Cloture')),
-  date_planifiee  DATE,
-  date_realisation DATE,
-  rapport_pdf     VARCHAR(500),
-  observations    TEXT,
-  created_at      TIMESTAMPTZ DEFAULT NOW()
+CREATE TABLE public.django_admin_log (
+  id integer GENERATED ALWAYS AS IDENTITY NOT NULL,
+  action_time timestamp with time zone NOT NULL,
+  object_id text,
+  object_repr character varying NOT NULL,
+  action_flag smallint NOT NULL CHECK (action_flag >= 0),
+  change_message text NOT NULL,
+  content_type_id integer,
+  user_id bigint NOT NULL,
+  CONSTRAINT django_admin_log_pkey PRIMARY KEY (id),
+  CONSTRAINT django_admin_log_content_type_id_c4bce8eb_fk_django_co FOREIGN KEY (content_type_id) REFERENCES public.django_content_type(id),
+  CONSTRAINT django_admin_log_user_id_c564eba6_fk_accounts_user_id FOREIGN KEY (user_id) REFERENCES public.accounts_user(id)
 );
-
-
--- =============================================
--- INDEX DE PERFORMANCE
--- =============================================
-
-CREATE INDEX IF NOT EXISTS idx_version_fiche_processus  ON version_fiche(id_processus);
-CREATE INDEX IF NOT EXISTS idx_version_fiche_statut     ON version_fiche(id_statut);
-CREATE INDEX IF NOT EXISTS idx_champ_fiche_version      ON champ_fiche(id_version);
-CREATE INDEX IF NOT EXISTS idx_document_version         ON document(id_version);
-CREATE INDEX IF NOT EXISTS idx_nc_version               ON nc(id_version);
-CREATE INDEX IF NOT EXISTS idx_nc_statut                ON nc(statut);
-CREATE INDEX IF NOT EXISTS idx_checklist_version        ON checklist_evaluation(id_version);
-CREATE INDEX IF NOT EXISTS idx_processus_departement    ON processus(id_departement);
-CREATE INDEX IF NOT EXISTS idx_user_departement         ON utilisateur(id_departement);
-CREATE INDEX IF NOT EXISTS idx_utilisateur_auth_id      ON utilisateur(auth_id);
-CREATE INDEX IF NOT EXISTS idx_exigence_article         ON exigence(id_article);
-CREATE INDEX IF NOT EXISTS idx_article_norme            ON article(id_norme);
-
-
--- =============================================
--- ROW LEVEL SECURITY (Supabase RLS)
--- =============================================
-
-ALTER TABLE utilisateur          ENABLE ROW LEVEL SECURITY;
-ALTER TABLE version_fiche        ENABLE ROW LEVEL SECURITY;
-ALTER TABLE nc                   ENABLE ROW LEVEL SECURITY;
-ALTER TABLE document             ENABLE ROW LEVEL SECURITY;
-ALTER TABLE checklist_evaluation ENABLE ROW LEVEL SECURITY;
-ALTER TABLE processus            ENABLE ROW LEVEL SECURITY;
-ALTER TABLE action_corrective    ENABLE ROW LEVEL SECURITY;
-
-
--- Helper : retrouver l'id_user interne à partir du JWT courant
-CREATE OR REPLACE FUNCTION current_user_id()
-RETURNS INTEGER
-LANGUAGE sql STABLE
-AS $$
-  SELECT id_user FROM utilisateur WHERE auth_id = auth.uid() AND est_actif = TRUE LIMIT 1;
-$$;
-
-
--- ── Politiques utilisateur ───────────────────
-
--- Un utilisateur voit uniquement son propre profil
-CREATE POLICY "utilisateur: voir son profil"
-  ON utilisateur FOR SELECT
-  USING (auth_id = auth.uid());
-
--- Lecture de sa propre ligne pour mise à jour
-CREATE POLICY "utilisateur: modifier son profil"
-  ON utilisateur FOR UPDATE
-  USING (auth_id = auth.uid());
-
-
--- ── Politiques version_fiche ─────────────────
-
--- Tout utilisateur actif peut lire les fiches
-CREATE POLICY "version_fiche: lecture utilisateurs actifs"
-  ON version_fiche FOR SELECT
-  USING (current_user_id() IS NOT NULL);
-
--- Seul le rédacteur peut créer/modifier une fiche en Brouillon
-CREATE POLICY "version_fiche: écriture rédacteur"
-  ON version_fiche FOR INSERT
-  WITH CHECK (id_redacteur = current_user_id());
-
-CREATE POLICY "version_fiche: modification rédacteur"
-  ON version_fiche FOR UPDATE
-  USING (
-    id_redacteur = current_user_id()
-    AND id_statut = (SELECT id_statut FROM statut_fiche WHERE libelle = 'Brouillon')
-  );
-
-
--- ── Politiques nc ────────────────────────────
-
-CREATE POLICY "nc: lecture utilisateurs actifs"
-  ON nc FOR SELECT
-  USING (current_user_id() IS NOT NULL);
-
-CREATE POLICY "nc: création par auditeur"
-  ON nc FOR INSERT
-  WITH CHECK (id_auditeur = current_user_id());
-
-
--- ── Politiques document ──────────────────────
-
-CREATE POLICY "document: lecture utilisateurs actifs"
-  ON document FOR SELECT
-  USING (current_user_id() IS NOT NULL);
-
-CREATE POLICY "document: upload par uploader"
-  ON document FOR INSERT
-  WITH CHECK (id_uploader = current_user_id());
-
-
--- ── Politiques checklist_evaluation ─────────
-
-CREATE POLICY "checklist: lecture utilisateurs actifs"
-  ON checklist_evaluation FOR SELECT
-  USING (current_user_id() IS NOT NULL);
-
-CREATE POLICY "checklist: saisie par auditeur"
-  ON checklist_evaluation FOR INSERT
-  WITH CHECK (id_auditeur = current_user_id());
-
-CREATE POLICY "checklist: modification par auditeur"
-  ON checklist_evaluation FOR UPDATE
-  USING (id_auditeur = current_user_id());
-
-
--- ── Politiques processus ─────────────────────
-
-CREATE POLICY "processus: lecture utilisateurs actifs"
-  ON processus FOR SELECT
-  USING (current_user_id() IS NOT NULL);
-
-
--- ── Politiques action_corrective ────────────
-
-CREATE POLICY "action_corrective: lecture utilisateurs actifs"
-  ON action_corrective FOR SELECT
-  USING (current_user_id() IS NOT NULL);
-
-CREATE POLICY "action_corrective: modification par responsable"
-  ON action_corrective FOR UPDATE
-  USING (id_responsable = current_user_id());
+CREATE TABLE public.django_content_type (
+  id integer GENERATED ALWAYS AS IDENTITY NOT NULL,
+  app_label character varying NOT NULL,
+  model character varying NOT NULL,
+  CONSTRAINT django_content_type_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.django_migrations (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  app character varying NOT NULL,
+  name character varying NOT NULL,
+  applied timestamp with time zone NOT NULL,
+  CONSTRAINT django_migrations_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.django_session (
+  session_key character varying NOT NULL,
+  session_data text NOT NULL,
+  expire_date timestamp with time zone NOT NULL,
+  CONSTRAINT django_session_pkey PRIMARY KEY (session_key)
+);
+CREATE TABLE public.document (
+  id_document integer NOT NULL DEFAULT nextval('document_id_document_seq'::regclass),
+  id_version integer,
+  id_uploader integer NOT NULL,
+  nom_fichier character varying NOT NULL,
+  type_document character varying NOT NULL CHECK (type_document::text = ANY (ARRAY['BPMN'::character varying, 'Rapport'::character varying, 'Preuve'::character varying, 'Support'::character varying, 'Rapport_audit_fiche'::character varying]::text[])),
+  chemin_stockage character varying NOT NULL,
+  taille integer,
+  version_doc character varying,
+  date_upload timestamp with time zone DEFAULT now(),
+  description text,
+  type_support character varying,
+  id_audit_field integer,
+  evaluation character varying CHECK (evaluation IS NULL OR (evaluation::text = ANY (ARRAY['Conforme'::character varying, 'Non_conforme'::character varying, 'Partiel'::character varying, 'NA'::character varying]::text[]))),
+  CONSTRAINT document_pkey PRIMARY KEY (id_document),
+  CONSTRAINT document_id_uploader_fkey FOREIGN KEY (id_uploader) REFERENCES public.utilisateur(id_user),
+  CONSTRAINT document_id_audit_field_fkey FOREIGN KEY (id_audit_field) REFERENCES public.audit_field(id_audit_field),
+  CONSTRAINT document_id_version_fkey FOREIGN KEY (id_version) REFERENCES public.version_fiche(id_version)
+);
+CREATE TABLE public.documents_document (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  titre character varying NOT NULL,
+  fichier character varying NOT NULL,
+  date_publication timestamp with time zone NOT NULL,
+  publie_par_id bigint,
+  CONSTRAINT documents_document_pkey PRIMARY KEY (id),
+  CONSTRAINT documents_document_publie_par_id_dbbb9f91_fk_accounts_user_id FOREIGN KEY (publie_par_id) REFERENCES public.accounts_user(id)
+);
+CREATE TABLE public.messaging_conversation (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  created_at timestamp with time zone NOT NULL,
+  updated_at timestamp with time zone NOT NULL,
+  auditeur_id bigint NOT NULL,
+  utilisateur_id bigint NOT NULL,
+  CONSTRAINT messaging_conversation_pkey PRIMARY KEY (id),
+  CONSTRAINT messaging_conversation_auditeur_id_32f1eb6e_fk_accounts_user_id FOREIGN KEY (auditeur_id) REFERENCES public.accounts_user(id),
+  CONSTRAINT messaging_conversati_utilisateur_id_29a16639_fk_accounts_ FOREIGN KEY (utilisateur_id) REFERENCES public.accounts_user(id)
+);
+CREATE TABLE public.messaging_message (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  content text NOT NULL,
+  is_read boolean NOT NULL,
+  created_at timestamp with time zone NOT NULL,
+  conversation_id bigint NOT NULL,
+  sender_id bigint NOT NULL,
+  CONSTRAINT messaging_message_pkey PRIMARY KEY (id),
+  CONSTRAINT messaging_message_conversation_id_3db4d3d1_fk_messaging FOREIGN KEY (conversation_id) REFERENCES public.messaging_conversation(id),
+  CONSTRAINT messaging_message_sender_id_7a7088e6_fk_accounts_user_id FOREIGN KEY (sender_id) REFERENCES public.accounts_user(id)
+);
+CREATE TABLE public.nc (
+  id_nc integer NOT NULL DEFAULT nextval('nc_id_nc_seq'::regclass),
+  id_version integer NOT NULL,
+  id_auditeur integer NOT NULL,
+  titre character varying NOT NULL,
+  description text,
+  date_detection timestamp with time zone DEFAULT now(),
+  date_cloture timestamp with time zone,
+  id_section_template integer,
+  CONSTRAINT nc_pkey PRIMARY KEY (id_nc),
+  CONSTRAINT nc_id_section_template_fkey FOREIGN KEY (id_section_template) REFERENCES public.section_template(id_section_template),
+  CONSTRAINT nc_id_auditeur_fkey FOREIGN KEY (id_auditeur) REFERENCES public.utilisateur(id_user),
+  CONSTRAINT nc_id_version_fkey FOREIGN KEY (id_version) REFERENCES public.version_fiche(id_version)
+);
+CREATE TABLE public.norme (
+  id_norme integer NOT NULL DEFAULT nextval('norme_id_norme_seq'::regclass),
+  code character varying NOT NULL UNIQUE,
+  version character varying NOT NULL,
+  titre character varying NOT NULL,
+  date_publication date,
+  created_at timestamp with time zone DEFAULT now(),
+  est_active boolean NOT NULL DEFAULT false,
+  CONSTRAINT norme_pkey PRIMARY KEY (id_norme)
+);
+CREATE TABLE public.option_champ (
+  id integer NOT NULL DEFAULT nextval('option_champ_id_seq'::regclass),
+  id_champ integer NOT NULL,
+  valeur character varying NOT NULL,
+  libelle character varying NOT NULL,
+  ordre integer NOT NULL DEFAULT 1,
+  CONSTRAINT option_champ_pkey PRIMARY KEY (id),
+  CONSTRAINT option_champ_id_champ_fkey FOREIGN KEY (id_champ) REFERENCES public.champ_template(id_champ_template)
+);
+CREATE TABLE public.organization_unit (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  code character varying NOT NULL UNIQUE,
+  name character varying NOT NULL,
+  type character varying NOT NULL,
+  level smallint NOT NULL CHECK (level >= 0),
+  description text NOT NULL,
+  responsable_id integer,
+  created_by_id integer,
+  is_active boolean NOT NULL,
+  created_at timestamp with time zone NOT NULL,
+  updated_at timestamp with time zone NOT NULL,
+  parent_id bigint,
+  CONSTRAINT organization_unit_pkey PRIMARY KEY (id),
+  CONSTRAINT organization_unit_parent_id_ce577442_fk_organization_unit_id FOREIGN KEY (parent_id) REFERENCES public.organization_unit(id)
+);
+CREATE TABLE public.processus (
+  id_processus integer NOT NULL DEFAULT nextval('processus_id_processus_seq'::regclass),
+  code_process character varying NOT NULL UNIQUE,
+  nom character varying NOT NULL,
+  description text,
+  type_process character varying NOT NULL CHECK (type_process::text = ANY (ARRAY['Management'::character varying, 'Realisation'::character varying, 'Support'::character varying]::text[])),
+  id_departement integer NOT NULL,
+  id_pilote integer,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT processus_pkey PRIMARY KEY (id_processus),
+  CONSTRAINT processus_id_departement_fkey FOREIGN KEY (id_departement) REFERENCES public.departement(id_departement),
+  CONSTRAINT processus_id_pilote_fkey FOREIGN KEY (id_pilote) REFERENCES public.utilisateur(id_user)
+);
+CREATE TABLE public.processus_liaison (
+  id integer NOT NULL DEFAULT nextval('processus_liaison_id_seq'::regclass),
+  id_processus_amont integer NOT NULL,
+  id_processus_aval integer NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT processus_liaison_pkey PRIMARY KEY (id),
+  CONSTRAINT processus_liaison_amont_fkey FOREIGN KEY (id_processus_amont) REFERENCES public.processus(id_processus),
+  CONSTRAINT processus_liaison_aval_fkey FOREIGN KEY (id_processus_aval) REFERENCES public.processus(id_processus)
+);
+CREATE TABLE public.role (
+  id_role integer NOT NULL DEFAULT nextval('role_id_role_seq'::regclass),
+  libelle character varying NOT NULL UNIQUE,
+  description text,
+  CONSTRAINT role_pkey PRIMARY KEY (id_role)
+);
+CREATE TABLE public.section_template (
+  id_section_template integer NOT NULL DEFAULT nextval('section_template_id_section_template_seq'::regclass),
+  nom character varying NOT NULL,
+  description text,
+  ordre integer NOT NULL DEFAULT 1,
+  est_actif boolean DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  id_norme integer,
+  CONSTRAINT section_template_pkey PRIMARY KEY (id_section_template),
+  CONSTRAINT section_template_id_norme_fkey FOREIGN KEY (id_norme) REFERENCES public.norme(id_norme)
+);
+CREATE TABLE public.statut_fiche (
+  id_statut integer NOT NULL DEFAULT nextval('statut_fiche_id_statut_seq'::regclass),
+  libelle character varying NOT NULL UNIQUE,
+  ordre integer NOT NULL,
+  couleur character varying,
+  est_final boolean DEFAULT false,
+  CONSTRAINT statut_fiche_pkey PRIMARY KEY (id_statut)
+);
+CREATE TABLE public.tache_planifiee (
+  id_tache integer NOT NULL DEFAULT nextval('tache_planifiee_id_tache_seq'::regclass),
+  intitule character varying NOT NULL,
+  description text,
+  type_tache character varying NOT NULL,
+  id_responsable integer NOT NULL,
+  id_createur integer NOT NULL,
+  date_debut date NOT NULL,
+  date_fin date NOT NULL,
+  priorite character varying NOT NULL DEFAULT 'Moyenne'::character varying CHECK (priorite::text = ANY (ARRAY['Haute'::character varying, 'Moyenne'::character varying, 'Basse'::character varying]::text[])),
+  statut character varying NOT NULL DEFAULT 'Planifiée'::character varying CHECK (statut::text = ANY (ARRAY['Planifiée'::character varying, 'En cours'::character varying, 'Terminée'::character varying, 'Annulée'::character varying]::text[])),
+  observations text,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT tache_planifiee_pkey PRIMARY KEY (id_tache),
+  CONSTRAINT tache_planifiee_id_responsable_fkey FOREIGN KEY (id_responsable) REFERENCES public.utilisateur(id_user),
+  CONSTRAINT tache_planifiee_id_createur_fkey FOREIGN KEY (id_createur) REFERENCES public.utilisateur(id_user)
+);
+CREATE TABLE public.user_role (
+  id_user integer NOT NULL,
+  id_role integer NOT NULL,
+  date_attribution date NOT NULL DEFAULT CURRENT_DATE,
+  date_expiration date,
+  id bigint NOT NULL DEFAULT nextval('user_role_id_seq'::regclass),
+  CONSTRAINT user_role_pkey PRIMARY KEY (id_user, id_role),
+  CONSTRAINT user_role_id_user_fkey FOREIGN KEY (id_user) REFERENCES public.utilisateur(id_user),
+  CONSTRAINT user_role_id_role_fkey FOREIGN KEY (id_role) REFERENCES public.role(id_role)
+);
+CREATE TABLE public.utilisateur (
+  id_user integer NOT NULL DEFAULT nextval('utilisateur_id_user_seq'::regclass),
+  auth_id bigint UNIQUE,
+  nom character varying NOT NULL,
+  prenom character varying NOT NULL,
+  email character varying NOT NULL UNIQUE,
+  est_actif boolean DEFAULT true,
+  id_departement integer,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT utilisateur_pkey PRIMARY KEY (id_user),
+  CONSTRAINT utilisateur_id_departement_fkey FOREIGN KEY (id_departement) REFERENCES public.departement(id_departement),
+  CONSTRAINT utilisateur_auth_id_fkey FOREIGN KEY (auth_id) REFERENCES public.accounts_user(id)
+);
+CREATE TABLE public.version_fiche (
+  id_version integer NOT NULL DEFAULT nextval('version_fiche_id_version_seq'::regclass),
+  id_processus integer NOT NULL,
+  id_redacteur integer NOT NULL,
+  numero_version character varying NOT NULL,
+  commentaire_version text,
+  date_creation timestamp with time zone DEFAULT now(),
+  date_derniere_modif timestamp with time zone,
+  date_validation timestamp with time zone,
+  statut character varying NOT NULL DEFAULT 'Brouillon'::character varying CHECK (statut::text = ANY (ARRAY['Brouillon'::character varying, 'Soumise'::character varying, 'En_revision'::character varying, 'Publiee'::character varying, 'Archivee'::character varying]::text[])),
+  revue boolean NOT NULL DEFAULT false,
+  commit integer NOT NULL DEFAULT 0,
+  CONSTRAINT version_fiche_pkey PRIMARY KEY (id_version),
+  CONSTRAINT version_fiche_id_processus_fkey FOREIGN KEY (id_processus) REFERENCES public.processus(id_processus),
+  CONSTRAINT version_fiche_id_redacteur_fkey FOREIGN KEY (id_redacteur) REFERENCES public.utilisateur(id_user)
+);
