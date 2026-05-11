@@ -24,9 +24,15 @@ export default function RequirementsPanel({
     [section.requirements]
   );
 
-  const autoTotal = section.processFields.length;
-  const autoCompleted = section.processFields.filter((field) => isFieldValid(field.value)).length;
-  const autoRate = autoTotal === 0 ? 0 : Math.round((autoCompleted / autoTotal) * 100);
+  const autoTotal = section.completionTotal ?? section.processFields.length;
+  const autoCompleted =
+    section.completionDone ?? section.processFields.filter((field) => isFieldValid(field.value)).length;
+  const autoRate =
+    typeof section.completionRate === "number"
+      ? section.completionRate
+      : autoTotal === 0
+        ? 0
+        : Math.round((autoCompleted / autoTotal) * 100);
 
   const [ncOpen, setNcOpen] = useState(false);
   const [ncForm, setNcForm] = useState(createNcForm(section, manualRequirements[0]?.id || ""));
@@ -67,10 +73,6 @@ export default function RequirementsPanel({
         .map((action) => ({
           id: action.id,
           description: action.description.trim(),
-          responsible: action.responsible.trim(),
-          dueDate: action.dueDate,
-          priority: action.priority,
-          status: action.status,
         })),
     });
 
@@ -117,6 +119,7 @@ export default function RequirementsPanel({
       </div>
 
       <div className="space-y-4 p-4">
+        {!section.isDocumentStep && (
         <section className="rounded-xl border border-[#E8E1F5] bg-[#FBFAFE] p-3.5">
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-2">
@@ -140,13 +143,14 @@ export default function RequirementsPanel({
             />
           </div>
         </section>
+        )}
 
         <section className="space-y-3">
           <div className="flex items-center gap-2">
             <Target className="h-4 w-4 text-[#5b1fa8]" />
             <div>
               <h3 className="text-xs font-bold uppercase tracking-[0.08em] text-gray-950">
-                Checklist manuelle ISO 9001
+                {section.isDocumentStep ? "Evaluation du document" : "Checklist manuelle ISO 9001"}
               </h3>
               <p className="text-xs text-slate-500">
                 Ces critères sont évalués uniquement par l&apos;auditeur.
@@ -226,7 +230,7 @@ export default function RequirementsPanel({
                               <div className="text-xs font-bold text-slate-800">
                                 {action.description}
                               </div>
-                              <div className="mt-1 flex flex-wrap gap-2 text-[11px] text-slate-500">
+                              <div className="hidden">
                                 {action.responsible && <span>Responsable: {action.responsible}</span>}
                                 {action.dueDate && <span>Échéance: {action.dueDate}</span>}
                                 {action.priority && <span>Priorité: {action.priority}</span>}
@@ -269,7 +273,7 @@ export default function RequirementsPanel({
                           className="rounded-md border border-gray-100 bg-gray-50 px-3 py-2"
                         >
                           <p className="text-xs font-semibold text-slate-800">{action.description}</p>
-                          <div className="mt-1 flex flex-wrap gap-2 text-[11px] text-slate-500">
+                          <div className="hidden">
                             {action.responsible && <span>{action.responsible}</span>}
                             {action.priority && <span>{action.priority}</span>}
                             {action.dueDate && <span>{action.dueDate}</span>}
@@ -424,7 +428,7 @@ export default function RequirementsPanel({
                             />
                           </label>
 
-                          <div className="grid gap-3 md:grid-cols-2">
+                          <div className="hidden">
                             <label className="block">
                               <span className="text-xs font-semibold text-gray-900">Responsable</span>
                               <input
@@ -450,7 +454,7 @@ export default function RequirementsPanel({
                             </label>
                           </div>
 
-                          <div className="grid gap-3 md:grid-cols-2">
+                          <div className="hidden">
                             <label className="block">
                               <span className="text-xs font-semibold text-gray-900">Priorité</span>
                               <select

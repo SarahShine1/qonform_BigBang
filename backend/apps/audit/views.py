@@ -49,6 +49,27 @@ ACTION_STATUS_FROM_DB = {
 
 SEVERITY_VALUES = {"Mineure", "Majeure", "Critique"}
 
+DEFAULT_AUDIT_CRITERIA = [
+    "Contexte coherent avec les enjeux ESI",
+    "Risques : criticite P x I correcte et plan de traitement",
+    "Responsabilites du pilote claires",
+    "Competences RH definies et mappees",
+    "Dysfonctionnements avec action corrective",
+]
+
+EVALUATION_SCORE = {
+    "Conforme": 100,
+    "Partiel": 50,
+    "Non_conforme": 0,
+}
+
+CONFORMITY_WEIGHTS = {
+    "completion": 0.40,
+    "checklist": 0.30,
+    "bpmn": 0.15,
+    "proofs": 0.15,
+}
+
 
 def dictfetchall(cursor):
     columns = [column[0] for column in cursor.description]
@@ -200,6 +221,22 @@ def fiche_audit_report(request, id_version):
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
+def start_audit_execution(request, id_version):
+    auditeur_id = get_auditeur_id(request)
+    if not auditeur_id:
+        return Response({"detail": "Auditeur introuvable."}, status=status.HTTP_400_BAD_REQUEST)
+
+    payload = request.data or {}
+    with transaction.atomic(), connection.cursor() as cursor:
+        update_version_status(cursor, id_version, "En_revision")
+        update_version_commit(cursor, id_version, payload.get("currentIndex", 0))
+        upsert_audit_terrain(cursor, id_version, auditeur_id, "En_cours", "")
+
+    return Response({"ok": True, "id_version": id_version, "status": "En_revision"})
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
 def save_audit_draft(request, id_version):
     auditeur_id = get_auditeur_id(request)
     if not auditeur_id:
@@ -210,6 +247,7 @@ def save_audit_draft(request, id_version):
 
     with transaction.atomic(), connection.cursor() as cursor:
         update_version_status(cursor, id_version, "En_revision")
+        update_version_commit(cursor, id_version, payload.get("currentIndex"))
         upsert_audit_terrain(cursor, id_version, auditeur_id, "En_cours", payload.get("recommendations", ""))
         replace_evaluations(cursor, id_version, auditeur_id, evaluations)
         replace_non_conformities(
@@ -251,7 +289,7 @@ def complete_audit_execution(request, id_version):
         )
 
         if action == "send_back":
-            update_version_status(cursor, id_version, "En_revision")
+            update_version_status(cursor, id_version, "Brouillon", revue=True)
             upsert_audit_terrain(
                 cursor,
                 id_version,
@@ -259,11 +297,11 @@ def complete_audit_execution(request, id_version):
                 "En_cours",
                 payload.get("recommendations", ""),
             )
-            result_status = "En_revision"
+            result_status = "Brouillon"
             report_name = None
         else:
-            update_version_status(cursor, id_version, "Publiee")
-            report_name = ensure_report_reference(cursor, id_version)
+            update_version_status(cursor, id_version, "Publiee", revue=False)
+            report_name = ensure_report_reference(cursor, id_version, auditeur_id)
             upsert_audit_terrain(
                 cursor,
                 id_version,
@@ -357,6 +395,7 @@ def load_fiche_audit_detail(id_version):
                 vf.id_version,
                 vf.numero_version,
                 vf.statut,
+                vf."commit" AS audit_commit,
                 vf.date_creation,
                 vf.date_derniere_modif,
                 vf.date_validation,
@@ -441,8 +480,34 @@ def load_fiche_audit_detail(id_version):
         )
         template_sections = dictfetchall(cursor)
 
+        criteres = []
+        if table_exists(cursor, "critere_evaluation"):
+            ensure_default_audit_criteria(cursor)
+            cursor.execute(
+                """
+                SELECT id_critere, nom, est_actif
+                FROM critere_evaluation
+                WHERE est_actif = TRUE
+                ORDER BY id_critere
+                """
+            )
+            criteres = dictfetchall(cursor)
+
         exigences = []
-        if table_exists(cursor, "exigence") and table_exists(cursor, "article"):
+        if criteres:
+            exigences = [
+                {
+                    "id_critere": item["id_critere"],
+                    "id_exigence": item["id_critere"],
+                    "description": item["nom"],
+                    "est_obligatoire": True,
+                    "ponderation": 1,
+                    "code_article": f"CR-{item['id_critere']}",
+                    "article_titre": "Critere d'audit",
+                }
+                for item in criteres
+            ]
+        elif table_exists(cursor, "exigence") and table_exists(cursor, "article"):
             cursor.execute(
                 """
                 SELECT
@@ -462,10 +527,34 @@ def load_fiche_audit_detail(id_version):
 
         evaluations = []
         if table_exists(cursor, "checklist_evaluation"):
-            if table_has_column(cursor, "checklist_evaluation", "id_exigence"):
+            if table_has_column(cursor, "checklist_evaluation", "id_critere"):
                 cursor.execute(
                     """
-                    SELECT id_evaluation, id_exigence, resultat, commentaire, date_evaluation
+                    SELECT
+                        id_evaluation,
+                        id_critere,
+                        id_critere AS id_exigence,
+                        id_section_template,
+                        resultat,
+                        commentaire,
+                        date_evaluation
+                    FROM checklist_evaluation
+                    WHERE id_version = %s
+                    ORDER BY id_evaluation
+                    """,
+                    [id_version],
+                )
+            elif table_has_column(cursor, "checklist_evaluation", "id_exigence"):
+                cursor.execute(
+                    """
+                    SELECT
+                        id_evaluation,
+                        NULL::integer AS id_critere,
+                        id_exigence,
+                        NULL::integer AS id_section_template,
+                        resultat,
+                        commentaire,
+                        date_evaluation
                     FROM checklist_evaluation
                     WHERE id_version = %s
                     ORDER BY id_evaluation
@@ -475,7 +564,14 @@ def load_fiche_audit_detail(id_version):
             else:
                 cursor.execute(
                     """
-                    SELECT id_evaluation, NULL::integer AS id_exigence, resultat, commentaire, date_evaluation
+                    SELECT
+                        id_evaluation,
+                        NULL::integer AS id_critere,
+                        NULL::integer AS id_exigence,
+                        id_section_template,
+                        resultat,
+                        commentaire,
+                        date_evaluation
                     FROM checklist_evaluation
                     WHERE id_version = %s
                     ORDER BY id_evaluation
@@ -483,6 +579,33 @@ def load_fiche_audit_detail(id_version):
                     [id_version],
                 )
             evaluations = dictfetchall(cursor)
+
+        documents = []
+        if table_exists(cursor, "document"):
+            select_parts = [
+                "id_document",
+                "id_version",
+                "nom_fichier",
+                "type_document",
+                "chemin_stockage",
+                "description",
+                "date_upload",
+            ]
+            if table_has_column(cursor, "document", "evaluation"):
+                select_parts.append("evaluation")
+            else:
+                select_parts.append("NULL::varchar AS evaluation")
+            cursor.execute(
+                f"""
+                SELECT {", ".join(select_parts)}
+                FROM document
+                WHERE id_version = %s
+                  AND type_document IN ('BPMN', 'Preuve', 'Rapport_audit_fiche')
+                ORDER BY date_upload DESC NULLS LAST, id_document DESC
+                """,
+                [id_version],
+            )
+            documents = dictfetchall(cursor)
 
         non_conformites = []
         if table_exists(cursor, "nc"):
@@ -499,7 +622,14 @@ def load_fiche_audit_detail(id_version):
             else:
                 cursor.execute(
                     """
-                    SELECT id_nc, NULL::integer AS id_exigence, titre, description, date_detection, date_cloture
+                    SELECT
+                        id_nc,
+                        NULL::integer AS id_exigence,
+                        id_section_template,
+                        titre,
+                        description,
+                        date_detection,
+                        date_cloture
                     FROM nc
                     WHERE id_version = %s
                     ORDER BY date_detection DESC NULLS LAST, id_nc DESC
@@ -530,11 +660,13 @@ def load_fiche_audit_detail(id_version):
         actions = dictfetchall(cursor)
 
     sections = build_sections(champ_rows, template_sections)
+    apply_section_completion_rates(sections)
     section_requirements = distribute_requirements_by_section(exigences, sections)
     requirement_to_section = {}
     for section in section_requirements:
         for requirement in section["requirements"]:
-            requirement_to_section[str(requirement["id_exigence"])] = section["nom"]
+            requirement_id = requirement.get("id_critere") or requirement.get("id_exigence")
+            requirement_to_section[str(requirement_id)] = section["nom"]
 
     actions_by_nc = defaultdict(list)
     for action in actions:
@@ -551,10 +683,23 @@ def load_fiche_audit_detail(id_version):
     normalized_nc = []
     for item in non_conformites:
         parsed_title, severity = parse_nc_title(item["titre"])
+        linked_section = "Section non liee"
+        if item.get("id_exigence"):
+            linked_section = requirement_to_section.get(str(item["id_exigence"]), linked_section)
+        elif item.get("id_section_template"):
+            linked_section = next(
+                (
+                    section["nom"]
+                    for section in sections
+                    if str(section.get("id_section_template")) == str(item.get("id_section_template"))
+                ),
+                linked_section,
+            )
         normalized_nc.append(
             {
                 "id_nc": item["id_nc"],
                 "id_exigence": item["id_exigence"],
+                "id_section_template": item.get("id_section_template"),
                 "titre": parsed_title,
                 "description": item["description"],
                 "date_detection": item["date_detection"],
@@ -565,13 +710,16 @@ def load_fiche_audit_detail(id_version):
             }
         )
 
-    taux_conformite = calculate_compliance_rate(evaluations)
+    documents_grouped = group_audit_documents(documents)
+    metrics = calculate_audit_metrics(sections, evaluations, documents_grouped)
+    taux_conformite = metrics["taux_global"]
     report_file = fiche.get("rapport_pdf") or default_report_filename(fiche["id_version"], fiche["code_process"])
 
     detail = {
         "id_version": fiche["id_version"],
         "numero_version": fiche["numero_version"],
         "statut": fiche["statut"],
+        "commit": fiche.get("audit_commit") or 0,
         "date_creation": fiche["date_creation"],
         "date_derniere_modif": fiche.get("date_derniere_modif"),
         "date_validation": fiche.get("date_validation"),
@@ -607,6 +755,8 @@ def load_fiche_audit_detail(id_version):
         "section_requirements": section_requirements,
         "exigences": exigences,
         "evaluations": evaluations,
+        "documents": documents_grouped,
+        "metrics": metrics,
         "non_conformites": normalized_nc,
         "taux_conformite": taux_conformite,
         "rapport": {
@@ -617,6 +767,20 @@ def load_fiche_audit_detail(id_version):
         },
     }
     return detail
+
+
+def ensure_default_audit_criteria(cursor):
+    cursor.execute("SELECT nom FROM critere_evaluation")
+    existing = {row[0] for row in cursor.fetchall()}
+    for criterion in DEFAULT_AUDIT_CRITERIA:
+        if criterion not in existing:
+            cursor.execute(
+                """
+                INSERT INTO critere_evaluation (nom, est_actif)
+                VALUES (%s, TRUE)
+                """,
+                [criterion],
+            )
 
 
 def build_sections(champ_rows, template_sections=None):
@@ -746,10 +910,123 @@ def distribute_requirements_by_section(exigences, sections):
     return buckets
 
 
-def update_version_status(cursor, id_version, statut):
+def apply_section_completion_rates(sections):
+    for section in sections:
+        champs = section.get("champs") or []
+        if not champs:
+            section["completion_rate"] = None
+            section["completion_done"] = 0
+            section["completion_total"] = 0
+            continue
+
+        completed = sum(1 for champ in champs if is_value_filled(champ.get("valeur")))
+        section["completion_rate"] = round((completed / len(champs)) * 100)
+        section["completion_done"] = completed
+        section["completion_total"] = len(champs)
+
+
+def is_value_filled(value):
+    if value is None:
+        return False
+    if isinstance(value, (list, tuple, dict)):
+        return len(value) > 0
+    return str(value).strip() != ""
+
+
+def group_audit_documents(documents):
+    grouped = {"bpmn": [], "preuves": [], "rapports": []}
+    for document in documents:
+        doc = {
+            "id_document": document["id_document"],
+            "id_version": document.get("id_version"),
+            "nom_fichier": document.get("nom_fichier"),
+            "type_document": document.get("type_document"),
+            "chemin_stockage": document.get("chemin_stockage"),
+            "description": document.get("description") or "",
+            "date_upload": document.get("date_upload"),
+            "evaluation": document.get("evaluation"),
+        }
+        if document.get("type_document") == "BPMN":
+            grouped["bpmn"].append(doc)
+        elif document.get("type_document") == "Preuve":
+            grouped["preuves"].append(doc)
+        elif document.get("type_document") == "Rapport_audit_fiche":
+            grouped["rapports"].append(doc)
+    return grouped
+
+
+def calculate_audit_metrics(sections, evaluations, documents_grouped):
+    completion_values = [
+        section.get("completion_rate")
+        for section in sections
+        if section.get("completion_rate") is not None
+    ]
+    completion = average_numbers(completion_values)
+    checklist = score_db_results(item.get("resultat") for item in evaluations)
+    bpmn = score_db_results(document.get("evaluation") for document in documents_grouped.get("bpmn", []))
+    proofs = score_db_results(document.get("evaluation") for document in documents_grouped.get("preuves", []))
+
+    values = {
+        "completion": completion,
+        "checklist": checklist,
+        "bpmn": bpmn,
+        "proofs": proofs,
+    }
+    active_weight = sum(weight for key, weight in CONFORMITY_WEIGHTS.items() if values.get(key) is not None)
+    if active_weight == 0:
+        global_rate = 0
+    else:
+        global_rate = round(
+            sum((values[key] or 0) * CONFORMITY_WEIGHTS[key] for key in values if values.get(key) is not None)
+            / active_weight
+        )
+
+    return {
+        "taux_completude_moyen": round(completion or 0),
+        "score_checklist": round(checklist or 0),
+        "score_bpmn": round(bpmn or 0),
+        "score_preuves": round(proofs or 0),
+        "taux_global": global_rate,
+        "ponderation": CONFORMITY_WEIGHTS,
+    }
+
+
+def average_numbers(values):
+    cleaned = [value for value in values if value is not None]
+    if not cleaned:
+        return None
+    return sum(cleaned) / len(cleaned)
+
+
+def score_db_results(results):
+    scored = [EVALUATION_SCORE[result] for result in results if result in EVALUATION_SCORE]
+    if not scored:
+        return None
+    return sum(scored) / len(scored)
+
+
+def update_version_status(cursor, id_version, statut, revue=None):
+    if revue is not None and table_has_column(cursor, "version_fiche", "revue"):
+        cursor.execute(
+            "UPDATE version_fiche SET statut = %s, revue = %s WHERE id_version = %s",
+            [statut, revue, id_version],
+        )
+    else:
+        cursor.execute(
+            "UPDATE version_fiche SET statut = %s WHERE id_version = %s",
+            [statut, id_version],
+        )
+
+
+def update_version_commit(cursor, id_version, commit_value):
+    if commit_value is None or not table_has_column(cursor, "version_fiche", "commit"):
+        return
+    current_index = coerce_int(commit_value)
+    if current_index is None:
+        return
     cursor.execute(
-        "UPDATE version_fiche SET statut = %s WHERE id_version = %s",
-        [statut, id_version],
+        'UPDATE version_fiche SET "commit" = %s WHERE id_version = %s',
+        [max(current_index, 0), id_version],
     )
 
 
@@ -904,10 +1181,10 @@ def table_has_column(cursor, table_name, column_name):
     return cursor.fetchone()[0]
 
 
-def ensure_report_reference(cursor, id_version):
+def ensure_report_reference(cursor, id_version, auditeur_id=None):
     cursor.execute(
         """
-        SELECT p.code_process
+        SELECT p.code_process, p.nom, vf.numero_version
         FROM version_fiche vf
         JOIN processus p ON p.id_processus = vf.id_processus
         WHERE vf.id_version = %s
@@ -916,11 +1193,58 @@ def ensure_report_reference(cursor, id_version):
     )
     row = cursor.fetchone()
     code_process = row[0] if row else f"FICHE-{id_version}"
-    return default_report_filename(id_version, code_process)
+    process_name = row[1] if row else f"Fiche {id_version}"
+    filename = default_report_filename(id_version, code_process)
+
+    if table_exists(cursor, "document"):
+        cursor.execute(
+            """
+            SELECT id_document
+            FROM document
+            WHERE id_version = %s AND type_document = 'Rapport_audit_fiche'
+            ORDER BY date_upload DESC NULLS LAST, id_document DESC
+            LIMIT 1
+            """,
+            [id_version],
+        )
+        existing = cursor.fetchone()
+        description = f"Rapport audit - {process_name} - version {row[2] if row else id_version}"
+
+        if existing:
+            cursor.execute(
+                """
+                UPDATE document
+                SET nom_fichier = %s,
+                    chemin_stockage = %s,
+                    description = %s,
+                    date_upload = NOW()
+                WHERE id_document = %s
+                """,
+                [filename, filename, description, existing[0]],
+            )
+        elif auditeur_id:
+            cursor.execute(
+                """
+                INSERT INTO document (
+                    id_version,
+                    id_uploader,
+                    nom_fichier,
+                    type_document,
+                    chemin_stockage,
+                    description,
+                    date_upload
+                )
+                VALUES (%s, %s, %s, 'Rapport_audit_fiche', %s, %s, NOW())
+                """,
+                [id_version, auditeur_id, filename, filename, description],
+            )
+
+    return filename
 
 
 def replace_evaluations(cursor, id_version, auditeur_id, evaluations):
     if not table_exists(cursor, "checklist_evaluation"):
+        replace_document_evaluations(cursor, evaluations)
         return
 
     cursor.execute(
@@ -928,26 +1252,77 @@ def replace_evaluations(cursor, id_version, auditeur_id, evaluations):
         [id_version, auditeur_id],
     )
 
-    if not table_has_column(cursor, "checklist_evaluation", "id_exigence"):
-        return
+    has_id_critere = table_has_column(cursor, "checklist_evaluation", "id_critere")
+    has_id_exigence = table_has_column(cursor, "checklist_evaluation", "id_exigence")
+    has_id_section_template = table_has_column(cursor, "checklist_evaluation", "id_section_template")
 
     for requirement_id, evaluation in evaluations.items():
-        try:
-            id_exigence = int(requirement_id)
-        except (TypeError, ValueError):
+        if str(requirement_id).startswith("doc-"):
             continue
 
+        id_requirement = coerce_requirement_id(requirement_id)
+        if id_requirement is None:
+            continue
         db_result = RESULT_TO_DB.get(evaluation.get("status"))
         if not db_result:
             continue
 
+        columns = ["id_version", "id_auditeur", "resultat", "commentaire"]
+        values = [id_version, auditeur_id, db_result, evaluation.get("observation", "")]
+
+        if has_id_critere:
+            columns.insert(2, "id_critere")
+            values.insert(2, id_requirement)
+        elif has_id_exigence:
+            columns.insert(2, "id_exigence")
+            values.insert(2, id_requirement)
+        else:
+            continue
+
+        section_id = coerce_int(evaluation.get("sectionId") or evaluation.get("id_section_template"))
+        if has_id_section_template:
+            columns.insert(3, "id_section_template")
+            values.insert(3, section_id)
+
+        placeholders = ", ".join(["%s"] * len(values))
+        cursor.execute(
+            f"""
+            INSERT INTO checklist_evaluation ({", ".join(columns)})
+            VALUES ({placeholders})
+            """,
+            values,
+        )
+
+    replace_document_evaluations(cursor, evaluations)
+
+
+def replace_document_evaluations(cursor, evaluations):
+    if not table_exists(cursor, "document") or not table_has_column(cursor, "document", "evaluation"):
+        return
+
+    for requirement_id, evaluation in evaluations.items():
+        if not str(requirement_id).startswith("doc-"):
+            continue
+        id_document = coerce_int(str(requirement_id).replace("doc-", "", 1))
+        db_result = RESULT_TO_DB.get(evaluation.get("status"))
+        if not id_document or not db_result:
+            continue
         cursor.execute(
             """
-            INSERT INTO checklist_evaluation (id_version, id_auditeur, id_exigence, resultat, commentaire)
-            VALUES (%s, %s, %s, %s, %s)
+            UPDATE document
+            SET evaluation = %s
+            WHERE id_document = %s
+              AND type_document IN ('BPMN', 'Preuve')
             """,
-            [id_version, auditeur_id, id_exigence, db_result, evaluation.get("observation", "")],
+            [db_result, id_document],
         )
+
+
+def coerce_requirement_id(requirement_id):
+    text = str(requirement_id or "").strip()
+    if text.startswith("critere-"):
+        text = text.replace("critere-", "", 1)
+    return coerce_int(text)
 
 
 def replace_non_conformities(cursor, id_version, auditeur_id, non_conformities, corrective_actions):

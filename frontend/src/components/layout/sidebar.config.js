@@ -78,18 +78,8 @@ const auditeurItems = [
     label: "Audit",
     icon: ClipboardCheck,
     children: [
-      {
-        label: "Audit des fiches",
-        icon: FileText,
-        to: "/auditeur/audit-fiches",
-        activePaths: [
-          "/auditeur/audit-fiches",
-          "/auditeur/execution-audit",
-          "/auditeur/audit-execution",
-          "/auditeur/fiches-auditees",
-        ],
-      },
-      { label: "Mes audits", icon: ClipboardList, to: "/mes-audits" },
+      { label: "Pré-audit", icon: FileText, to: "/audit/preaudit" },
+      { label: "Mes audits", icon: ClipboardList, to: "/audit/mes-audits" },
       { label: "Audits terrain", icon: Map, to: "/audit/audits-terrain" },
     ],
   },

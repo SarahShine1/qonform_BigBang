@@ -1,3 +1,5 @@
+import re
+
 from django.db.models import Q
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
@@ -11,10 +13,50 @@ from .serializers import (
     ProcessusSerializer,
 )
 from apps.accounts.models import Departement, Utilisateur
-from apps.fiches.models import VersionFiche
+from apps.fiches.models import ProcessusLiaison, VersionFiche
+from apps.organigramme.models import OrganizationUnit
+from apps.organigramme.serializers import unpack_unit_metadata
+from apps.organigramme.services import sync_departements_from_organigramme
 
 
-class ProcessusViewSet(viewsets.ReadOnlyModelViewSet):
+TYPE_CODE_MAP = {
+    "Management": "MNG",
+    "Realisation": "REA",
+    "Support": "SUP",
+}
+
+
+def _next_process_code(departement_id, type_process):
+    departement = Departement.objects.filter(id_departement=departement_id).first()
+    organization_unit = OrganizationUnit.objects.filter(pk=departement_id, is_active=True).first()
+    metadata = unpack_unit_metadata(getattr(organization_unit, "description", ""))
+    department_code = (
+        metadata.get("displayCode")
+        or getattr(departement, "code", "")
+        or getattr(organization_unit, "code", "")
+        or f"DEP{departement_id}"
+    )
+    type_code = TYPE_CODE_MAP.get(type_process, "GEN")
+    prefix = f"{department_code}-{type_code}-"
+
+    matching_codes = Processus.objects.filter(
+        id_departement=departement_id,
+        type_process=type_process,
+    ).values_list("code_process", flat=True)
+
+    next_number = 1
+    for code in matching_codes:
+        normalized_code = str(code or "").strip()
+        match = re.search(rf"^{re.escape(prefix)}(\d+)$", normalized_code)
+        if not match:
+            match = re.search(r"(\d+)$", normalized_code)
+        if match:
+            next_number = max(next_number, int(match.group(1)) + 1)
+
+    return f"{prefix}{next_number:03d}"
+
+
+class ProcessusViewSet(viewsets.ModelViewSet):
     """
     GET /api/v1/processus/       – liste des processus
     GET /api/v1/processus/{id}/  – détail d'un processus
@@ -29,6 +71,18 @@ class ProcessusViewSet(viewsets.ReadOnlyModelViewSet):
         if dept:
             qs = qs.filter(id_departement=dept)
         return qs.order_by("nom")
+
+    def create(self, request, *args, **kwargs):
+        sync_departements_from_organigramme()
+        return super().create(request, *args, **kwargs)
+
+    def perform_create(self, serializer):
+        departement_id = serializer.validated_data["id_departement"]
+        type_process = serializer.validated_data.get("type_process") or "Support"
+        serializer.save(
+            code_process=serializer.validated_data.get("code_process") or _next_process_code(departement_id, type_process),
+            type_process=type_process,
+        )
 
 
 def _effective_version_date(version):
@@ -96,9 +150,7 @@ class ProcessInteractionsAPIView(APIView):
         }
 
         version_rows = VersionFiche.objects.filter(
-            Q(id_processus__in=process_ids)
-            | Q(id_processus_amont__in=process_ids)
-            | Q(id_processus_aval__in=process_ids)
+            id_processus__in=process_ids
         ).values(
             "id_version",
             "id_processus",
@@ -106,8 +158,6 @@ class ProcessInteractionsAPIView(APIView):
             "statut",
             "date_creation",
             "date_derniere_modif",
-            "id_processus_amont",
-            "id_processus_aval",
         )
 
         best_versions = {}
@@ -120,37 +170,36 @@ class ProcessInteractionsAPIView(APIView):
         upstream_map = {process_id: set() for process_id in process_ids}
         downstream_map = {process_id: set() for process_id in process_ids}
 
-        for process_id, version in best_versions.items():
-            if process_id not in process_map:
+        liaison_rows = ProcessusLiaison.objects.filter(
+            Q(id_processus_amont__in=process_ids)
+            | Q(id_processus_aval__in=process_ids)
+        ).values("id_processus_amont", "id_processus_aval")
+
+        for liaison in liaison_rows:
+            upstream_id = liaison["id_processus_amont"]
+            downstream_id = liaison["id_processus_aval"]
+
+            if upstream_id not in process_map or downstream_id not in process_map:
                 continue
 
-            upstream_id = version["id_processus_amont"]
-            downstream_id = version["id_processus_aval"]
+            if upstream_id == downstream_id:
+                continue
 
-            if upstream_id and upstream_id != process_id and upstream_id in process_map:
-                upstream_map[process_id].add(upstream_id)
-                downstream_map[upstream_id].add(process_id)
-
-            if downstream_id and downstream_id != process_id and downstream_id in process_map:
-                downstream_map[process_id].add(downstream_id)
-                upstream_map[downstream_id].add(process_id)
+            downstream_map[upstream_id].add(downstream_id)
+            upstream_map[downstream_id].add(upstream_id)
 
         response_data = []
         for process in process_list:
             version = best_versions.get(process.id_processus)
 
-            if version:
-                upstream_ids = sorted(
-                    upstream_map[process.id_processus],
-                    key=lambda related_id: process_map[related_id].nom.lower(),
-                )
-                downstream_ids = sorted(
-                    downstream_map[process.id_processus],
-                    key=lambda related_id: process_map[related_id].nom.lower(),
-                )
-            else:
-                upstream_ids = []
-                downstream_ids = []
+            upstream_ids = sorted(
+                upstream_map[process.id_processus],
+                key=lambda related_id: process_map[related_id].nom.lower(),
+            )
+            downstream_ids = sorted(
+                downstream_map[process.id_processus],
+                key=lambda related_id: process_map[related_id].nom.lower(),
+            )
 
             upstream = [
                 _serialize_process_ref(process_map[related_id]) for related_id in upstream_ids

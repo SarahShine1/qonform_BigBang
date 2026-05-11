@@ -23,6 +23,11 @@ export const auditApi = {
     return mapFicheDetailToExecution(data);
   },
 
+  startExecution: async (idVersion, currentIndex = 0) => {
+    const { data } = await apiClient.post(`/audit/fiches/${idVersion}/start/`, { currentIndex });
+    return data;
+  },
+
   saveDraft: async (payload) => {
     const { data } = await apiClient.post(`/audit/fiches/${payload.auditId}/draft/`, payload);
     return data;
@@ -43,6 +48,14 @@ export const auditApi = {
 
   createCorrectiveAction: async (idNc, payload) => {
     const { data } = await apiClient.post(`/audit/nc/${idNc}/actions-correctives/`, payload);
+    return data;
+  },
+
+  openDocument: async (idDocument) => {
+    const { data } = await apiClient.get(`/documents/${idDocument}/download/`);
+    if (data?.url) {
+      window.open(data.url, "_blank", "noopener,noreferrer");
+    }
     return data;
   },
 
@@ -74,7 +87,7 @@ function mapFicheDetailToExecution(fiche) {
     fiche.sections || []
   );
 
-  const sections = (fiche.sections || []).map((section, index) => {
+  const ficheSections = (fiche.sections || []).map((section, index) => {
     const requirementSection =
       sectionRequirements.find(
         (item) =>
@@ -86,19 +99,42 @@ function mapFicheDetailToExecution(fiche) {
       id: String(section.id_section_template || `section-${index + 1}`),
       title: section.nom,
       shortTitle: section.nom,
+      completionRate: section.completion_rate,
+      completionDone: section.completion_done,
+      completionTotal: section.completion_total,
       processFields: (section.champs || []).map((champ) => ({
         label: champ.libelle,
         value: formatFieldValue(champ.valeur),
       })),
       requirements: (requirementSection?.requirements || []).map((requirement) => ({
-        id: String(requirement.id_exigence),
+        id: String(requirement.id_critere || requirement.id_exigence),
+        sectionId: String(section.id_section_template || ""),
         label: requirement.description,
-        clause: requirement.code_article || `EX-${requirement.id_exigence}`,
+        clause: requirement.code_article || `CR-${requirement.id_critere || requirement.id_exigence}`,
         type: "manual",
         articleTitle: requirement.article_titre,
       })),
     };
   });
+
+  const documents = fiche.documents || {};
+  const sections = [
+    ...ficheSections,
+    buildDocumentSection({
+      id: "bpmn",
+      title: "Evaluation BPMN",
+      shortTitle: "BPMN",
+      emptyLabel: "Aucun BPMN lie a cette version de fiche.",
+      documents: documents.bpmn || [],
+    }),
+    buildDocumentSection({
+      id: "preuves",
+      title: "Evaluation des preuves et enregistrements",
+      shortTitle: "Preuves",
+      emptyLabel: "Aucune preuve ou enregistrement lie a cette version de fiche.",
+      documents: documents.preuves || [],
+    }),
+  ];
 
   sections.push({
     id: "summary",
@@ -125,9 +161,13 @@ function mapFicheDetailToExecution(fiche) {
         fiche.date_creation ||
         new Date().toISOString().slice(0, 10),
       status: mapVersionStatusToUi(fiche.statut),
+      observations: fiche.audit?.observations || "",
     },
     sections,
-    initialEvaluations: mapEvaluations(fiche.evaluations || []),
+    initialEvaluations: {
+      ...mapEvaluations(fiche.evaluations || []),
+      ...mapDocumentEvaluations(documents),
+    },
     nonConformities: (fiche.non_conformites || []).map((item) => ({
       id: String(item.id_nc),
       idNc: item.id_nc,
@@ -148,6 +188,9 @@ function mapFicheDetailToExecution(fiche) {
       })),
     })),
     complianceRate: fiche.taux_conformite || 0,
+    initialIndex: Number(fiche.commit || 0),
+    metrics: fiche.metrics || null,
+    documents,
     sourceFiche: fiche,
     report: fiche.rapport || null,
   };
@@ -172,12 +215,60 @@ function distributeRequirementsBySection(requirements, sections) {
   return buckets;
 }
 
+function buildDocumentSection({ id, title, shortTitle, emptyLabel, documents }) {
+  const safeDocuments = documents || [];
+  return {
+    id,
+    title,
+    shortTitle,
+    isDocumentStep: true,
+    completionRate: null,
+    processFields:
+      safeDocuments.length > 0
+        ? safeDocuments.map((document) => ({
+            label: document.nom_fichier || `Document ${document.id_document}`,
+            value: [document.type_document, document.description || document.chemin_stockage]
+              .filter(Boolean)
+              .join(" - ") || "Document lie a la fiche",
+            valid: true,
+            documentId: document.id_document,
+            type: document.type_document,
+            url: document.url,
+          }))
+        : [{ label: "Documents", value: emptyLabel, valid: false }],
+    requirements: safeDocuments.map((document) => ({
+      id: `doc-${document.id_document}`,
+      documentId: document.id_document,
+      label: document.nom_fichier || `Document ${document.id_document}`,
+      clause: document.type_document || "Document",
+      type: "document",
+      articleTitle: document.chemin_stockage || document.description || "",
+      url: document.url,
+    })),
+  };
+}
+
 function mapEvaluations(evaluations) {
   return evaluations.reduce((acc, evaluation) => {
-    acc[String(evaluation.id_exigence)] = {
+    const requirementId = evaluation.id_critere || evaluation.id_exigence;
+    if (!requirementId) return acc;
+    acc[String(requirementId)] = {
       status: DB_TO_UI_STATUS[evaluation.resultat] || "",
       observation: evaluation.commentaire || "",
+      sectionId: evaluation.id_section_template ? String(evaluation.id_section_template) : "",
     };
+    return acc;
+  }, {});
+}
+
+function mapDocumentEvaluations(documents = {}) {
+  return [...(documents.bpmn || []), ...(documents.preuves || [])].reduce((acc, document) => {
+    if (document.evaluation) {
+      acc[`doc-${document.id_document}`] = {
+        status: DB_TO_UI_STATUS[document.evaluation] || "",
+        observation: "",
+      };
+    }
     return acc;
   }, {});
 }

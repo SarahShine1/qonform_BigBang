@@ -8,6 +8,7 @@ import AppLayout from "../../components/layout/AppLayout";
 import PipelineFiche from "../../components/fiche/PipelineFiche";
 import InfoItem from "../../components/fiche/InfoItem";
 import SectionBlock from "../../components/fiche/SectionBlock";
+import DocumentSection from "../../components/fiche/DocumentSection";
 import { PURPLE, PURPLE_HOVER, BORDER } from "../../components/fiche/ficheConstants";
 import { useAuth } from "../../hooks/useAuth";
 import { getProcessusList } from "../../api/processus.api";
@@ -16,6 +17,70 @@ import {
   createVersionFiche, updateVersionFiche, saveChampFiches,
   getVersionFiche, getChampsFiche,
 } from "../../api/fiches.api";
+
+// ── Multi-process selector ───────────────────────────────────────────────────
+function MultiProcessSelect({ label, value, onChange, options, disabled }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const toggle = (id) => {
+    const num = Number(id);
+    onChange(value.includes(num) ? value.filter((v) => v !== num) : [...value, num]);
+  };
+
+  const selected = options.filter((p) => value.includes(p.id_processus));
+
+  return (
+    <div ref={ref} className="relative">
+      <div
+        onClick={() => { if (!disabled) setOpen((o) => !o); }}
+        className="min-h-[36px] flex flex-wrap gap-1.5 items-center rounded-lg px-2.5 py-1.5 cursor-pointer"
+        style={{ border: `1px solid ${BORDER}`, backgroundColor: disabled ? "#F9FAFB" : "#fff" }}
+      >
+        {selected.length === 0 && (
+          <span className="text-[12.5px] text-slate-400">— Aucun —</span>
+        )}
+        {selected.map((p) => (
+          <span key={p.id_processus}
+            className="flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-semibold text-white"
+            style={{ backgroundColor: PURPLE }}>
+            {p.code_process}
+            {!disabled && (
+              <button type="button" onClick={(e) => { e.stopPropagation(); toggle(p.id_processus); }}
+                className="ml-0.5 opacity-70 hover:opacity-100">✕</button>
+            )}
+          </span>
+        ))}
+        {!disabled && (
+          <span className="ml-auto text-slate-400 text-[11px]">{open ? "▲" : "▼"}</span>
+        )}
+      </div>
+      {open && (
+        <div className="absolute z-50 mt-1 w-full rounded-xl border bg-white shadow-lg"
+          style={{ borderColor: BORDER, maxHeight: 220, overflowY: "auto" }}>
+          {options.map((p) => {
+            const checked = value.includes(p.id_processus);
+            return (
+              <label key={p.id_processus}
+                className="flex items-center gap-3 px-3 py-2 text-[12.5px] cursor-pointer hover:bg-slate-50">
+                <input type="checkbox" checked={checked} onChange={() => toggle(p.id_processus)}
+                  className="accent-purple-700" />
+                <span className="font-semibold" style={{ color: PURPLE }}>{p.code_process}</span>
+                <span className="text-slate-500 truncate">{p.nom}</span>
+              </label>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ── helpers ─────────────────────────────────────────────────────────────────
 const fmtDate = (d) =>
@@ -131,8 +196,8 @@ export default function FicheProcessusForm() {
   const [processusList,        setProcessusList]      = useState([]);
   const [selectedProcessusId,  setSelectedProcessusId] = useState("");
   const [formValues,           setFormValues]         = useState({});
-  const [amontId,              setAmontId]            = useState("");
-  const [avalId,               setAvalId]             = useState("");
+  const [amontIds,             setAmontIds]           = useState([]);
+  const [avalIds,              setAvalIds]            = useState([]);
   const [currentStatut,        setCurrentStatut]      = useState("Brouillon");
   const [versionNumero,        setVersionNumero]      = useState(null);
   const [existingVersionId,    setExistingVersionId]  = useState(null);
@@ -208,8 +273,8 @@ export default function FicheProcessusForm() {
           setSelectedProcessusId(String(fiche.id_processus));
           setCurrentStatut(fiche.statut ?? "Brouillon");
           setVersionNumero(fiche.numero_version);
-          setAmontId(fiche.id_processus_amont ? String(fiche.id_processus_amont) : "");
-          setAvalId(fiche.id_processus_aval   ? String(fiche.id_processus_aval)  : "");
+          setAmontIds(fiche.liaisons_amont ?? []);
+          setAvalIds(fiche.liaisons_aval   ?? []);
           setReadOnly(fiche.statut !== "Brouillon");
           const vals = {};
           champsExistants.forEach((c) => {
@@ -235,8 +300,8 @@ export default function FicheProcessusForm() {
       setExistingVersionId(null);
       setReadOnly(false);
       setFormValues({});
-      setAmontId("");
-      setAvalId("");
+      setAmontIds([]);
+      setAvalIds([]);
       setCurrentStatut("Brouillon");
       setVersionNumero(null);
       setVerifData(null);
@@ -254,8 +319,8 @@ export default function FicheProcessusForm() {
           setExistingVersionId(null);
           setReadOnly(false);
           setFormValues({});
-          setAmontId("");
-          setAvalId("");
+          setAmontIds([]);
+          setAvalIds([]);
           setCurrentStatut("Brouillon");
           setVersionNumero(null);
           return;
@@ -266,8 +331,8 @@ export default function FicheProcessusForm() {
         setExistingVersionId(fiche.id_version);
         setCurrentStatut(fiche.statut ?? "Brouillon");
         setVersionNumero(fiche.numero_version);
-        setAmontId(fiche.id_processus_amont ? String(fiche.id_processus_amont) : "");
-        setAvalId(fiche.id_processus_aval   ? String(fiche.id_processus_aval)  : "");
+        setAmontIds(fiche.liaisons_amont ?? []);
+        setAvalIds(fiche.liaisons_aval   ?? []);
 
         const champsExistants = await getChampsFiche(fiche.id_version);
         if (cancelled) return;
@@ -300,8 +365,8 @@ export default function FicheProcessusForm() {
       setReadOnly(false);
     }
     setFormValues({});
-    setAmontId("");
-    setAvalId("");
+    setAmontIds([]);
+    setAvalIds([]);
     setCurrentStatut("Brouillon");
     setVersionNumero(null);
     setVerifData(null);
@@ -318,20 +383,20 @@ export default function FicheProcessusForm() {
 
       if (!versionIdToUpdate) {
         const fiche = await createVersionFiche({
-          id_processus:       Number(selectedProcessusId),
-          id_redacteur:       user?.id_user,
-          numero_version:     "1.0",
-          statut:             targetStatut,
-          id_processus_amont: amontId ? Number(amontId) : null,
-          id_processus_aval:  avalId  ? Number(avalId)  : null,
+          id_processus:   Number(selectedProcessusId),
+          id_redacteur:   user?.id_user,
+          numero_version: "1.0",
+          statut:         targetStatut,
+          amont_ids:      amontIds,
+          aval_ids:       avalIds,
         });
         versionId = fiche.id_version;
         if (!isUrlEdit) setExistingVersionId(fiche.id_version);
       } else {
         await updateVersionFiche(versionIdToUpdate, {
-          statut:             targetStatut,
-          id_processus_amont: amontId ? Number(amontId) : null,
-          id_processus_aval:  avalId  ? Number(avalId)  : null,
+          statut:    targetStatut,
+          amont_ids: amontIds,
+          aval_ids:  avalIds,
         });
         versionId = versionIdToUpdate;
       }
@@ -524,17 +589,12 @@ export default function FicheProcessusForm() {
                           Processus en amont
                         </span>
                       </div>
-                      <select value={amontId} onChange={(e) => setAmontId(e.target.value)}
+                      <MultiProcessSelect
+                        value={amontIds}
+                        onChange={setAmontIds}
+                        options={processusList.filter((p) => p.id_processus !== Number(selectedProcessusId))}
                         disabled={readOnly}
-                        className={`${inputCls} disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-default`}
-                        style={{ border: `1px solid ${BORDER}` }}>
-                        <option value="">— Aucun —</option>
-                        {processusList.map((p) => (
-                          <option key={p.id_processus} value={p.id_processus}>
-                            {p.code_process} - {p.nom}
-                          </option>
-                        ))}
-                      </select>
+                      />
                     </div>
                     <div className="py-4 grid items-start gap-5"
                       style={{ gridTemplateColumns: "200px 1fr", borderTop: `1px solid ${BORDER}` }}>
@@ -543,17 +603,12 @@ export default function FicheProcessusForm() {
                           Processus en aval
                         </span>
                       </div>
-                      <select value={avalId} onChange={(e) => setAvalId(e.target.value)}
+                      <MultiProcessSelect
+                        value={avalIds}
+                        onChange={setAvalIds}
+                        options={processusList.filter((p) => p.id_processus !== Number(selectedProcessusId))}
                         disabled={readOnly}
-                        className={`${inputCls} disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-default`}
-                        style={{ border: `1px solid ${BORDER}` }}>
-                        <option value="">— Aucun —</option>
-                        {processusList.map((p) => (
-                          <option key={p.id_processus} value={p.id_processus}>
-                            {p.code_process} - {p.nom}
-                          </option>
-                        ))}
-                      </select>
+                      />
                     </div>
                   </div>
                 </div>
@@ -572,6 +627,13 @@ export default function FicheProcessusForm() {
                       />
                     ))
                 }
+
+                {/* Section Documents & Fichiers — toujours présente */}
+                <DocumentSection
+                  versionId={id ? Number(id) : existingVersionId}
+                  readOnly={readOnly}
+                  sectionIndex={sections.length + 1}
+                />
               </div>
             )}
           </div>

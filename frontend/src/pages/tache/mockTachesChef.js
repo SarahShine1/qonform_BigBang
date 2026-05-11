@@ -1,0 +1,28 @@
+export const mockTachesChef = [
+  {
+    id: 1,
+    intitule: "Audit terrain service informatique",
+    description: "Vérifier la conformité du service informatique selon les exigences internes.",
+    type: "Audit",
+    processus: "SUP-IT-003",
+    responsable: "Ahmed BENAUI",
+    dateDebut: "2026-05-10",
+    dateFin: "2026-05-13",
+    priorite: "Haute",
+    statut: "Planifiée",
+    observations: "Prévoir la consultation des documents qualité.",
+  },
+  {
+    id: 2,
+    intitule: "Mise à jour documentation processus RH",
+    description: "Mettre à jour les documents liés au processus RH.",
+    type: "Documentation",
+    processus: "SUP-RH-001",
+    responsable: "Sara MALEK",
+    dateDebut: "2026-05-18",
+    dateFin: "2026-05-25",
+    priorite: "Moyenne",
+    statut: "Planifiée",
+    observations: "",
+  },
+];

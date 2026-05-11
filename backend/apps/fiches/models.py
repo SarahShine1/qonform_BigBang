@@ -1,12 +1,30 @@
 from django.db import models
 
 
+class Norme(models.Model):
+    id_norme = models.AutoField(primary_key=True)
+    code = models.CharField(max_length=50, unique=True)
+    version = models.CharField(max_length=50)
+    titre = models.CharField(max_length=255)
+    date_publication = models.DateField(blank=True, null=True)
+    est_active = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        managed = False
+        db_table = "norme"
+
+    def __str__(self):
+        return f"{self.code} v{self.version}"
+
+
 class SectionTemplate(models.Model):
     id_section_template = models.AutoField(primary_key=True)
     nom = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
     ordre = models.IntegerField(default=1)
     est_actif = models.BooleanField(default=True)
+    id_norme = models.IntegerField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -88,8 +106,8 @@ class VersionFiche(models.Model):
     date_creation = models.DateTimeField(auto_now_add=True)
     date_derniere_modif = models.DateTimeField(blank=True, null=True)
     date_validation = models.DateTimeField(blank=True, null=True)
-    id_processus_amont = models.IntegerField(blank=True, null=True)
-    id_processus_aval = models.IntegerField(blank=True, null=True)
+    revue = models.BooleanField(default=False)
+    commit = models.IntegerField(default=0)
 
     class Meta:
         managed = False
@@ -97,6 +115,17 @@ class VersionFiche(models.Model):
 
     def __str__(self):
         return f"Fiche v{self.numero_version} (processus {self.id_processus})"
+
+
+class ProcessusLiaison(models.Model):
+    id = models.AutoField(primary_key=True)
+    id_processus_amont = models.IntegerField()
+    id_processus_aval = models.IntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        managed = False
+        db_table = "processus_liaison"
 
 
 class ColonneTemplate(models.Model):

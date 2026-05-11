@@ -14,7 +14,13 @@ import MaturityPage from "./pages/maturity/MaturityPage";
 import ModulePlaceholderPage from "./pages/shared/ModulePlaceholderPage";
 import FicheProcessusForm from "./pages/fiche_form/FicheProcessusForm";
 import ProcessusPage from "./pages/processus/ProcessusPage";
+import ChefTachesPage from "./pages/tache/ChefTachesPage";
+import CanevasFichePage from "./pages/canevas/CanevasFichePage";
+import NormeTemplatePage from "./pages/canevas/NormeTemplatePage";
 import InteractionMapPage from "./pages/cartographie/InteractionMapPage";
+import AuditTerrainPage from "./pages/audit/AuditTerrainPage";
+import DocumentationPage from "./pages/Documentationpage";
+import PreAuditPage from "./pages/audit/PreAuditPage";
 
 export default function App() {
   return (
@@ -38,7 +44,6 @@ export default function App() {
               }
             />
 
-            <Route path="/organigram" element={<Organigramme />} />
             <Route path="/organigramme" element={<Organigramme />} />
             <Route path="/gestion-utilisateurs" element={<GestionUtilisateurs />} />
 
@@ -53,42 +58,25 @@ export default function App() {
               }
             />
 
-            <Route path="/cartographie/canevas-fiche" element={<ModulePlaceholderPage title="Canevas fiche" />} />
+            <Route path="/cartographie/canevas-fiche" element={<CanevasFichePage />} />
+            <Route path="/cartographie/canevas-fiche/:id" element={<NormeTemplatePage />} />
             <Route path="/cartographie/processus" element={<ProcessusPage />} />
             <Route path="/cartographie/interactions" element={<InteractionMapPage />} />
             <Route path="/suivi" element={<ModulePlaceholderPage title="Suivi" />} />
-            <Route path="/audit/preaudit" element={<ModulePlaceholderPage title="Préaudit" />} />
-            <Route path="/audit/mes-audits" element={<ModulePlaceholderPage title="Mes audits" />} />
-            <Route path="/audit/audits-terrain" element={<ModulePlaceholderPage title="Audits terrain" />} />
+            <Route path="/audit/preaudit" element={<PreAuditPage />} />
+            <Route path="/audit/pre-audit" element={<PreAuditPage />} />
+            <Route path="/audit/mes-audits" element={<MesAudits />} />
+            <Route path="/audit/audits-terrain" element={<AuditTerrainPage />} />
             <Route path="/dashboard-pilote" element={<ModulePlaceholderPage title="Dashboard Pilote" />} />
-<Route path="/dashboard-auditeur" element={<ModulePlaceholderPage title="Dashboard Auditeur" />} />
-
-            <Route
-              path="/planification"
-              element={
-                <ModulePlaceholderPage
-                  pageTitle="Planification"
-                  title="Planification"
-                  description="Cette section pourra accueillir la planification qualite, les echeances et les jalons de preparation."
-                />
-              }
-            />
+            <Route path="/dashboard-auditeur" element={<ModulePlaceholderPage title="Dashboard Auditeur" />} />
+            <Route path="/planification" element={<ChefTachesPage />} />
 
             <Route path="/audits" element={<MesAudits />} />
             <Route path="/mes-audits" element={<MesAudits />} />
             <Route path="/mes-audits/planifies" element={<MesAudits />} />
             <Route path="/mes-audits/clotures" element={<MesAudits />} />
 
-            <Route
-              path="/documents"
-              element={
-                <ModulePlaceholderPage
-                  pageTitle="Documents"
-                  title="Documents"
-                  description="Cette page accueillera la gestion documentaire et les references qualite partagees."
-                />
-              }
-            />
+            <Route path="/documents" element={<DocumentationPage />} />
 
             <Route
               path="/actions"
@@ -101,23 +89,17 @@ export default function App() {
               }
             />
 
-            {/* Gestion processus */}
             <Route path="/gestion-processus/fiches/nouveau" element={<FicheProcessusForm />} />
             <Route path="/gestion-processus/fiches/:id/modifier" element={<FicheProcessusForm />} />
 
-            <Route
-              path="/niveau-maturite"
-              element={
-                <MaturityPage />
-              }
-            />
+            <Route path="/niveau-maturite" element={<MaturityPage />} />
 
             <Route
               path="/parametres"
               element={
                 <ModulePlaceholderPage
                   pageTitle="Parametres"
-                  title="Param\u00E8tres"
+                  title="Parametres"
                   description="Les parametres de la plateforme pourront etre completes ici sans changer la navigation actuelle."
                 />
               }

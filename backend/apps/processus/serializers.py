@@ -39,6 +39,17 @@ class ProcessusSerializer(serializers.ModelSerializer):
             "id_pilote", "pilote_nom", "created_at",
         ]
         read_only_fields = ["id_processus", "created_at", "pilote_nom", "departement_nom"]
+        extra_kwargs = {
+            "code_process": {"required": False, "allow_blank": True},
+            "type_process": {"required": False},
+            "description": {"required": False, "allow_blank": True, "allow_null": True},
+            "id_pilote": {"required": False, "allow_null": True},
+        }
+
+    def validate_id_departement(self, value):
+        if not Departement.objects.filter(id_departement=value).exists():
+            raise serializers.ValidationError("Departement introuvable.")
+        return value
 
 
 class InteractionProcessRefSerializer(serializers.Serializer):

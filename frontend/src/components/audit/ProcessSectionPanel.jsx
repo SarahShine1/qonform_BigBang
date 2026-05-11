@@ -1,6 +1,6 @@
-import { CheckCircle2, CircleX, FileText } from "lucide-react";
+import { CheckCircle2, CircleX, ExternalLink, FileText } from "lucide-react";
 
-export default function ProcessSectionPanel({ section, sectionIndex }) {
+export default function ProcessSectionPanel({ section, sectionIndex, onOpenDocument }) {
   return (
     <section className="min-h-[520px] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
       <div className="flex items-center justify-center bg-[#5b1fa8] px-5 py-3.5">
@@ -20,23 +20,33 @@ export default function ProcessSectionPanel({ section, sectionIndex }) {
         ) : section.id === "documents" ? (
           <DocumentedInfoView fields={section.processFields} />
         ) : (
-          <Rows fields={section.processFields} />
+          <Rows fields={section.processFields} onOpenDocument={onOpenDocument} />
         )}
       </div>
     </section>
   );
 }
 
-function Rows({ fields }) {
+function Rows({ fields, onOpenDocument }) {
   return (
     <div className="divide-y divide-gray-100">
       {fields.map((field) => {
-        const valid = isFieldValid(field.value);
+        const valid = field.valid ?? isFieldValid(field.value);
         return (
           <div key={field.label} className="grid grid-cols-[220px_1fr_32px] items-start gap-5 py-2.5">
             <div className="text-xs font-bold text-[#5b1fa8]">{field.label}</div>
-            <div className="min-h-[22px] border-b border-gray-100 pb-1 text-sm italic text-slate-500">
-              {field.value}
+            <div className="min-h-[22px] border-b border-gray-100 pb-1 text-sm text-slate-500">
+              <div className="italic">{field.value}</div>
+              {field.documentId && (
+                <button
+                  type="button"
+                  onClick={() => onOpenDocument?.(field.documentId)}
+                  className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-purple-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-purple-700 hover:bg-purple-50"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  Voir
+                </button>
+              )}
             </div>
             <FieldStatusIcon valid={valid} />
           </div>
@@ -62,7 +72,7 @@ function DocumentedInfoView({ fields }) {
           <div key={field.label} className="grid grid-cols-[220px_1fr_32px] items-start gap-4 border-t border-gray-100 px-4 py-3">
             <div className="text-xs font-bold uppercase tracking-[0.06em] text-slate-500">{field.label}</div>
             <div className="text-sm italic text-slate-500">{field.value}</div>
-            <FieldStatusIcon valid={isFieldValid(field.value)} />
+            <FieldStatusIcon valid={field.valid ?? isFieldValid(field.value)} />
           </div>
         ))}
       </div>
@@ -82,7 +92,7 @@ function FlowView({ fields }) {
           {steps.map((field) => (
             <div key={field.label} className="grid grid-cols-[1fr_32px] items-center gap-4 rounded-lg border border-gray-100 px-3 py-2">
               <div className="text-sm italic text-slate-500">{field.value}</div>
-              <FieldStatusIcon valid={isFieldValid(field.value)} />
+              <FieldStatusIcon valid={field.valid ?? isFieldValid(field.value)} />
             </div>
           ))}
         </div>
@@ -94,7 +104,7 @@ function FlowView({ fields }) {
           <div className="text-sm italic text-slate-400">
             {bpmn?.value || "Inserer ici l'image du logigramme ou le lien vers le schema BPMN"}
           </div>
-          <FieldStatusIcon valid={isFieldValid(bpmn?.value)} />
+          <FieldStatusIcon valid={bpmn?.valid ?? isFieldValid(bpmn?.value)} />
         </div>
       </div>
     </div>

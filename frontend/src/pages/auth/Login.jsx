@@ -192,11 +192,7 @@ export default function Login() {
     try {
       const data = await loginRequest(email, password);
       login(data);
-      const roles = (data.user?.roles || []).map((role) => String(role).trim().toUpperCase());
-      const destination = roles.includes("AUDITEUR")
-        ? "/auditeur/audit-execution/AUD-2026-001"
-        : "/accueil";
-      navigate(destination, { replace: true });
+      navigate("/accueil", { replace: true });
     } catch (requestError) {
       const detail = requestError?.response?.data?.detail;
       setError(typeof detail === "string" ? detail : "Identifiants invalides.");

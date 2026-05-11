@@ -39,11 +39,21 @@ export default function AuditExecution() {
       .then((payload) => {
         if (!active) return;
         setData(payload);
+        setCurrentIndex(Math.min(payload.initialIndex || 0, Math.max((payload.sections || []).length - 1, 0)));
         setEvaluations(buildInitialEvaluations(payload));
         setNonConformities(mapInitialNonConformities(payload));
         setCorrectiveActions(mapInitialCorrectiveActions(payload));
-        setAuditStatus(payload.audit.status || "Soumise");
+        setRecommendations(payload.audit.observations || "");
+        const initialStatus = payload.audit.status || "Soumise";
+        setAuditStatus(initialStatus);
         setReportMeta(payload.report || null);
+        if (initialStatus === "Soumise") {
+          auditApi.startExecution(payload.audit.id, payload.initialIndex || 0).then((response) => {
+            if (active && response?.status) {
+              setAuditStatus(mapAuditStatus(response.status));
+            }
+          }).catch(() => {});
+        }
       })
       .catch((error) => {
         if (!active) return;
@@ -73,19 +83,8 @@ export default function AuditExecution() {
     };
   }, [data, auditStatus, userName]);
 
-  const complianceRate = useMemo(() => {
-    if (!data) return 0;
-    const requirements = data.sections.flatMap((section) => section.requirements);
-    const scored = requirements
-      .map((requirement) => evaluations[requirement.id]?.status)
-      .filter((statusValue) => statusValue && statusValue !== "non_applicable");
-
-    if (scored.length === 0) return 0;
-
-    const scoreMap = new Map(complianceStatuses.map((statusValue) => [statusValue.value, statusValue.score]));
-    const score = scored.reduce((total, statusValue) => total + (scoreMap.get(statusValue) || 0), 0);
-    return Math.round((score / scored.length) * 100);
-  }, [data, evaluations]);
+  const auditMetrics = useMemo(() => calculateAuditMetrics(data, evaluations), [data, evaluations]);
+  const complianceRate = auditMetrics.tauxGlobal;
 
   const completedSectionIds = useMemo(() => {
     if (!data) return new Set();
@@ -120,15 +119,17 @@ export default function AuditExecution() {
   const buildPayload = () => ({
     auditId: audit.id,
     currentSectionId: currentSection.id,
+    currentIndex,
     evaluations,
     recommendations,
     correctiveActions,
     nonConformities,
     complianceRate,
+    metrics: auditMetrics,
   });
 
   const redirectToKanban = (message) => {
-    navigate("/auditeur/audit-fiches", {
+    navigate("/audit/mes-audits", {
       replace: true,
       state: {
         flash: {
@@ -140,11 +141,15 @@ export default function AuditExecution() {
   };
 
   const updateEvaluation = (requirementId, patch) => {
+    const linkedRequirement = currentSection?.requirements?.find(
+      (requirement) => String(requirement.id) === String(requirementId)
+    );
     setEvaluations((current) => ({
       ...current,
       [requirementId]: {
         status: "",
         ...current[requirementId],
+        sectionId: linkedRequirement?.sectionId || current[requirementId]?.sectionId || "",
         ...patch,
       },
     }));
@@ -176,8 +181,8 @@ export default function AuditExecution() {
     setFeedback(null);
     try {
       await auditApi.completeExecution(buildPayload(), "send_back");
-      setAuditStatus("En revision");
-      redirectToKanban("La fiche a bien ete renvoyee au pilote et apparait maintenant en revision.");
+      setAuditStatus("Brouillon");
+      redirectToKanban("La fiche a bien ete renvoyee au pilote pour correction.");
     } catch (error) {
       setFeedback({
         type: "error",
@@ -224,10 +229,6 @@ export default function AuditExecution() {
       id: crypto.randomUUID(),
       ncId,
       description: "",
-      priority: "Moyenne",
-      responsible: "",
-      dueDate: "",
-      status: "A faire",
     };
 
     setCorrectiveActions((current) => [...current, action]);
@@ -291,6 +292,18 @@ export default function AuditExecution() {
     await auditApi.downloadReport(audit.id, filename);
   };
 
+  const openDocument = async (documentId) => {
+    if (!documentId) return;
+    try {
+      await auditApi.openDocument(documentId);
+    } catch (error) {
+      setFeedback({
+        type: "error",
+        message: extractApiError(error, "Impossible d'ouvrir ce document."),
+      });
+    }
+  };
+
   return (
     <AppLayout
       pageTitle="Execution de l'audit interne"
@@ -327,6 +340,7 @@ export default function AuditExecution() {
             sections={data.sections}
             evaluations={evaluations}
             complianceRate={complianceRate}
+            auditMetrics={auditMetrics}
             recommendations={recommendations}
             correctiveActions={correctiveActions}
             nonConformities={nonConformities}
@@ -343,7 +357,11 @@ export default function AuditExecution() {
           />
         ) : (
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:[grid-template-columns:minmax(0,1fr)_minmax(0,1fr)]">
-            <ProcessSectionPanel section={currentSection} sectionIndex={currentIndex} />
+            <ProcessSectionPanel
+              section={currentSection}
+              sectionIndex={currentIndex}
+              onOpenDocument={openDocument}
+            />
             <RequirementsPanel
               section={currentSection}
               evaluations={evaluations}
@@ -409,6 +427,82 @@ function buildInitialEvaluations(payload) {
   };
 }
 
+function calculateAuditMetrics(data, evaluations) {
+  if (!data) {
+    return {
+      tauxCompletudeMoyen: 0,
+      scoreChecklist: 0,
+      scoreBpmn: 0,
+      scorePreuves: 0,
+      tauxGlobal: 0,
+    };
+  }
+
+  const scoreMap = new Map(complianceStatuses.map((statusValue) => [statusValue.value, statusValue.score]));
+  const sections = data.sections.filter((section) => section.id !== "summary");
+  const ficheSections = sections.filter((section) => !section.isDocumentStep);
+  const bpmnSections = sections.filter((section) => section.id === "bpmn");
+  const proofSections = sections.filter((section) => section.id === "preuves");
+
+  const completionScore = average(
+    ficheSections
+      .map((section) => section.completionRate)
+      .filter((rate) => typeof rate === "number")
+  );
+  const checklistScore = scoreRequirements(
+    ficheSections.flatMap((section) => section.requirements),
+    evaluations,
+    scoreMap
+  );
+  const bpmnScore = scoreRequirements(
+    bpmnSections.flatMap((section) => section.requirements),
+    evaluations,
+    scoreMap
+  );
+  const proofScore = scoreRequirements(
+    proofSections.flatMap((section) => section.requirements),
+    evaluations,
+    scoreMap
+  );
+
+  const weighted = [
+    { value: completionScore, weight: 0.4 },
+    { value: checklistScore, weight: 0.3 },
+    { value: bpmnScore, weight: 0.15 },
+    { value: proofScore, weight: 0.15 },
+  ].filter((item) => item.value !== null);
+
+  const weightTotal = weighted.reduce((total, item) => total + item.weight, 0);
+  const tauxGlobal =
+    weightTotal === 0
+      ? data.complianceRate || 0
+      : Math.round(weighted.reduce((total, item) => total + item.value * item.weight, 0) / weightTotal);
+
+  return {
+    tauxCompletudeMoyen: Math.round(completionScore ?? data.metrics?.taux_completude_moyen ?? 0),
+    scoreChecklist: Math.round(checklistScore ?? data.metrics?.score_checklist ?? 0),
+    scoreBpmn: Math.round(bpmnScore ?? data.metrics?.score_bpmn ?? 0),
+    scorePreuves: Math.round(proofScore ?? data.metrics?.score_preuves ?? 0),
+    tauxGlobal,
+  };
+}
+
+function scoreRequirements(requirements, evaluations, scoreMap) {
+  const scores = requirements
+    .map((requirement) => evaluations[requirement.id]?.status)
+    .filter((statusValue) => statusValue && statusValue !== "non_applicable")
+    .map((statusValue) => scoreMap.get(statusValue))
+    .filter((score) => typeof score === "number")
+    .map((score) => score * 100);
+
+  return average(scores);
+}
+
+function average(values) {
+  if (!values.length) return null;
+  return values.reduce((total, value) => total + value, 0) / values.length;
+}
+
 function mapInitialNonConformities(payload) {
   return (payload.nonConformities || []).map((nc) => ({
     id: String(nc.id_nc || nc.id),
@@ -448,5 +542,6 @@ function extractApiError(error, fallbackMessage) {
 function mapAuditStatus(status) {
   if (status === "Publiee") return "Publié";
   if (status === "En_revision") return "En revision";
+  if (status === "Brouillon") return "Brouillon";
   return status || "";
 }

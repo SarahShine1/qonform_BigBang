@@ -5,6 +5,7 @@ export default function AuditSummaryStep({
   sections,
   evaluations,
   complianceRate,
+  auditMetrics,
   recommendations,
   correctiveActions,
   nonConformities: auditNonConformities = [],
@@ -37,6 +38,8 @@ export default function AuditSummaryStep({
   const requirementNonConformities = requirements.filter(
     (requirement) => requirement.status === "non_conforme"
   );
+  const partialRequirements = requirements.filter((requirement) => requirement.status === "partiel");
+  const weakRequirements = [...requirementNonConformities, ...partialRequirements];
   const ratedRequirements = requirements.filter((requirement) => requirement.status);
   const notRatedCount = requirements.length - ratedRequirements.length;
   const statusCounts = {
@@ -75,18 +78,29 @@ export default function AuditSummaryStep({
           <Metric label="Actions correctives" value={correctiveActions.length} tone="purple" />
         </div>
 
+        {auditMetrics && (
+          <div className="mt-3 grid grid-cols-4 gap-3">
+            <Metric label="Completude" value={`${auditMetrics.tauxCompletudeMoyen}%`} tone="purple" />
+            <Metric label="Checklist" value={`${auditMetrics.scoreChecklist}%`} tone="purple" />
+            <Metric label="BPMN" value={`${auditMetrics.scoreBpmn}%`} tone="purple" />
+            <Metric label="Preuves" value={`${auditMetrics.scorePreuves}%`} tone="purple" />
+          </div>
+        )}
+
         <div className="mt-4 rounded-lg border border-gray-100 bg-gray-50 p-3">
           <h3 className="text-sm font-bold text-gray-900">Non-conformités détectées</h3>
-          {requirementNonConformities.length === 0 && auditNonConformities.length === 0 ? (
+          {weakRequirements.length === 0 && auditNonConformities.length === 0 ? (
             <p className="mt-2 text-sm text-slate-500">Aucune non-conformité détectée.</p>
           ) : (
             <ul className="mt-3 space-y-2">
-              {requirementNonConformities.map((item) => (
+              {weakRequirements.map((item) => (
                 <li key={item.id} className="rounded-md bg-white px-3 py-2 text-sm text-slate-700">
                   <span className="font-semibold text-red-700">{item.clause}</span>
                   {" - "}
                   {item.label}
-                  <span className="ml-2 text-xs text-slate-400">({item.sectionTitle})</span>
+                  <span className="ml-2 text-xs text-slate-400">
+                    ({item.sectionTitle} - {item.status === "partiel" ? "Partiel" : "Non conforme"})
+                  </span>
                 </li>
               ))}
               {auditNonConformities.map((item) => (
@@ -148,7 +162,7 @@ export default function AuditSummaryStep({
                         </p>
                       ) : (
                         ncActions.map((action, index) => (
-                          <div key={action.id} className="grid grid-cols-[1fr_120px_34px] gap-2 rounded-md bg-white p-2">
+                          <div key={action.id} className="grid grid-cols-[1fr_34px] gap-2 rounded-md bg-white p-2">
                             <input
                               value={action.description}
                               onChange={(event) =>
@@ -157,18 +171,6 @@ export default function AuditSummaryStep({
                               placeholder={`Action corrective ${index + 1}`}
                               className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs"
                             />
-                            <select
-                              value={action.priority || "Moyenne"}
-                              onChange={(event) =>
-                                onUpdateAction(action.id, { priority: event.target.value })
-                              }
-                              className="rounded-md border border-gray-200 bg-white px-2 py-1.5 text-xs"
-                            >
-                              <option>Basse</option>
-                              <option>Moyenne</option>
-                              <option>Haute</option>
-                              <option>Critique</option>
-                            </select>
                             <button
                               type="button"
                               onClick={() => onRemoveAction(action.id)}
@@ -403,9 +405,6 @@ export default function AuditSummaryStep({
                         >
                           <span className="font-bold text-purple-700">{nc?.title || "NC"}</span> -{" "}
                           {action.description || "Action à préciser"}
-                          <span className="ml-2 rounded-full bg-purple-50 px-2 py-0.5 text-xs font-bold text-purple-700">
-                            {action.priority || "Moyenne"}
-                          </span>
                         </li>
                       );
                     })}
@@ -434,10 +433,6 @@ export default function AuditSummaryStep({
                               <div key={action.id} className="rounded-md bg-white px-3 py-2 text-xs text-slate-700">
                                 <div className="font-semibold text-slate-800">{action.description}</div>
                                 <div className="mt-1 flex flex-wrap gap-2 text-[11px] text-slate-500">
-                                  {action.responsible && <span>Responsable: {action.responsible}</span>}
-                                  {action.dueDate && <span>Échéance: {action.dueDate}</span>}
-                                  {action.priority && <span>Priorité: {action.priority}</span>}
-                                  {action.status && <span>Statut: {action.status}</span>}
                                 </div>
                               </div>
                             ))}
