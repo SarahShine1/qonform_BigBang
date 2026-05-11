@@ -3,6 +3,7 @@ import {
   Building2,
   CalendarDays,
   CircleCheck,
+  ClipboardList,
   Edit2,
   GitBranch,
   Minus,
@@ -18,7 +19,7 @@ import {
 } from "lucide-react";
 import { Button } from "./ui/Button";
 
-const connectorClass = "bg-[#C8B7F5]";
+const connectorClass = "bg-[#BDAAF4]";
 
 const typeLabels = {
   ROOT: "RACINE",
@@ -70,11 +71,11 @@ function accentForUnit(unit) {
   };
 }
 
-function unitIcon(unit) {
-  if (unit.type === "ROOT") return Building2;
-  if (unit.type === "DIRECTION" || unit.type === "DEPARTMENT") return Network;
-  if (unit.type === "SERVICE") return Users;
-  return GitBranch;
+function UnitIcon({ unit, className }) {
+  if (unit?.type === "ROOT") return <Building2 className={className} />;
+  if (unit?.type === "DIRECTION" || unit?.type === "DEPARTMENT") return <Network className={className} />;
+  if (unit?.type === "SERVICE") return <Users className={className} />;
+  return <GitBranch className={className} />;
 }
 
 function flattenTree(nodes, parent = null) {
@@ -104,6 +105,22 @@ function filterTree(nodes, query, type) {
     .filter(Boolean);
 }
 
+function normalizeRole(role) {
+  return String(role || "")
+    .trim()
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function getEmployeeName(employee) {
+  return `${employee?.prenom || ""} ${employee?.nom || ""}`.trim() || employee?.email || "";
+}
+
+function isPilot(employee) {
+  return (employee?.roles || []).map(normalizeRole).some((role) => role.includes("PILOTE"));
+}
+
 function DetailRow({ icon: Icon, label, value }) {
   return (
     <div className="flex min-h-[28px] items-center gap-2">
@@ -131,7 +148,6 @@ function NodeCard({
   onDelete,
 }) {
   const accent = accentForUnit(unit);
-  const Icon = unitIcon(unit);
   const isSelected = selectedId === unit.id;
 
   const sizes =
@@ -191,7 +207,7 @@ function NodeCard({
               accent.icon,
             ].join(" ")}
           >
-            <Icon className={sizes.icon} />
+            <UnitIcon unit={unit} className={sizes.icon} />
           </div>
 
           <div className="min-w-0 flex-1">
@@ -253,19 +269,22 @@ function NodeCard({
   );
 }
 
-function ServiceStack({ childrenUnits, selectedId, onSelect, canManage, onCreate, onEdit, onDelete }) {
+function ServiceStack({ childrenUnits, level, selectedId, onSelect, canManage, onCreate, onEdit, onDelete }) {
   if (!childrenUnits.length) return null;
 
   return (
-    <div className="mt-6 flex flex-col items-center">
-      <div className={`h-4 w-px ${connectorClass}`} />
-      <div className="space-y-3">
-        {childrenUnits.map((child) => (
-          <div key={child.id} className="relative flex justify-center">
-            <div className={`absolute left-1/2 top-[-12px] h-[12px] w-px -translate-x-1/2 ${connectorClass}`} />
-            <NodeCard
+    <div className="mt-5 flex flex-col items-center">
+      <div className={`h-4 w-px rounded-full ${connectorClass}`} />
+      <div className="relative pt-4">
+        {childrenUnits.length > 1 ? (
+          <div className={`absolute left-[76px] right-[76px] top-0 h-px rounded-full ${connectorClass}`} />
+        ) : null}
+        <div className="flex items-start justify-center gap-4">
+          {childrenUnits.map((child) => (
+            <DirectionColumn
+              key={child.id}
               unit={child}
-              level={2}
+              level={level}
               selectedId={selectedId}
               onSelect={onSelect}
               canManage={canManage}
@@ -273,20 +292,20 @@ function ServiceStack({ childrenUnits, selectedId, onSelect, canManage, onCreate
               onEdit={onEdit}
               onDelete={onDelete}
             />
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </div>
   );
 }
 
-function DirectionColumn({ unit, selectedId, onSelect, canManage, onCreate, onEdit, onDelete }) {
+function DirectionColumn({ unit, level = 1, selectedId, onSelect, canManage, onCreate, onEdit, onDelete }) {
   return (
     <div className="relative flex flex-col items-center">
-      <div className={`absolute left-1/2 top-[-24px] h-[24px] w-px -translate-x-1/2 ${connectorClass}`} />
+      <div className={`absolute left-1/2 top-[-16px] h-[16px] w-px -translate-x-1/2 rounded-full ${connectorClass}`} />
       <NodeCard
         unit={unit}
-        level={1}
+        level={Math.min(level, 2)}
         selectedId={selectedId}
         onSelect={onSelect}
         canManage={canManage}
@@ -296,6 +315,7 @@ function DirectionColumn({ unit, selectedId, onSelect, canManage, onCreate, onEd
       />
       <ServiceStack
         childrenUnits={unit.children || []}
+        level={level + 1}
         selectedId={selectedId}
         onSelect={onSelect}
         canManage={canManage}
@@ -325,16 +345,17 @@ function RootTree({ root, selectedId, onSelect, canManage, onCreate, onEdit, onD
 
       {children.length > 0 ? (
         <div className="mt-6 flex flex-col items-center">
-          <div className={`h-4 w-px ${connectorClass}`} />
+          <div className={`h-4 w-px rounded-full ${connectorClass}`} />
           <div className="relative pt-4">
             {children.length > 1 ? (
-              <div className={`absolute left-[92px] right-[92px] top-0 h-px ${connectorClass}`} />
+              <div className={`absolute left-[92px] right-[92px] top-0 h-px rounded-full ${connectorClass}`} />
             ) : null}
-            <div className="flex items-start justify-center gap-6">
+            <div className="flex items-start justify-center gap-5">
               {children.map((child) => (
                 <DirectionColumn
                   key={child.id}
                   unit={child}
+                  level={1}
                   selectedId={selectedId}
                   onSelect={onSelect}
                   canManage={canManage}
@@ -356,6 +377,8 @@ export function OrgChart({
   loading,
   error,
   canManage,
+  employees = [],
+  processes = [],
   onManage,
   onCreate,
   onEdit,
@@ -365,23 +388,28 @@ export function OrgChart({
   const [zoom, setZoom] = useState(100);
   const [selectedId, setSelectedId] = useState(null);
   const [detailsDismissed, setDetailsDismissed] = useState(false);
+  const [processListOpen, setProcessListOpen] = useState(false);
 
   const filteredTree = useMemo(() => filterTree(tree, query, "ALL"), [tree, query]);
   const flatTree = useMemo(() => flattenTree(filteredTree), [filteredTree]);
   const hasTree = filteredTree.length > 0;
 
   useEffect(() => {
-    if (!flatTree.length) {
-      setSelectedId(null);
-      setDetailsDismissed(false);
-      return;
-    }
-    if (detailsDismissed) {
-      return;
-    }
-    if (!selectedId || !flatTree.some((unit) => unit.id === selectedId)) {
-      setSelectedId(flatTree[0].id);
-    }
+    const timer = window.setTimeout(() => {
+      if (!flatTree.length) {
+        setSelectedId(null);
+        setDetailsDismissed(false);
+        return;
+      }
+      if (detailsDismissed) {
+        return;
+      }
+      if (!selectedId || !flatTree.some((unit) => unit.id === selectedId)) {
+        setSelectedId(flatTree[0].id);
+      }
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, [flatTree, selectedId, detailsDismissed]);
 
   const selectedUnit = useMemo(() => {
@@ -390,7 +418,31 @@ export function OrgChart({
   }, [flatTree, selectedId, detailsDismissed]);
 
   const selectedAccent = selectedUnit ? accentForUnit(selectedUnit) : null;
-  const SelectedIcon = selectedUnit ? unitIcon(selectedUnit) : Building2;
+  const selectedEmployees = useMemo(
+    () =>
+      selectedUnit
+        ? employees.filter(
+            (employee) => String(employee.departement ?? employee.id_departement ?? "") === String(selectedUnit.id),
+          )
+        : [],
+    [employees, selectedUnit],
+  );
+  const selectedResponsible = useMemo(() => {
+    if (!selectedUnit) return null;
+    const assignedPilot = selectedEmployees.find(isPilot);
+    if (assignedPilot) return assignedPilot;
+    if (selectedUnit.responsable) return selectedUnit.responsable;
+    return selectedEmployees[0] || null;
+  }, [selectedEmployees, selectedUnit]);
+  const selectedProcesses = useMemo(
+    () =>
+      selectedUnit
+        ? processes.filter(
+            (process) => String(process.id_departement ?? process.departement_id ?? "") === String(selectedUnit.id),
+          )
+        : [],
+    [processes, selectedUnit],
+  );
 
   const updateZoom = (delta) => {
     setZoom((current) => Math.max(80, Math.min(115, current + delta)));
@@ -438,8 +490,13 @@ export function OrgChart({
         ) : null}
       </div>
 
-      <div className="grid grid-cols-[minmax(0,1fr)_280px] items-start bg-white">
-        <div className="relative overflow-visible bg-[radial-gradient(circle_at_top,rgba(124,86,231,0.05),transparent_42%),linear-gradient(180deg,#ffffff_0%,#fcfbff_100%)] px-5 py-5">
+      <div
+        className={[
+          "grid items-start bg-white",
+          selectedUnit ? "grid-cols-[minmax(0,1fr)_280px]" : "grid-cols-1",
+        ].join(" ")}
+      >
+        <div className="relative overflow-x-auto overflow-y-visible bg-[radial-gradient(circle_at_top,rgba(124,86,231,0.05),transparent_42%),linear-gradient(180deg,#ffffff_0%,#fcfbff_100%)] px-5 py-5">
           {loading ? (
             <div className="flex min-h-[320px] items-center justify-center rounded-xl border border-dashed border-purple-100 text-sm text-gray-400">
               Chargement de l&apos;organigramme...
@@ -460,8 +517,8 @@ export function OrgChart({
           ) : null}
 
           {!loading && !error && hasTree ? (
-            <div className="flex justify-center pt-2">
-              <div style={{ transform: `scale(${zoom / 100})`, transformOrigin: "top center" }}>
+            <div className="flex min-w-max justify-center pt-2">
+              <div style={{ transform: `scale(${zoom / 100})`, transformOrigin: "top left" }}>
                 <div className="flex items-start justify-center gap-8 px-3 pb-4">
                   {filteredTree.map((root) => (
                     <RootTree
@@ -470,6 +527,7 @@ export function OrgChart({
                       selectedId={selectedId}
                       onSelect={(unit) => {
                         setDetailsDismissed(false);
+                        setProcessListOpen(false);
                         setSelectedId(unit.id);
                       }}
                       canManage={canManage}
@@ -484,8 +542,8 @@ export function OrgChart({
           ) : null}
         </div>
 
+        {selectedUnit ? (
         <aside className="w-[280px] border-l border-[#E9E1F8] bg-white p-3">
-          {selectedUnit ? (
             <>
               <div className="flex items-center justify-between gap-3">
                 <h3 className="text-[13px] font-semibold text-slate-900">Détails de l&apos;unité</h3>
@@ -494,6 +552,7 @@ export function OrgChart({
                   onClick={() => {
                     setSelectedId(null);
                     setDetailsDismissed(true);
+                    setProcessListOpen(false);
                   }}
                   className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
                 >
@@ -508,7 +567,7 @@ export function OrgChart({
                     selectedAccent?.icon || "bg-violet-50 text-violet-700",
                   ].join(" ")}
                 >
-                  <SelectedIcon className="h-4 w-4" />
+                  <UnitIcon unit={selectedUnit} className="h-4 w-4" />
                 </div>
                 <div className="min-w-0">
                   <h3 className="text-[15px] font-semibold leading-tight text-slate-900">{selectedUnit.name}</h3>
@@ -532,12 +591,47 @@ export function OrgChart({
                 <DetailRow
                   icon={UserRound}
                   label="Responsable"
-                  value={
-                    selectedUnit.responsable
-                      ? `${selectedUnit.responsable.prenom} ${selectedUnit.responsable.nom}`
-                      : "Aucun responsable"
-                  }
+                  value={selectedResponsible ? getEmployeeName(selectedResponsible) : "Aucun responsable"}
                 />
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setProcessListOpen((open) => !open)}
+                    className="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-[10px] border border-[#E9E1F8] text-[11px] font-medium text-[#6B21D9] transition hover:bg-[#FBF8FF]"
+                  >
+                    <ClipboardList className="h-3.5 w-3.5" />
+                    Processus lies ({selectedProcesses.length})
+                  </button>
+
+                  {processListOpen ? (
+                    <div className="absolute left-0 right-0 top-9 z-20 rounded-[12px] border border-[#E9E1F8] bg-white p-2 shadow-[0_14px_28px_rgba(45,11,104,0.12)]">
+                      {selectedProcesses.length > 0 ? (
+                        <div className="max-h-48 space-y-1.5 overflow-y-auto pr-1">
+                          {selectedProcesses.map((process) => (
+                            <div
+                              key={process.id_processus}
+                              className="rounded-[9px] border border-slate-100 bg-slate-50 px-2.5 py-2"
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="truncate text-[11px] font-semibold text-slate-800">{process.nom}</p>
+                                <span className="shrink-0 rounded-full bg-white px-1.5 py-0.5 text-[8px] font-semibold text-slate-500">
+                                  {process.type_process}
+                                </span>
+                              </div>
+                              <p className="mt-1 text-[9px] font-semibold uppercase tracking-[0.06em] text-slate-400">
+                                {process.code_process}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="px-2 py-4 text-center text-[11px] text-slate-400">
+                          Aucun processus rattache a ce departement.
+                        </p>
+                      )}
+                    </div>
+                  ) : null}
+                </div>
                 <DetailRow icon={CircleCheck} label="Statut" value="Actif" />
                 <DetailRow icon={CalendarDays} label="Créé le" value={selectedUnit.createdAt || "—"} />
                 <DetailRow icon={CalendarDays} label="Mise à jour" value={selectedUnit.updatedAt || "—"} />
@@ -564,12 +658,8 @@ export function OrgChart({
                 </div>
               ) : null}
             </>
-          ) : (
-            <div className="flex min-h-[240px] items-center justify-center text-center text-[12px] text-slate-400">
-              Sélectionnez une unité pour afficher ses détails.
-            </div>
-          )}
         </aside>
+        ) : null}
       </div>
     </section>
   );
