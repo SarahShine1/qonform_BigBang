@@ -6,9 +6,9 @@ import { useAuth } from "../../hooks/useAuth";
 import { getProcessusList } from "../../api/processus.api";
 
 const TYPE_COLORS = {
-  Management:  { bg: "#EDE9FE", text: "#58148E" },
+  Management: { bg: "#EDE9FE", text: "#58148E" },
   Realisation: { bg: "#D1FAE5", text: "#065F46" },
-  Support:     { bg: "#FEF3C7", text: "#92400E" },
+  Support: { bg: "#FEF3C7", text: "#92400E" },
 };
 
 function TypeBadge({ type }) {
@@ -32,9 +32,13 @@ function ProcessusCard({ processus, onFiche }) {
         </div>
 
         <div className="min-w-0">
-          <p className="truncate text-[13px] font-semibold text-slate-800">{processus.nom}</p>
+          <p className="truncate text-[13px] font-semibold text-slate-800">
+            {processus.nom}
+          </p>
           <div className="mt-1 flex flex-wrap items-center gap-2">
-            <span className="text-[11px] text-slate-400">{processus.code_process}</span>
+            <span className="text-[11px] text-slate-400">
+              {processus.code_process}
+            </span>
             <TypeBadge type={processus.type_process} />
             {processus.pilote_nom && (
               <span className="text-[11px] text-slate-400">
@@ -50,11 +54,15 @@ function ProcessusCard({ processus, onFiche }) {
         onClick={() => onFiche(processus.id_processus)}
         className="flex shrink-0 items-center gap-1.5 rounded-lg px-4 py-2 text-[12px] font-semibold text-white transition"
         style={{ backgroundColor: "#58148E" }}
-        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#45107A")}
-        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#58148E")}
+        onMouseEnter={(e) =>
+          (e.currentTarget.style.backgroundColor = "#45107A")
+        }
+        onMouseLeave={(e) =>
+          (e.currentTarget.style.backgroundColor = "#58148E")
+        }
       >
         <FileText size={13} strokeWidth={2} />
-        Fiches de processus
+        Voir dossier
       </button>
     </div>
   );
@@ -66,23 +74,27 @@ export default function ProcessusPage() {
 
   const [processus, setProcessus] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError]     = useState(null);
+  const [error, setError] = useState(null);
 
-  const userName = `${user?.prenom ?? ""} ${user?.nom ?? ""}`.trim() || user?.email || "Utilisateur";
+  const userName =
+    `${user?.prenom ?? ""} ${user?.nom ?? ""}`.trim() ||
+    user?.email ||
+    "Utilisateur";
   const userRole = user?.roles?.[0] ?? "";
 
   useEffect(() => {
     if (!user) return;
     setLoading(true);
-    const params = user.departement != null ? { departement: user.departement } : {};
+    const params =
+      user.departement != null ? { departement: user.departement } : {};
     getProcessusList(params)
       .then(setProcessus)
       .catch(() => setError("Impossible de charger les processus."))
       .finally(() => setLoading(false));
   }, [user]);
 
-  const handleFiche = (id) => {
-    navigate(`/gestion-processus/fiches/nouveau?processus=${id}`);
+  const handleDossier = (id) => {
+    navigate(`/gestion-processus/dossier/${id}`);
   };
 
   return (
@@ -90,7 +102,9 @@ export default function ProcessusPage() {
       <div className="mx-auto max-w-4xl space-y-3">
         <div className="flex items-center justify-between pb-1">
           {!loading && !error && (
-            <span className="text-[11px] text-slate-400">{processus.length} processus</span>
+            <span className="text-[11px] text-slate-400">
+              {processus.length} processus
+            </span>
           )}
         </div>
 
@@ -112,9 +126,15 @@ export default function ProcessusPage() {
           </div>
         )}
 
-        {!loading && !error && processus.map((p) => (
-          <ProcessusCard key={p.id_processus} processus={p} onFiche={handleFiche} />
-        ))}
+        {!loading &&
+          !error &&
+          processus.map((p) => (
+            <ProcessusCard
+              key={p.id_processus}
+              processus={p}
+              onFiche={handleDossier}
+            />
+          ))}
       </div>
     </AppLayout>
   );
