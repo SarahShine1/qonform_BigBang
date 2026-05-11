@@ -1,5 +1,5 @@
-import { Navigate } from "react-router-dom";
+import AuditFiches from "./AuditFiches";
 
 export default function MesAudits() {
-  return <Navigate to="/mes-audits/execution/AUD-2026-001" replace />;
+  return <AuditFiches />;
 }
