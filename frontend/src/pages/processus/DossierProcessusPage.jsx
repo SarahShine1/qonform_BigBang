@@ -16,8 +16,10 @@ import { getProcessusList } from "../../api/processus.api";
 import {
   getSectionTemplates, getChampTemplates, getFiches,
   createVersionFiche, updateVersionFiche, saveChampFiches, getChampsFiche,
+  openFicheReport,
 } from "../../api/fiches.api";
 import { getDocuments } from "../../api/documents.api";
+import { auditApi } from "../../api/audit.api";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const TABS = [
@@ -95,12 +97,16 @@ function MultiProcessSelect({ value, onChange, options, disabled }) {
         {selected.length === 0 && <span className="text-[12.5px] text-slate-400">— Aucun —</span>}
         {selected.map((p) => (
           <span key={p.id_processus}
-            className="flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-semibold text-white"
-            style={{ backgroundColor: PURPLE }}>
+            className="flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-semibold"
+            style={{
+              backgroundColor: "#F0EBFF",
+              border: `1.5px dashed ${PURPLE}`,
+              color: PURPLE,
+            }}>
             {p.code_process}
             {!disabled && (
               <button type="button" onClick={(e) => { e.stopPropagation(); toggle(p.id_processus); }}
-                className="ml-0.5 opacity-70 hover:opacity-100">✕</button>
+                className="ml-0.5 opacity-60 hover:opacity-100">✕</button>
             )}
           </span>
         ))}
@@ -214,6 +220,108 @@ function ArchiveModal({ versionNumero, onConfirm, onCancel, loading }) {
   );
 }
 
+// ── Audit Feedback Panel ─────────────────────────────────────────────────────
+function FeedbackPanel({ feedback, loading }) {
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 size={20} className="animate-spin" style={{ color: "#F59E0B" }} />
+      </div>
+    );
+  }
+  if (!feedback) {
+    return (
+      <p className="px-4 py-8 text-center text-[12px] italic text-slate-400">
+        Aucun feedback disponible.
+      </p>
+    );
+  }
+  const { complianceRate, nonConformities, audit } = feedback;
+  return (
+    <div className="space-y-4 p-4">
+      {/* Taux de conformité */}
+      <div className="rounded-xl border border-amber-200 bg-white px-4 py-3">
+        <p className="mb-2 text-[10.5px] font-bold uppercase tracking-wider text-amber-700">
+          Taux de conformité
+        </p>
+        <p className="text-[26px] font-bold text-amber-600">{complianceRate ?? 0}%</p>
+        <div className="mt-1.5 h-2 w-full rounded-full bg-amber-100">
+          <div
+            className="h-2 rounded-full bg-amber-400 transition-all duration-500"
+            style={{ width: `${Math.min(complianceRate ?? 0, 100)}%` }}
+          />
+        </div>
+      </div>
+
+      {/* Observations */}
+      {audit?.observations && (
+        <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+          <p className="mb-1.5 text-[10.5px] font-bold uppercase tracking-wider text-slate-400">
+            Observations
+          </p>
+          <p className="text-[12px] leading-relaxed text-slate-600">{audit.observations}</p>
+        </div>
+      )}
+
+      {/* Non-conformités */}
+      <div className="overflow-hidden rounded-xl border border-red-200">
+        <div className="border-b border-red-200 bg-red-50 px-4 py-2.5">
+          <p className="text-[10.5px] font-bold uppercase tracking-wider text-red-700">
+            Non-conformités ({nonConformities?.length ?? 0})
+          </p>
+        </div>
+        {!nonConformities?.length ? (
+          <div className="bg-green-50 px-4 py-3 text-center">
+            <p className="text-[12px] font-semibold text-green-700">Aucune non-conformité</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-red-100 bg-white">
+            {nonConformities.map(nc => (
+              <div key={nc.id} className="px-4 py-3">
+                <div className="mb-1 flex items-start justify-between gap-2">
+                  <p className="text-[12px] font-semibold text-slate-700">{nc.title}</p>
+                  {nc.severity && (
+                    <span className="shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-[9px] font-bold text-red-700">
+                      {nc.severity}
+                    </span>
+                  )}
+                </div>
+                {nc.description && (
+                  <p className="text-[11px] leading-relaxed text-slate-500">{nc.description}</p>
+                )}
+                {nc.sectionTitle && nc.sectionTitle !== "Section non liée" && (
+                  <p className="mt-0.5 text-[10px] italic text-slate-400">
+                    Section : {nc.sectionTitle}
+                  </p>
+                )}
+                {nc.actions?.length > 0 && (
+                  <div className="mt-2 space-y-1.5">
+                    {nc.actions.map(action => (
+                      <div key={action.id} className="rounded-lg bg-blue-50 px-3 py-2">
+                        <p className="mb-0.5 text-[10.5px] font-semibold text-blue-700">
+                          Action corrective
+                        </p>
+                        <p className="text-[11px] text-slate-600">{action.description}</p>
+                        {(action.responsible || action.dueDate) && (
+                          <p className="mt-0.5 text-[10px] text-slate-400">
+                            {action.responsible && `Resp. : ${action.responsible}`}
+                            {action.responsible && action.dueDate && " · "}
+                            {action.dueDate && `Échéance : ${action.dueDate}`}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Fiche Tab ──────────────────────────────────────────────────────────────────
 function FicheTab({ processusId, processus, user, onVersionCreated }) {
   const [sections,         setSections]         = useState([]);
@@ -233,6 +341,9 @@ function FicheTab({ processusId, processus, user, onVersionCreated }) {
   const [error,            setError]            = useState(null);
   const [notif,            setNotif]            = useState(null);
   const [verifData,        setVerifData]        = useState(null);
+  const [showFeedback,    setShowFeedback]    = useState(false);
+  const [auditFeedback,   setAuditFeedback]   = useState(null);
+  const [loadingFeedback, setLoadingFeedback] = useState(false);
   const notifTimer  = useRef(null);
   const containerRef = useRef(null);
   const [overlayStyle, setOverlayStyle] = useState({});
@@ -395,6 +506,20 @@ function FicheTab({ processusId, processus, user, onVersionCreated }) {
     }
   };
 
+  const toggleFeedback = async () => {
+    if (showFeedback) { setShowFeedback(false); return; }
+    setShowFeedback(true);
+    if (!auditFeedback && existingVersionId) {
+      setLoadingFeedback(true);
+      try {
+        const data = await auditApi.getExecution(existingVersionId);
+        setAuditFeedback(data);
+      } catch { /* fail silently */ } finally {
+        setLoadingFeedback(false);
+      }
+    }
+  };
+
   const statusMsg = {
     Soumise:     { bg: "#FFFBEB", text: "#92400E", msg: "En attente du feedback de l'auditeur sur la fiche." },
     En_revision: { bg: "#DBEAFE", text: "#1D4ED8", msg: "Feedback en cours par l'auditeur." },
@@ -415,160 +540,199 @@ function FicheTab({ processusId, processus, user, onVersionCreated }) {
       <NotifBanner notif={notif} onClose={() => setNotif(null)} overlayStyle={overlayStyle} />
       <VerifPanel data={verifData} onClose={() => setVerifData(null)} overlayStyle={overlayStyle} />
 
-      {/* Pipeline statut */}
-      <div className="rounded-xl bg-white px-8 py-5" style={{ border: `1px solid ${BORDER}` }}>
-        <PipelineFiche statut={currentStatut} />
-
-        {/* Message sous le pipeline */}
-        {statusMsg && (
-          <p className="mt-3 rounded-lg px-4 py-2 text-center text-[11.5px] font-medium"
-            style={{ backgroundColor: statusMsg.bg, color: statusMsg.text }}>
-            {statusMsg.msg}
-          </p>
-        )}
-      </div>
-
-      {/* ── Boutons entre pipeline et fiche ── */}
-      <div className="my-3 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          {/* Badge lecture seule */}
-          {!canEdit && !canArchive && (
-            <span className="flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[10.5px] font-semibold text-slate-500">
-              <Lock size={10} /> Lecture seule
-            </span>
-          )}
-          {/* Voir feedback */}
-          {revue && auditDoc?.url && (
-            <a href={auditDoc.url} target="_blank" rel="noopener noreferrer"
-              className="flex items-center gap-1.5 rounded-xl px-4 py-2 text-[12px] font-semibold text-white transition"
-              style={{ backgroundColor: "#0284C7" }}
-              onMouseEnter={e => e.currentTarget.style.backgroundColor = "#0369A1"}
-              onMouseLeave={e => e.currentTarget.style.backgroundColor = "#0284C7"}>
-              <MessageSquare size={13} /> Voir feedback auditeur
-            </a>
-          )}
-          {/* Erreur */}
-          {error && (
-            <div className="flex items-center gap-1.5 rounded-lg bg-red-50 px-3 py-1.5 text-[11px] font-medium text-red-600">
-              <AlertCircle size={13} /> {error}
-            </div>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2">
-          {/* Archiver (Publiee + Pilote) */}
-          {canArchive && (
-            <button type="button" onClick={() => setShowArchiveModal(true)}
-              className="flex items-center gap-2 rounded-xl px-5 py-2 text-[12px] font-semibold text-white transition"
-              style={{ backgroundColor: "#D97706" }}
-              onMouseEnter={e => e.currentTarget.style.backgroundColor = "#B45309"}
-              onMouseLeave={e => e.currentTarget.style.backgroundColor = "#D97706"}>
-              <Archive size={14} /> Archiver cette version
-            </button>
-          )}
-          {/* Enregistrer (Brouillon + Pilote) */}
-          {canEdit && (
-            <button type="button" disabled={saving || loading}
-              onClick={() => handleSave("Brouillon")}
-              className="flex items-center gap-2 rounded-xl px-5 py-2 text-[12px] font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-50"
-              style={{ backgroundColor: PURPLE, boxShadow: "0 4px 14px rgba(88,20,142,0.3)" }}
-              onMouseEnter={e => e.currentTarget.style.backgroundColor = PURPLE_HOVER}
-              onMouseLeave={e => e.currentTarget.style.backgroundColor = PURPLE}>
-              {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-              Enregistrer
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Fiche form card */}
-      <div className="overflow-hidden rounded-xl bg-white" style={{ border: `1px solid ${BORDER}` }}>
-        <div className="flex items-center justify-center px-6 py-3"
-          style={{ backgroundColor: PURPLE, borderBottom: `1px solid ${BORDER}` }}>
-          <span className="text-[12px] font-semibold text-white">Fiche Processus</span>
-        </div>
-
-        {loading ? (
-          <div className="flex flex-col items-center justify-center gap-3 py-20 text-slate-400">
-            <Loader2 size={26} className="animate-spin" style={{ color: PURPLE }} />
-            <span className="text-[12px]">Chargement du formulaire…</span>
+      <div className={showFeedback ? "flex items-start gap-4" : undefined}>
+        {/* ── Left column (or full width) ── */}
+        <div className={showFeedback ? "flex-1 min-w-0" : undefined}>
+          {/* Pipeline statut */}
+          <div className="rounded-xl bg-white px-8 py-5" style={{ border: `1px solid ${BORDER}` }}>
+            <PipelineFiche statut={currentStatut} />
+            {statusMsg && (
+              <p className="mt-3 rounded-lg px-4 py-2 text-center text-[11.5px] font-medium"
+                style={{ backgroundColor: statusMsg.bg, color: statusMsg.text }}>
+                {statusMsg.msg}
+              </p>
+            )}
           </div>
-        ) : (
-          <div>
-            {/* Section 0 — Liens processus */}
-            <div style={{ borderTop: `1px solid ${BORDER}` }}>
-              <div className="flex items-center gap-3 px-6 py-3"
-                style={{ backgroundColor: "#F9FAFB", borderBottom: `1px solid ${BORDER}` }}>
-                <span className="flex h-[20px] w-[20px] shrink-0 items-center justify-center rounded-[4px] text-[10px] font-bold text-white"
-                  style={{ backgroundColor: PURPLE }}>0</span>
-                <span className="text-[10.5px] font-bold uppercase tracking-widest text-slate-500">
-                  Liens processus
+
+          {/* ── Boutons entre pipeline et fiche ── */}
+          <div className="my-3 flex items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Yellow toggle: only shown to open (closing is done via X inside the panel) */}
+              {isPilote && revue && !showFeedback && (
+                <button type="button" onClick={toggleFeedback}
+                  className="flex items-center gap-1.5 rounded-xl px-4 py-2 text-[12px] font-semibold transition"
+                  style={{
+                    backgroundColor: "#FEF3C7",
+                    color: "#92400E",
+                    border: "1.5px solid #FCD34D",
+                  }}>
+                  <MessageSquare size={13} />
+                  Voir les remarques de l'auditeur
+                </button>
+              )}
+              {/* Link to audit report doc (when panel is closed or non-pilote) */}
+              {revue && auditDoc?.url && !showFeedback && (
+                <a href={auditDoc.url} target="_blank" rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 rounded-xl px-4 py-2 text-[12px] font-semibold text-white transition"
+                  style={{ backgroundColor: "#0284C7" }}
+                  onMouseEnter={e => e.currentTarget.style.backgroundColor = "#0369A1"}
+                  onMouseLeave={e => e.currentTarget.style.backgroundColor = "#0284C7"}>
+                  <ExternalLink size={13} /> Voir rapport audit
+                </a>
+              )}
+              {/* Badge lecture seule */}
+              {!canEdit && !canArchive && !revue && (
+                <span className="flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[10.5px] font-semibold text-slate-500">
+                  <Lock size={10} /> Lecture seule
                 </span>
-              </div>
-              <div className="bg-white px-6">
-                <div className="py-4 grid items-start gap-5" style={{ gridTemplateColumns: "200px 1fr" }}>
-                  <span className="text-[12px] font-semibold pt-0.5" style={{ color: PURPLE }}>Processus en amont</span>
-                  <MultiProcessSelect
-                    value={amontIds} onChange={setAmontIds}
-                    options={processusList.filter(p => p.id_processus !== Number(processusId))}
-                    disabled={!canEdit}
-                  />
+              )}
+              {/* Erreur */}
+              {error && (
+                <div className="flex items-center gap-1.5 rounded-lg bg-red-50 px-3 py-1.5 text-[11px] font-medium text-red-600">
+                  <AlertCircle size={13} /> {error}
                 </div>
-                <div className="py-4 grid items-start gap-5" style={{ gridTemplateColumns: "200px 1fr", borderTop: `1px solid ${BORDER}` }}>
-                  <span className="text-[12px] font-semibold pt-0.5" style={{ color: PURPLE }}>Processus en aval</span>
-                  <MultiProcessSelect
-                    value={avalIds} onChange={setAvalIds}
-                    options={processusList.filter(p => p.id_processus !== Number(processusId))}
-                    disabled={!canEdit}
-                  />
-                </div>
-              </div>
+              )}
             </div>
 
-            {/* Sections dynamiques */}
-            {sections.map((section, idx) => (
-              <SectionBlock
-                key={section.id_section_template}
-                section={section}
-                index={idx + 1}
-                formValues={formValues}
-                onChange={handleChange}
-                readOnly={!canEdit}
-              />
-            ))}
+            <div className="flex items-center gap-2">
+              {canArchive && (
+                <button type="button" onClick={() => setShowArchiveModal(true)}
+                  className="flex items-center gap-2 rounded-xl px-5 py-2 text-[12px] font-semibold text-white transition"
+                  style={{ backgroundColor: "#D97706" }}
+                  onMouseEnter={e => e.currentTarget.style.backgroundColor = "#B45309"}
+                  onMouseLeave={e => e.currentTarget.style.backgroundColor = "#D97706"}>
+                  <Archive size={14} /> Archiver cette version
+                </button>
+              )}
+              {canEdit && (
+                <button type="button" disabled={saving || loading}
+                  onClick={() => handleSave("Brouillon")}
+                  className="flex items-center gap-2 rounded-xl px-5 py-2 text-[12px] font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-50"
+                  style={{ backgroundColor: PURPLE, boxShadow: "0 4px 14px rgba(88,20,142,0.3)" }}
+                  onMouseEnter={e => e.currentTarget.style.backgroundColor = PURPLE_HOVER}
+                  onMouseLeave={e => e.currentTarget.style.backgroundColor = PURPLE}>
+                  {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                  Enregistrer
+                </button>
+              )}
+            </div>
+          </div>
 
-            {/* Section BPMN */}
-            <DocumentSection
-              versionId={existingVersionId}
-              readOnly={!canEdit}
-              sectionIndex={sections.length + 1}
-              showBpmn={true}
-              showPreuves={false}
-              label="BPMN"
-              bpmnDescription="Déposez ici le diagramme BPMN décrivant le workflow complet du processus."
-            />
+          {/* Fiche form card */}
+          <div className="overflow-hidden rounded-xl bg-white" style={{ border: `1px solid ${BORDER}` }}>
+            <div className="flex items-center justify-center px-6 py-3"
+              style={{ backgroundColor: PURPLE, borderBottom: `1px solid ${BORDER}` }}>
+              <span className="text-[12px] font-semibold text-white">Fiche Processus</span>
+            </div>
+
+            {loading ? (
+              <div className="flex flex-col items-center justify-center gap-3 py-20 text-slate-400">
+                <Loader2 size={26} className="animate-spin" style={{ color: PURPLE }} />
+                <span className="text-[12px]">Chargement du formulaire…</span>
+              </div>
+            ) : (
+              <div>
+                {/* Section 0 — Liens processus */}
+                <div style={{ borderTop: `1px solid ${BORDER}` }}>
+                  <div className="flex items-center gap-3 px-6 py-3"
+                    style={{ backgroundColor: "#F9FAFB", borderBottom: `1px solid ${BORDER}` }}>
+                    <span className="flex h-[20px] w-[20px] shrink-0 items-center justify-center rounded-[4px] text-[10px] font-bold text-white"
+                      style={{ backgroundColor: PURPLE }}>0</span>
+                    <span className="text-[10.5px] font-bold uppercase tracking-widest text-slate-500">
+                      Liens processus
+                    </span>
+                  </div>
+                  <div className="bg-white px-6">
+                    <div className="py-4 grid items-start gap-5" style={{ gridTemplateColumns: "200px 1fr" }}>
+                      <span className="text-[12px] font-semibold pt-0.5" style={{ color: PURPLE }}>Processus en amont</span>
+                      <MultiProcessSelect
+                        value={amontIds} onChange={setAmontIds}
+                        options={processusList.filter(p => p.id_processus !== Number(processusId))}
+                        disabled={!canEdit}
+                      />
+                    </div>
+                    <div className="py-4 grid items-start gap-5" style={{ gridTemplateColumns: "200px 1fr", borderTop: `1px solid ${BORDER}` }}>
+                      <span className="text-[12px] font-semibold pt-0.5" style={{ color: PURPLE }}>Processus en aval</span>
+                      <MultiProcessSelect
+                        value={avalIds} onChange={setAvalIds}
+                        options={processusList.filter(p => p.id_processus !== Number(processusId))}
+                        disabled={!canEdit}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Sections dynamiques */}
+                {sections.map((section, idx) => (
+                  <SectionBlock
+                    key={section.id_section_template}
+                    section={section}
+                    index={idx + 1}
+                    formValues={formValues}
+                    onChange={handleChange}
+                    readOnly={!canEdit}
+                  />
+                ))}
+
+                {/* Section BPMN */}
+                <DocumentSection
+                  versionId={existingVersionId}
+                  readOnly={!canEdit}
+                  sectionIndex={sections.length + 1}
+                  showBpmn={true}
+                  showPreuves={false}
+                  label="BPMN"
+                  bpmnDescription="Déposez ici le diagramme BPMN décrivant le workflow complet du processus."
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Boutons bas */}
+          {canEdit && (
+            <div className="mt-4 flex items-center justify-end gap-3">
+              <button type="button" disabled={saving || loading}
+                onClick={() => setVerifData(calcCompletion(sections, formValues))}
+                className="rounded-xl px-6 py-2 text-[12px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-50"
+                style={{ backgroundColor: "#fff", border: `1.5px solid ${PURPLE}`, color: PURPLE }}>
+                Vérifier avant soumettre
+              </button>
+              <button type="button" disabled={saving || loading} onClick={() => handleSave("Soumise")}
+                className="flex items-center gap-2 rounded-xl px-6 py-2 text-[12px] font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-50"
+                style={{ backgroundColor: PURPLE }}
+                onMouseEnter={e => e.currentTarget.style.backgroundColor = PURPLE_HOVER}
+                onMouseLeave={e => e.currentTarget.style.backgroundColor = PURPLE}>
+                {saving ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                Soumettre la fiche
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* ── Right column: sticky audit feedback panel ── */}
+        {showFeedback && (
+          <div
+            className="w-[360px] shrink-0 sticky top-4 overflow-hidden rounded-xl"
+            style={{
+              height: "calc(100vh - 5rem)",
+              overflowY: "auto",
+              border: "1.5px solid #FDE68A",
+            }}
+          >
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-amber-200 bg-amber-50 px-4 py-3">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-amber-700">
+                Feedback auditeur
+              </span>
+              <button type="button" onClick={() => setShowFeedback(false)}
+                className="rounded p-1 opacity-60 transition hover:opacity-100"
+                style={{ color: "#92400E" }}>
+                <X size={14} />
+              </button>
+            </div>
+            <FeedbackPanel feedback={auditFeedback} loading={loadingFeedback} />
           </div>
         )}
       </div>
-
-      {/* Boutons bas */}
-      {canEdit && (
-        <div className="mt-4 flex items-center justify-end gap-3">
-          <button type="button" disabled={saving || loading} onClick={() => setVerifData(calcCompletion(sections, formValues))}
-            className="rounded-xl px-6 py-2 text-[12px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-50"
-            style={{ backgroundColor: "#fff", border: `1.5px solid ${PURPLE}`, color: PURPLE }}>
-            Vérifier avant soumettre
-          </button>
-          <button type="button" disabled={saving || loading} onClick={() => handleSave("Soumise")}
-            className="flex items-center gap-2 rounded-xl px-6 py-2 text-[12px] font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-50"
-            style={{ backgroundColor: PURPLE }}
-            onMouseEnter={e => e.currentTarget.style.backgroundColor = PURPLE_HOVER}
-            onMouseLeave={e => e.currentTarget.style.backgroundColor = PURPLE}>
-            {saving ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-            Soumettre la fiche
-          </button>
-        </div>
-      )}
     </div>
   );
 }
@@ -586,6 +750,7 @@ function StatutBadge({ statut }) {
 
 function VersionsTab({ versions, loading, processus, onConsulterCurrent }) {
   const navigate = useNavigate();
+  const handleOpenReport = (versionId) => openFicheReport(versionId);
 
   if (loading) {
     return (
@@ -643,9 +808,10 @@ function VersionsTab({ versions, loading, processus, onConsulterCurrent }) {
                 <div className="flex items-center gap-3">
                   <StatutBadge statut={version.statut} />
                   <button type="button"
+                    onClick={() => handleOpenReport(version.id_version)}
                     className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[11.5px] font-semibold text-slate-500 transition hover:bg-slate-50"
                     style={{ borderColor: BORDER }}>
-                    <Download size={12} /> Télécharger
+                    <Download size={12} /> Voir PDF
                   </button>
                   <button type="button"
                     onClick={() => isCurrent ? onConsulterCurrent() : navigate(`/gestion-processus/fiches/${version.id_version}/modifier`)}
@@ -666,7 +832,31 @@ function VersionsTab({ versions, loading, processus, onConsulterCurrent }) {
 }
 
 // ── Audit Fiche Tab ───────────────────────────────────────────────────────────
-function AuditDocCard({ doc }) {
+function AuditDocCard({ doc, versionId }) {
+  const [opening, setOpening] = useState(false);
+
+  const handleOpen = async () => {
+    setOpening(true);
+    try {
+      // Use the authenticated backend endpoint — handles auth & serves clean HTML
+      await auditApi.openReport(versionId);
+    } catch {
+      // Fallback: fetch the stored URL and force text/html blob
+      try {
+        const resp = await fetch(doc.url);
+        const html = await resp.text();
+        const blob = new Blob([html], { type: "text/html" });
+        const blobUrl = URL.createObjectURL(blob);
+        window.open(blobUrl, "_blank", "noopener,noreferrer");
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+      } catch {
+        if (doc.url) window.open(doc.url, "_blank", "noopener,noreferrer");
+      }
+    } finally {
+      setOpening(false);
+    }
+  };
+
   return (
     <div className="flex items-center gap-3 rounded-xl border bg-white px-4 py-3"
       style={{ borderColor: "#C4B5FD" }}>
@@ -678,13 +868,13 @@ function AuditDocCard({ doc }) {
         <p className="truncate text-[12.5px] font-semibold text-slate-700">{doc.nom_fichier}</p>
         {doc.taille && <p className="text-[10.5px] text-slate-400">{(doc.taille / 1024).toFixed(0)} Ko</p>}
       </div>
-      {doc.url && (
-        <a href={doc.url} target="_blank" rel="noopener noreferrer"
-          className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold transition hover:bg-slate-100"
-          style={{ color: PURPLE }}>
-          <ExternalLink size={12} /> Voir
-        </a>
-      )}
+      <button type="button" onClick={handleOpen} disabled={opening}
+        className="flex shrink-0 items-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold transition hover:bg-slate-100 disabled:opacity-50"
+        style={{ color: PURPLE }}>
+        {opening
+          ? <><Loader2 size={12} className="animate-spin" /> Ouverture…</>
+          : <><ExternalLink size={12} /> Voir</>}
+      </button>
     </div>
   );
 }
@@ -741,7 +931,7 @@ function AuditFicheTab({ versions, currentVersion }) {
           ) : (
             <div className="space-y-2">
               {(docs[currentVersion.id_version] ?? []).map(doc => (
-                <AuditDocCard key={doc.id_document} doc={doc} />
+                <AuditDocCard key={doc.id_document} doc={doc} versionId={currentVersion.id_version} />
               ))}
             </div>
           )}
@@ -766,7 +956,7 @@ function AuditFicheTab({ versions, currentVersion }) {
                 ) : (
                   <div className="space-y-2">
                     {(docs[v.id_version] ?? []).map(doc => (
-                      <AuditDocCard key={doc.id_document} doc={doc} />
+                      <AuditDocCard key={doc.id_document} doc={doc} versionId={v.id_version} />
                     ))}
                   </div>
                 )}

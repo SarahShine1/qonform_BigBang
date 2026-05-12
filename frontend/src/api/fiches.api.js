@@ -63,3 +63,9 @@ export const getChampsFiche = (versionId) =>
 
 export const saveChampFiches = (versionId, champs) =>
   apiClient.post(`/fiches/${versionId}/champs/`, champs).then((r) => r.data);
+
+export const openFicheReport = (versionId) => {
+  const token = localStorage.getItem("access_token") ?? "";
+  const url = `${apiClient.defaults.baseURL}/fiches/${versionId}/report/?token=${encodeURIComponent(token)}`;
+  window.open(url, "_blank");
+};

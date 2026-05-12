@@ -197,7 +197,7 @@ CREATE TABLE public.document (
   id_version integer,
   id_uploader integer NOT NULL,
   nom_fichier character varying NOT NULL,
-  type_document character varying NOT NULL CHECK (type_document::text = ANY (ARRAY['BPMN'::character varying, 'Rapport'::character varying, 'Preuve'::character varying, 'Support'::character varying, 'Rapport_audit_fiche'::character varying]::text[])),
+  type_document character varying NOT NULL CHECK (type_document::text = ANY (ARRAY['BPMN'::character varying, 'Rapport'::character varying, 'Preuve'::character varying, 'Support'::character varying, 'Rapport_audit_fiche'::character varying, 'PV'::character varying]::text[])),
   chemin_stockage character varying NOT NULL,
   taille integer,
   version_doc character varying,
@@ -206,10 +206,12 @@ CREATE TABLE public.document (
   type_support character varying,
   id_audit_field integer,
   evaluation character varying CHECK (evaluation IS NULL OR (evaluation::text = ANY (ARRAY['Conforme'::character varying, 'Non_conforme'::character varying, 'Partiel'::character varying, 'NA'::character varying]::text[]))),
+  id_pv integer,
   CONSTRAINT document_pkey PRIMARY KEY (id_document),
   CONSTRAINT document_id_uploader_fkey FOREIGN KEY (id_uploader) REFERENCES public.utilisateur(id_user),
   CONSTRAINT document_id_audit_field_fkey FOREIGN KEY (id_audit_field) REFERENCES public.audit_field(id_audit_field),
-  CONSTRAINT document_id_version_fkey FOREIGN KEY (id_version) REFERENCES public.version_fiche(id_version)
+  CONSTRAINT document_id_version_fkey FOREIGN KEY (id_version) REFERENCES public.version_fiche(id_version),
+  CONSTRAINT document_id_pv_fkey FOREIGN KEY (id_pv) REFERENCES public.pv(id)
 );
 CREATE TABLE public.documents_document (
   id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
@@ -311,6 +313,23 @@ CREATE TABLE public.processus_liaison (
   CONSTRAINT processus_liaison_pkey PRIMARY KEY (id),
   CONSTRAINT processus_liaison_amont_fkey FOREIGN KEY (id_processus_amont) REFERENCES public.processus(id_processus),
   CONSTRAINT processus_liaison_aval_fkey FOREIGN KEY (id_processus_aval) REFERENCES public.processus(id_processus)
+);
+CREATE TABLE public.pv (
+  id integer GENERATED ALWAYS AS IDENTITY NOT NULL,
+  code character varying NOT NULL UNIQUE,
+  type character varying NOT NULL,
+  date date NOT NULL,
+  created_at timestamp with time zone NOT NULL,
+  updated_at timestamp with time zone NOT NULL,
+  CONSTRAINT pv_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.pv_participants (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  pv_id integer NOT NULL,
+  user_id bigint NOT NULL,
+  CONSTRAINT pv_participants_pkey PRIMARY KEY (id),
+  CONSTRAINT pv_participants_pv_id_c49be6dd_fk_pv_id FOREIGN KEY (pv_id) REFERENCES public.pv(id),
+  CONSTRAINT pv_participants_user_id_a236fb57_fk_accounts_user_id FOREIGN KEY (user_id) REFERENCES public.accounts_user(id)
 );
 CREATE TABLE public.role (
   id_role integer NOT NULL DEFAULT nextval('role_id_role_seq'::regclass),
