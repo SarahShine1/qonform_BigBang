@@ -62,19 +62,27 @@ export default function App() {
               }
             />
 
-            <Route
-              path="/cartographie/canevas-fiche"
-              element={<CanevasFichePage />}
-            />
-            <Route
-              path="/cartographie/canevas-fiche/:id"
-              element={<NormeTemplatePage />}
-            />
             <Route path="/cartographie/processus" element={<ProcessusPage />} />
             <Route
-              path="/cartographie/interactions"
-              element={<InteractionMapPage />}
-            />
+              element={
+                <RoleProtectedRoute
+                  excludedRoles={["DG", "Direction generale", "Direction générale"]}
+                />
+              }
+            >
+              <Route
+                path="/cartographie/canevas-fiche"
+                element={<CanevasFichePage />}
+              />
+              <Route
+                path="/cartographie/canevas-fiche/:id"
+                element={<NormeTemplatePage />}
+              />
+              <Route
+                path="/cartographie/interactions"
+                element={<InteractionMapPage />}
+              />
+            </Route>
             <Route
               path="/suivi"
               element={<ModulePlaceholderPage title="Suivi" />}
@@ -114,7 +122,6 @@ export default function App() {
               }
             />
 
-            {/* Gestion processus */}
             <Route
               path="/gestion-processus/dossier/:id"
               element={<DossierProcessusPage />}

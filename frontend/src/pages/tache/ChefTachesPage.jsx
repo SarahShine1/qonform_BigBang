@@ -11,6 +11,14 @@ import {
   getUtilisateurs,
 
 } from "./chefTacheService";
+function normalizeRole(role) {
+  return String(role || "")
+    .trim()
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ");
+}
 function SearchIcon() {
   return (
     <svg className="w-[14px] h-[14px]" viewBox="0 0 24 24" fill="none">
@@ -594,7 +602,12 @@ function ChefTachesPage() {
     : "";
 
   const userRole = user?.roles?.[0] || "";
-  const role = userRole;
+  const normalizedRoles = (user?.roles || []).map(normalizeRole);
+  const isDg =
+    normalizedRoles.includes("DG") ||
+    normalizedRoles.includes("DIRECTION GENERALE");
+  const canManagePlanification = normalizedRoles.includes("CAQ");
+  const canViewAllPlanification = canManagePlanification || isDg;
 
  const utilisateurId =
   user?.id_user ||
@@ -614,7 +627,7 @@ function ChefTachesPage() {
   const [formError, setFormError] = useState("");
   const [utilisateurs, setUtilisateurs] = useState([]);
 const tachesFiltrees = (
-  role === "CAQ"
+  canViewAllPlanification
     ? taches
     : taches.filter(
         (tache) => String(tache.responsable) === String(utilisateurId)
@@ -833,7 +846,7 @@ async function supprimerTache(id) {
               Tâches planifiées
             </h1>
 
-      {role === "CAQ" && (
+      {canManagePlanification && (
   <button
     type="button"
     onClick={() => {
@@ -857,7 +870,7 @@ async function supprimerTache(id) {
   </button>
 )}
           </div>
-          {role === "CAQ" ? (
+          {canViewAllPlanification ? (
             <TachesGantt taches={tachesFiltrees} />
           ) : (
             <TachesYearCalendar taches={tachesFiltrees} />
@@ -1041,7 +1054,7 @@ async function supprimerTache(id) {
     <EyeIcon />
   </button>
 
-  {role === "CAQ" ? (
+  {canManagePlanification ? (
     <>
       <button
         type="button"
@@ -1061,7 +1074,7 @@ async function supprimerTache(id) {
         <DeleteIcon />
       </button>
     </>
-  ) : (
+  ) : !isDg ? (
     <>
       {getStatutAutomatique(tache) === "Planifiée" && (
         <button
@@ -1097,7 +1110,7 @@ async function supprimerTache(id) {
             </button>
         )}
     </>
-  )}
+  ) : null}
 </div>
                           </td>
                         </tr>
