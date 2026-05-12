@@ -104,7 +104,7 @@ h2 {
 
 h1 {
   font-size: 56px;
-  letter-spacing: -1.68px;
+  letter-spacing: 0px;
   margin: 32px 0;
   @media (max-width: 1024px) {
     font-size: 36px;
@@ -137,6 +137,7 @@ code {
   line-height: 135%;
   padding: 4px 8px;
   background: var(--code-bg);
+
 }
 .sidebar-scroll {
   scrollbar-width: none; /* Firefox */
@@ -145,4 +146,24 @@ code {
 
 .sidebar-scroll::-webkit-scrollbar {
   display: none; /* Chrome, Edge, Safari */
+}
+/* ---- Form controls fix ---- */
+input,
+textarea,
+select {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border-color: #e6e6e9;
+  color-scheme: light;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #9ca3af !important;
+}
+
+select option {
+  background-color: #ffffff;
+  color: #111827;
+
 }

@@ -76,10 +76,11 @@ class RoleSerializer(serializers.ModelSerializer):
 class DepartementSerializer(serializers.ModelSerializer):
     id = serializers.IntegerField(source="id_departement", read_only=True)
     name = serializers.CharField(source="nom", read_only=True)
+    code = serializers.CharField(read_only=True)
 
     class Meta:
         model = Departement
-        fields = ["id", "name"]
+        fields = ["id", "name", "code"]
 
 
 class ManagedUserSerializer(serializers.Serializer):

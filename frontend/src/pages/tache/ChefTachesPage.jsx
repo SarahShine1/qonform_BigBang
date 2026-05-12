@@ -11,7 +11,6 @@ import {
   getUtilisateurs,
 
 } from "./chefTacheService";
-
 function normalizeRole(role) {
   return String(role || "")
     .trim()
@@ -20,7 +19,6 @@ function normalizeRole(role) {
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/\s+/g, " ");
 }
-
 function SearchIcon() {
   return (
     <svg className="w-[14px] h-[14px]" viewBox="0 0 24 24" fill="none">
@@ -1113,7 +1111,6 @@ async function supprimerTache(id) {
         )}
     </>
   ) : null}
-  
 </div>
                           </td>
                         </tr>

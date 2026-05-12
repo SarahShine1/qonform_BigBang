@@ -1,5 +1,18 @@
-import { NavLink } from "react-router-dom";
-import { ChevronDown, LogOut } from "lucide-react";
+import { useState } from "react";
+import { NavLink, useLocation } from "react-router-dom";
+import {
+  BarChart3,
+  Calendar,
+  ChevronDown,
+  ClipboardList,
+  FolderOpen,
+  GitBranch,
+  LayoutDashboard,
+  LogOut,
+  Map,
+  Settings,
+  Users,
+} from "lucide-react";
 import qonformeLogo from "../../assets/icons/qonforme-logo.svg";
 import { useAuth } from "../../hooks/useAuth";
 import SidebarCalendar from "./SidebarCalendar";
@@ -37,10 +50,17 @@ function SidebarLink({ item }) {
 
 function SidebarDropdown({ item }) {
   const Icon = item.icon;
+  const location = useLocation();
+  const hasActiveChild = item.children.some((child) => isItemActive(child, location.pathname));
 
   return (
-    <details className="group/dropdown">
-      <summary className="flex cursor-pointer list-none items-center gap-2.5 rounded-md px-2.5 py-[5px] text-violet-100 transition-all hover:bg-white/8 hover:text-white [&::-webkit-details-marker]:hidden">
+    <details className="group/dropdown" open={hasActiveChild || undefined}>
+      <summary
+        className={[
+          "flex cursor-pointer list-none items-center gap-2.5 rounded-md px-2.5 py-[5px] transition-all hover:bg-white/8 hover:text-white [&::-webkit-details-marker]:hidden",
+          hasActiveChild ? "text-white" : "text-violet-100",
+        ].join(" ")}
+      >
         <Icon
           className="h-[15px] w-[15px] flex-shrink-0 text-[#F5EEFF]"
           strokeWidth={1.8}
@@ -60,23 +80,32 @@ function SidebarDropdown({ item }) {
               key={child.to}
               to={child.to}
               className={({ isActive }) =>
-                [
-                  "flex items-center gap-2 rounded-md px-2 py-[4px] transition-all",
-                  isActive
-                    ? "bg-white/10 text-[#F4B740]"
+                {
+                  const active = isActive || isItemActive(child, location.pathname);
+                  return [
+
+                  "flex items-center gap-2.5 rounded-md px-2.5 py-[5px] transition-all",
+                  active  ? "bg-white/10 text-[#F4B740]"
                     : "text-violet-100/85 hover:bg-white/8 hover:text-white",
-                ].join(" ")
+
+                ].join(" ");
+                }
               }
             >
               {({ isActive }) => (
+                (() => {
+                  const active = isActive || isItemActive(child, location.pathname);
+                  return (
                 <>
                   <ChildIcon
                     className="h-[13px] w-[13px] flex-shrink-0"
-                    style={{ color: isActive ? "#F4B740" : "#EDE7FF" }}
+                    style={{ color: active ? "#F4B740" : "#EDE7FF" }}
                     strokeWidth={1.8}
                   />
                   <span className="text-[10.5px] font-medium">{child.label}</span>
                 </>
+                  );
+                })()
               )}
             </NavLink>
           );
@@ -84,6 +113,13 @@ function SidebarDropdown({ item }) {
       </div>
     </details>
   );
+}
+
+function isItemActive(item, pathname) {
+  if (item.activePaths?.some((path) => pathname === path || pathname.startsWith(`${path}/`))) {
+    return true;
+  }
+  return pathname === item.to || pathname.startsWith(`${item.to}/`);
 }
 
 export default function Sidebar() {
