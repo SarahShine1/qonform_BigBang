@@ -99,10 +99,12 @@ function FileCard({ doc, onDelete, deleting }) {
             <ExternalLink size={12} /> Voir
           </a>
         )}
-        <button type="button" onClick={() => onDelete(doc)} disabled={deleting}
-          className="rounded-lg p-1.5 text-slate-300 transition hover:bg-red-50 hover:text-red-400 disabled:opacity-40">
-          {deleting ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
-        </button>
+        {onDelete && (
+          <button type="button" onClick={() => onDelete(doc)} disabled={deleting}
+            className="rounded-lg p-1.5 text-slate-300 transition hover:bg-red-50 hover:text-red-400 disabled:opacity-40">
+            {deleting ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -149,7 +151,15 @@ function MultiDropZone({ label, accept, onFiles, uploading, error }) {
 }
 
 // ── Main section ──────────────────────────────────────────────────────────────
-export default function DocumentSection({ versionId, readOnly = false, sectionIndex }) {
+export default function DocumentSection({
+  versionId,
+  readOnly = false,
+  sectionIndex,
+  showBpmn = true,
+  showPreuves = true,
+  label = "Documents & Fichiers",
+  bpmnDescription = null,
+}) {
   const { user } = useAuth();
   const [bpmn,          setBpmn]          = useState(null);
   const [preuves,       setPreuves]       = useState([]);
@@ -159,7 +169,6 @@ export default function DocumentSection({ versionId, readOnly = false, sectionIn
   const [bpmnError,     setBpmnError]     = useState("");
   const [prvError,      setPrvError]      = useState("");
 
-  // Load existing documents when versionId is available
   useEffect(() => {
     if (!versionId) return;
     getDocuments(versionId).then((docs) => {
@@ -236,7 +245,7 @@ export default function DocumentSection({ versionId, readOnly = false, sectionIn
           {sectionIndex}
         </span>
         <span className="text-[10.5px] font-bold uppercase tracking-widest text-slate-500">
-          Documents &amp; Fichiers
+          {label}
         </span>
       </div>
 
@@ -251,66 +260,76 @@ export default function DocumentSection({ versionId, readOnly = false, sectionIn
         {!noVersion && (
           <>
             {/* BPMN field */}
-            <div style={{ borderBottom: `1px solid ${BORDER}`, paddingBottom: "1.25rem" }}>
-              {bpmn ? (
-                <div>
-                  <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                    Diagramme BPMN
-                  </p>
-                  <FileCard
-                    doc={bpmn}
-                    onDelete={handleDelete}
-                    deleting={deletingId === bpmn.id_document}
-                  />
-                </div>
-              ) : (
-                !readOnly && (
-                  <SingleDropZone
-                    label="Diagramme BPMN (un seul fichier)"
-                    accept={ACCEPTED}
-                    onFile={handleBpmnDrop}
-                    uploading={uploadingBpmn}
-                    error={bpmnError}
-                  />
-                )
-              )}
-              {readOnly && !bpmn && (
-                <p className="text-[12px] italic text-slate-400">Aucun diagramme BPMN.</p>
-              )}
-            </div>
+            {showBpmn && (
+              <div style={{
+                borderBottom: showPreuves ? `1px solid ${BORDER}` : "none",
+                paddingBottom: showPreuves ? "1.25rem" : 0,
+              }}>
+                {bpmnDescription && (
+                  <p className="mb-3 text-[12px] italic text-slate-500">{bpmnDescription}</p>
+                )}
+                {bpmn ? (
+                  <div>
+                    <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                      Diagramme BPMN
+                    </p>
+                    <FileCard
+                      doc={bpmn}
+                      onDelete={!readOnly ? handleDelete : null}
+                      deleting={deletingId === bpmn.id_document}
+                    />
+                  </div>
+                ) : (
+                  !readOnly && (
+                    <SingleDropZone
+                      label="Diagramme BPMN (un seul fichier)"
+                      accept={ACCEPTED}
+                      onFile={handleBpmnDrop}
+                      uploading={uploadingBpmn}
+                      error={bpmnError}
+                    />
+                  )
+                )}
+                {readOnly && !bpmn && (
+                  <p className="text-[12px] italic text-slate-400">Aucun diagramme BPMN.</p>
+                )}
+              </div>
+            )}
 
             {/* Preuves field */}
-            <div>
-              {!readOnly && (
-                <MultiDropZone
-                  label="Preuves de déroulement du processus"
-                  accept={ACCEPTED}
-                  onFiles={handlePreuvesDrop}
-                  uploading={uploadingPrv}
-                  error={prvError}
-                />
-              )}
-              {readOnly && preuves.length === 0 && (
-                <p className="text-[12px] italic text-slate-400">Aucune preuve.</p>
-              )}
-              {preuves.length > 0 && (
-                <div className={`space-y-2 ${!readOnly ? "mt-3" : ""}`}>
-                  {!readOnly && preuves.length > 0 && (
-                    <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                      Preuves ajoutées ({preuves.length})
-                    </p>
-                  )}
-                  {preuves.map((doc) => (
-                    <FileCard
-                      key={doc.id_document}
-                      doc={doc}
-                      onDelete={handleDelete}
-                      deleting={deletingId === doc.id_document}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
+            {showPreuves && (
+              <div>
+                {!readOnly && (
+                  <MultiDropZone
+                    label="Preuves de déroulement du processus"
+                    accept={ACCEPTED}
+                    onFiles={handlePreuvesDrop}
+                    uploading={uploadingPrv}
+                    error={prvError}
+                  />
+                )}
+                {readOnly && preuves.length === 0 && (
+                  <p className="text-[12px] italic text-slate-400">Aucune preuve.</p>
+                )}
+                {preuves.length > 0 && (
+                  <div className={`space-y-2 ${!readOnly ? "mt-3" : ""}`}>
+                    {!readOnly && preuves.length > 0 && (
+                      <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                        Preuves ajoutées ({preuves.length})
+                      </p>
+                    )}
+                    {preuves.map((doc) => (
+                      <FileCard
+                        key={doc.id_document}
+                        doc={doc}
+                        onDelete={!readOnly ? handleDelete : null}
+                        deleting={deletingId === doc.id_document}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </>
         )}
       </div>
