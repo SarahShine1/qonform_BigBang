@@ -225,6 +225,9 @@ function FicheCard({ fiche, columnKey, onClick }) {
   const redacteur = fiche.redacteur
     ? `${fiche.redacteur.prenom || ""} ${fiche.redacteur.nom || ""}`.trim()
     : "";
+  const auditeur = fiche.auditeur
+    ? `${fiche.auditeur.prenom || ""} ${fiche.auditeur.nom || ""}`.trim()
+    : "";
 
   return (
     <button
@@ -234,9 +237,14 @@ function FicheCard({ fiche, columnKey, onClick }) {
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-[11px] font-bold uppercase text-purple-700">
-            {process.code_process || "Sans code"}
-          </p>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <p className="text-[11px] font-bold uppercase text-purple-700">
+              {process.code_process || "Sans code"}
+            </p>
+            {columnKey === "soumise" && (
+              <RevueBadge revue={fiche.revue} />
+            )}
+          </div>
           <h3 className="mt-0.5 line-clamp-2 text-[13px] font-bold leading-4 text-gray-950">
             {process.nom || "Processus non renseigne"}
           </h3>
@@ -255,6 +263,11 @@ function FicheCard({ fiche, columnKey, onClick }) {
           <FileText className="h-3.5 w-3.5" />
           <span>{fiche.departement?.nom || "Service non renseigne"}</span>
         </div>
+        {columnKey === "en_revision" && (
+          <div className="rounded-md border border-amber-100 bg-white/70 px-2 py-1 text-[11px] font-semibold text-amber-800">
+            Auditeur : {auditeur || "Non assigne"}
+          </div>
+        )}
       </div>
 
       <div className="mt-2.5 flex items-center justify-between gap-2">
@@ -266,6 +279,20 @@ function FicheCard({ fiche, columnKey, onClick }) {
         )}
       </div>
     </button>
+  );
+}
+
+function RevueBadge({ revue }) {
+  return (
+    <span
+      className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+        revue
+          ? "bg-amber-100 text-amber-800"
+          : "bg-blue-50 text-blue-700"
+      }`}
+    >
+      {revue ? "A reauditer" : "Nouvelle"}
+    </span>
   );
 }
 

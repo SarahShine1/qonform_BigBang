@@ -1,7 +1,8 @@
 from collections import defaultdict
+from html import escape
 
 from django.db import connection, transaction
-from django.http import HttpResponse
+from django.http import StreamingHttpResponse
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -113,6 +114,15 @@ def serialize_fiche_card(row):
         "statut_fiche": version_status,
         "statut_audit": VERSION_STATUS_LABELS.get(version_status, version_status),
         "rapport_pdf": row.get("rapport_pdf"),
+        "revue": bool(row.get("revue")),
+        "audit_kind": "reaudit" if row.get("revue") else "new",
+        "auditeur": {
+            "id_user": row.get("id_auditeur"),
+            "nom": row.get("auditeur_nom"),
+            "prenom": row.get("auditeur_prenom"),
+        }
+        if row.get("id_auditeur")
+        else None,
         "date_creation": row.get("date_creation"),
         "date_validation": row.get("date_validation"),
         "processus": {
@@ -144,6 +154,7 @@ def fiches_audit_list(request):
                 vf.id_version,
                 vf.numero_version,
                 vf.statut AS statut_fiche,
+                vf.revue,
                 vf.date_creation,
                 vf.date_validation,
                 p.id_processus,
@@ -160,18 +171,48 @@ def fiches_audit_list(request):
                     WHEN at.id_audit IS NOT NULL THEN 'En_cours'
                     ELSE 'Planifie'
                 END AS audit_statut,
-                at.rapport_pdf
+                at.rapport_pdf,
+                COALESCE(audit_owner.id_auditeur, at.id_auditeur) AS id_auditeur
+                ,auditeur.nom AS auditeur_nom
+                ,auditeur.prenom AS auditeur_prenom
             FROM version_fiche vf
             JOIN processus p ON p.id_processus = vf.id_processus
             LEFT JOIN departement d ON d.id_departement = p.id_departement
             LEFT JOIN utilisateur u ON u.id_user = vf.id_redacteur
             LEFT JOIN LATERAL (
-                SELECT id_audit, date_realisation, rapport_pdf
+                SELECT id_audit, id_auditeur, date_realisation, rapport_pdf
                 FROM audit_terrain
                 WHERE audit_terrain.id_processus = vf.id_processus
                 ORDER BY created_at DESC NULLS LAST, id_audit DESC
                 LIMIT 1
             ) at ON TRUE
+            LEFT JOIN LATERAL (
+                SELECT owner.id_auditeur
+                FROM (
+                    SELECT ce.id_auditeur, MAX(ce.date_evaluation) AS activity_date
+                    FROM checklist_evaluation ce
+                    WHERE ce.id_version = vf.id_version
+                    GROUP BY ce.id_auditeur
+
+                    UNION ALL
+
+                    SELECT nc.id_auditeur, MAX(nc.date_detection) AS activity_date
+                    FROM nc
+                    WHERE nc.id_version = vf.id_version
+                    GROUP BY nc.id_auditeur
+
+                    UNION ALL
+
+                    SELECT at2.id_auditeur, MAX(at2.created_at) AS activity_date
+                    FROM audit_terrain at2
+                    WHERE at2.id_processus = vf.id_processus
+                    GROUP BY at2.id_auditeur
+                ) owner
+                WHERE owner.id_auditeur IS NOT NULL
+                ORDER BY owner.activity_date DESC NULLS LAST
+                LIMIT 1
+            ) audit_owner ON TRUE
+            LEFT JOIN utilisateur auditeur ON auditeur.id_user = COALESCE(audit_owner.id_auditeur, at.id_auditeur)
             WHERE vf.statut IN ('Soumise', 'En_revision', 'Publiee')
             ORDER BY
                 CASE vf.statut
@@ -214,7 +255,9 @@ def fiche_audit_report(request, id_version):
     disposition = "attachment" if request.query_params.get("download") == "1" else "inline"
     filename = detail["rapport"]["fichier"]
 
-    response = HttpResponse(html, content_type="text/html; charset=utf-8")
+    # Use a streaming response so Django Debug Toolbar cannot inject its panel
+    # into the report HTML while DEBUG=True.
+    response = StreamingHttpResponse([html], content_type="text/html; charset=utf-8")
     response["Content-Disposition"] = f'{disposition}; filename="{filename}"'
     return response
 
@@ -396,6 +439,7 @@ def load_fiche_audit_detail(id_version):
                 vf.numero_version,
                 vf.statut,
                 vf."commit" AS audit_commit,
+                vf.revue,
                 vf.date_creation,
                 vf.date_derniere_modif,
                 vf.date_validation,
@@ -720,6 +764,7 @@ def load_fiche_audit_detail(id_version):
         "numero_version": fiche["numero_version"],
         "statut": fiche["statut"],
         "commit": fiche.get("audit_commit") or 0,
+        "revue": bool(fiche.get("revue")),
         "date_creation": fiche["date_creation"],
         "date_derniere_modif": fiche.get("date_derniere_modif"),
         "date_validation": fiche.get("date_validation"),
@@ -1401,6 +1446,9 @@ def replace_non_conformities(cursor, id_version, auditeur_id, non_conformities, 
 
 
 def render_report_html(detail):
+    def h(value):
+        return escape(str(value or ""))
+
     status_labels = {
         "conforme": "Conforme",
         "partiel": "Partiellement conforme",
@@ -1451,28 +1499,53 @@ def render_report_html(detail):
                 f"<li><strong>{item['titre']}</strong> - {action.get('description') or 'Action à préciser'} ({action.get('statut') or 'A faire'})</li>"
             )
 
+    metrics = detail.get("metrics") or {}
+    conclusion = get_report_conclusion(detail.get("taux_conformite") or 0)
+
     return f"""<!doctype html>
 <html lang="fr">
   <head>
     <meta charset="utf-8" />
     <title>{detail["rapport"]["titre"]}</title>
     <style>
-      body{{font-family:Arial,sans-serif;color:#1f2937;margin:32px}}
+      *{{box-sizing:border-box}}
+      body{{font-family:Arial,sans-serif;color:#1f2937;margin:32px;background:#fff}}
+      .audit-report-content{{max-width:980px;margin:0 auto}}
+      nav,aside,button,svg,.no-print,.theme-toggle,.floating,.app-shell{{display:none!important}}
       h1{{color:#4c1d95}}
       h2{{margin-top:24px;color:#111827}}
       table{{width:100%;border-collapse:collapse;margin-top:16px}}
       th,td{{border:1px solid #e5e7eb;padding:10px;text-align:left;font-size:13px;vertical-align:top}}
       th{{background:#f3f0ff;color:#4c1d95}}
       .score{{font-size:28px;color:#047857;font-weight:700}}
+      .metrics{{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:18px 0}}
+      .metric{{border:1px solid #e5e7eb;border-radius:8px;padding:10px;background:#fafafa}}
+      .metric span{{display:block;font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700}}
+      .metric strong{{display:block;margin-top:6px;color:#4c1d95;font-size:18px}}
+      @media print{{
+        @page{{margin:14mm}}
+        body{{margin:0}}
+        nav,aside,button,svg,a[href="#"],.no-print,.theme-toggle,.floating,.app-shell{{display:none!important}}
+        .audit-report-content{{max-width:none}}
+        h1,h2{{break-after:avoid}}
+        table,tr{{break-inside:avoid}}
+      }}
     </style>
   </head>
   <body>
+    <main class="audit-report-content">
     <h1>{detail["rapport"]["titre"]}</h1>
     <p><strong>Code :</strong> {detail["processus"]["code_process"]}</p>
     <p><strong>Processus :</strong> {detail["processus"]["nom"]}</p>
     <p><strong>Pilote :</strong> {detail["processus"].get("pilote") or "Non renseigné"}</p>
     <p><strong>Auditeur :</strong> {format_user(detail["audit"]["auditeur"].get("prenom"), detail["audit"]["auditeur"].get("nom")) or "Non renseigné"}</p>
     <p><strong>Date :</strong> {detail["audit"].get("date_realisation") or detail.get("date_validation") or detail.get("date_creation") or ""}</p>
+    <div class="metrics">
+      <div class="metric"><span>Completude</span><strong>{metrics.get("taux_completude_moyen", 0)}%</strong></div>
+      <div class="metric"><span>Checklist</span><strong>{metrics.get("score_checklist", 0)}%</strong></div>
+      <div class="metric"><span>BPMN</span><strong>{metrics.get("score_bpmn", 0)}%</strong></div>
+      <div class="metric"><span>Preuves</span><strong>{metrics.get("score_preuves", 0)}%</strong></div>
+    </div>
     <p class="score">Taux de conformité : {detail["taux_conformite"]}%</p>
 
     <h2>Exigences évaluées</h2>
@@ -1496,8 +1569,19 @@ def render_report_html(detail):
       </thead>
       <tbody>{''.join(nc_rows) or "<tr><td colspan='4'>Aucune NC relevée.</td></tr>"}</tbody>
     </table>
+    <h2>Conclusion</h2>
+    <p>{h(conclusion)}</p>
+    </main>
   </body>
 </html>"""
+
+
+def get_report_conclusion(rate):
+    if rate >= 80:
+        return "Fiche globalement conforme."
+    if rate >= 50:
+        return "Fiche partiellement conforme, ameliorations necessaires."
+    return "Fiche non conforme, actions correctives prioritaires."
 
 
 def calculate_compliance_rate(evaluations):
