@@ -8,6 +8,11 @@ const DB_TO_UI_STATUS = {
 };
 
 export const auditApi = {
+  getDashboard: async () => {
+    const { data } = await apiClient.get("/audit/dashboard/");
+    return data;
+  },
+
   getFiches: async () => {
     const { data } = await apiClient.get("/audit/fiches/");
     return data;
