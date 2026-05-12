@@ -67,6 +67,47 @@ export default function App() {
                 />
               }
             />
+            <Route path="/cartographie/processus" element={<ProcessusPage />} />
+            <Route
+              element={
+                <RoleProtectedRoute
+                  excludedRoles={["DG", "Direction generale", "Direction générale"]}
+                />
+              }
+            >
+              <Route
+                path="/cartographie/canevas-fiche"
+                element={<CanevasFichePage />}
+              />
+              <Route
+                path="/cartographie/canevas-fiche/:id"
+                element={<NormeTemplatePage />}
+              />
+              <Route
+                path="/cartographie/interactions"
+                element={<InteractionMapPage />}
+              />
+            </Route>
+            <Route
+              path="/suivi"
+              element={<ModulePlaceholderPage title="Suivi" />}
+            />
+            <Route path="/audit/preaudit" element={<PreAuditPage />} />
+            <Route path="/audit/pre-audit" element={<PreAuditPage />} />
+            <Route path="/audit/mes-audits" element={<MesAudits />} />
+            <Route
+              path="/audit/audits-terrain"
+              element={<AuditTerrainPage />}
+            />
+            <Route
+              path="/dashboard-pilote"
+              element={<ModulePlaceholderPage title="Dashboard Pilote" />}
+            />
+            <Route
+              path="/dashboard-auditeur"
+              element={<ModulePlaceholderPage title="Dashboard Auditeur" />}
+            />
+            <Route path="/planification" element={<ChefTachesPage />} />
 
             <Route path="/audits" element={<MesAudits />} />
             <Route path="/mes-audits" element={<MesAudits />} />
