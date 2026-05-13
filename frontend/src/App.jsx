@@ -19,6 +19,7 @@ import CanevasFichePage from "./pages/canevas/CanevasFichePage";
 import NormeTemplatePage from "./pages/canevas/NormeTemplatePage";
 import InteractionMapPage from "./pages/cartographie/InteractionMapPage";
 import AuditTerrainPage from "./pages/audit/AuditTerrainPage";
+import DashboardAuditeur from "./pages/audit/DashboardAuditeur";
 import DocumentationPage from "./pages/Documentationpage";
 import DossierProcessusPage from "./pages/processus/DossierProcessusPage";
 import PreAuditPage from "./pages/audit/PreAuditPage";
@@ -100,7 +101,7 @@ export default function App() {
             />
             <Route
               path="/dashboard-auditeur"
-              element={<ModulePlaceholderPage title="Dashboard Auditeur" />}
+              element={<DashboardAuditeur />}
             />
             <Route path="/planification" element={<ChefTachesPage />} />
 
