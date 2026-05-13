@@ -6,6 +6,7 @@ import AppLayout from "../../components/layout/AppLayout";
 import OrganizationBuilderModal from "../../components/organigramme/OrganizationBuilderModal";
 import OrganizationUnitModal from "../../components/organigramme/OrganizationUnitModal";
 import { organigramApi } from "../../api/organigram.api";
+import { getProcessusList } from "../../api/processus.api";
 import { useAuth } from "../../hooks/useAuth";
 
 function normalizeRole(role) {
@@ -60,6 +61,7 @@ export default function Organigramme() {
 
   const [tree, setTree] = useState([]);
   const [employees, setEmployees] = useState([]);
+  const [processes, setProcesses] = useState([]);
   const [loadingTree, setLoadingTree] = useState(true);
   const [loadingEmployees, setLoadingEmployees] = useState(true);
   const [treeError, setTreeError] = useState("");
@@ -122,10 +124,19 @@ export default function Organigramme() {
     }
   }, []);
 
+  const loadProcesses = useCallback(async () => {
+    try {
+      setProcesses(await getProcessusList());
+    } catch {
+      setProcesses([]);
+    }
+  }, []);
+
   useEffect(() => {
     loadTree();
     loadEmployees();
-  }, [loadTree, loadEmployees]);
+    loadProcesses();
+  }, [loadTree, loadEmployees, loadProcesses]);
 
   const openBuilder = () => {
     setBuilderError("");
@@ -221,6 +232,8 @@ export default function Organigramme() {
           loading={loadingTree}
           error={treeError}
           canManage={canManage}
+          employees={employees}
+          processes={processes}
           onManage={canManage ? openBuilder : undefined}
           onCreate={openCreate}
           onEdit={openEdit}

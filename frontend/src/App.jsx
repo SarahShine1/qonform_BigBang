@@ -20,6 +20,7 @@ import NormeTemplatePage from "./pages/canevas/NormeTemplatePage";
 import InteractionMapPage from "./pages/cartographie/InteractionMapPage";
 import AuditTerrainPage from "./pages/audit/AuditTerrainPage";
 import DocumentationPage from "./pages/Documentationpage";
+import DossierProcessusPage from "./pages/processus/DossierProcessusPage";
 import PreAuditPage from "./pages/audit/PreAuditPage";
 
 export default function App() {
@@ -45,7 +46,10 @@ export default function App() {
             />
 
             <Route path="/organigramme" element={<Organigramme />} />
-            <Route path="/gestion-utilisateurs" element={<GestionUtilisateurs />} />
+            <Route
+              path="/gestion-utilisateurs"
+              element={<GestionUtilisateurs />}
+            />
 
             <Route
               path="/cartographie"
@@ -58,17 +62,46 @@ export default function App() {
               }
             />
 
-            <Route path="/cartographie/canevas-fiche" element={<CanevasFichePage />} />
-            <Route path="/cartographie/canevas-fiche/:id" element={<NormeTemplatePage />} />
             <Route path="/cartographie/processus" element={<ProcessusPage />} />
-            <Route path="/cartographie/interactions" element={<InteractionMapPage />} />
-            <Route path="/suivi" element={<ModulePlaceholderPage title="Suivi" />} />
+            <Route
+              element={
+                <RoleProtectedRoute
+                  excludedRoles={["DG", "Direction generale", "Direction générale"]}
+                />
+              }
+            >
+              <Route
+                path="/cartographie/canevas-fiche"
+                element={<CanevasFichePage />}
+              />
+              <Route
+                path="/cartographie/canevas-fiche/:id"
+                element={<NormeTemplatePage />}
+              />
+              <Route
+                path="/cartographie/interactions"
+                element={<InteractionMapPage />}
+              />
+            </Route>
+            <Route
+              path="/suivi"
+              element={<ModulePlaceholderPage title="Suivi" />}
+            />
             <Route path="/audit/preaudit" element={<PreAuditPage />} />
             <Route path="/audit/pre-audit" element={<PreAuditPage />} />
             <Route path="/audit/mes-audits" element={<MesAudits />} />
-            <Route path="/audit/audits-terrain" element={<AuditTerrainPage />} />
-            <Route path="/dashboard-pilote" element={<ModulePlaceholderPage title="Dashboard Pilote" />} />
-            <Route path="/dashboard-auditeur" element={<ModulePlaceholderPage title="Dashboard Auditeur" />} />
+            <Route
+              path="/audit/audits-terrain"
+              element={<AuditTerrainPage />}
+            />
+            <Route
+              path="/dashboard-pilote"
+              element={<ModulePlaceholderPage title="Dashboard Pilote" />}
+            />
+            <Route
+              path="/dashboard-auditeur"
+              element={<ModulePlaceholderPage title="Dashboard Auditeur" />}
+            />
             <Route path="/planification" element={<ChefTachesPage />} />
 
             <Route path="/audits" element={<MesAudits />} />
@@ -89,8 +122,18 @@ export default function App() {
               }
             />
 
-            <Route path="/gestion-processus/fiches/nouveau" element={<FicheProcessusForm />} />
-            <Route path="/gestion-processus/fiches/:id/modifier" element={<FicheProcessusForm />} />
+            <Route
+              path="/gestion-processus/dossier/:id"
+              element={<DossierProcessusPage />}
+            />
+            <Route
+              path="/gestion-processus/fiches/nouveau"
+              element={<FicheProcessusForm />}
+            />
+            <Route
+              path="/gestion-processus/fiches/:id/modifier"
+              element={<FicheProcessusForm />}
+            />
 
             <Route path="/niveau-maturite" element={<MaturityPage />} />
 
@@ -106,15 +149,31 @@ export default function App() {
             />
           </Route>
 
-          <Route element={<RoleProtectedRoute roles={["AUDITEUR", "Auditeur"]} />}>
+          <Route
+            element={<RoleProtectedRoute roles={["AUDITEUR", "Auditeur"]} />}
+          >
             <Route path="/auditeur/audit-fiches" element={<AuditFiches />} />
-            <Route path="/auditeur/execution-audit/:auditId" element={<AuditExecution />} />
-            <Route path="/auditeur/audit-execution/:auditId" element={<AuditExecution />} />
-            <Route path="/auditeur/fiches-auditees/:idVersion" element={<AuditPublishedDetail />} />
-            <Route path="/mes-audits/execution/:auditId" element={<AuditExecution />} />
+            <Route
+              path="/auditeur/execution-audit/:auditId"
+              element={<AuditExecution />}
+            />
+            <Route
+              path="/auditeur/audit-execution/:auditId"
+              element={<AuditExecution />}
+            />
+            <Route
+              path="/auditeur/fiches-auditees/:idVersion"
+              element={<AuditPublishedDetail />}
+            />
+            <Route
+              path="/mes-audits/execution/:auditId"
+              element={<AuditExecution />}
+            />
           </Route>
 
-          <Route element={<RoleProtectedRoute roles={["CAQ", "ADMIN", "Admin"]} />}>
+          <Route
+            element={<RoleProtectedRoute roles={["CAQ", "ADMIN", "Admin"]} />}
+          >
             <Route path="/caq/organigramme" element={<Organigramme />} />
           </Route>
 

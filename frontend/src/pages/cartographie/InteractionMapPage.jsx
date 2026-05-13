@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowDown,
-  ArrowRight,
   ArrowUp,
   Briefcase,
   Download,
@@ -341,7 +340,7 @@ function InteractionNodeCard({ process, side, emptyLabel }) {
 
   if (isEmpty) {
     return (
-      <div className="flex h-[56px] items-center rounded-[10px] border border-dashed border-[#E7DFF5] bg-[#FEFDFF] px-3 text-[8.7px] text-slate-400">
+      <div className="flex h-[64px] items-center rounded-[10px] border border-dashed border-[#E7DFF5] bg-[#FEFDFF] px-3 text-[8.5px] text-slate-400">
         {emptyLabel || "Aucun processus"}
       </div>
     );
@@ -349,7 +348,7 @@ function InteractionNodeCard({ process, side, emptyLabel }) {
 
   return (
     <div
-      className="h-[56px] rounded-[10px] border border-[#ECE4FA] bg-white px-3 py-1.5 shadow-[0_6px_14px_rgba(88,20,142,0.035)]"
+      className="h-[64px] rounded-[10px] border border-[#ECE4FA] bg-white px-3 py-2 shadow-[0_6px_14px_rgba(88,20,142,0.035)]"
       style={{
         boxShadow: `0 6px 14px rgba(88,20,142,0.035), inset 0 0 0 1px ${accent}14`,
       }}
@@ -358,19 +357,19 @@ function InteractionNodeCard({ process, side, emptyLabel }) {
         <ProcessIcon type={process.type} size="xs" />
 
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[8.9px] font-semibold leading-3 text-slate-900">
+          <p className="line-clamp-2 text-[8.4px] font-semibold leading-[11px] text-slate-900">
             {process.name}
           </p>
 
           <div className="mt-1 flex items-center gap-1.5">
-            <span className="truncate text-[6.8px] font-semibold uppercase tracking-[0.08em] text-slate-400">
+            <span className="max-w-[72px] truncate text-[6.6px] font-semibold uppercase tracking-[0.08em] text-slate-400">
               {process.code}
             </span>
 
             <TypeBadge
               type={process.type}
               label={process.typeLabel || getTypeStyle(process.type).label}
-              className="px-1.5 py-[2px] text-[6.8px]"
+              className="px-1.5 py-[2px] text-[6.6px]"
             />
           </div>
         </div>
@@ -382,7 +381,7 @@ function InteractionNodeCard({ process, side, emptyLabel }) {
 
 function EmptyNodeCard({ label }) {
   return (
-    <div className="flex h-[56px] items-center rounded-[10px] border border-dashed border-[#E7DDF8] bg-[#FCFAFF] px-3 text-[8.7px] text-slate-400">
+    <div className="flex h-[64px] items-center rounded-[10px] border border-dashed border-[#E7DDF8] bg-[#FCFAFF] px-3 text-[8.5px] text-slate-400">
       {label}
     </div>
   );
@@ -391,41 +390,19 @@ function EmptyNodeCard({ label }) {
 function FlowArrow({ side = "upstream" }) {
   const isDownstream = side === "downstream";
   const color = isDownstream ? "#56CFC0" : "#A855F7";
-  const markerId = `flow-arrow-${side}`;
 
   return (
-    <div className="flex h-[56px] items-center justify-center">
-      <svg
-        width="52"
-        height="20"
-        viewBox="0 0 52 20"
-        fill="none"
-        className="h-[20px] w-[52px] overflow-visible"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <defs>
-          <marker
-            id={markerId}
-            markerWidth="6"
-            markerHeight="6"
-            refX="5"
-            refY="3"
-            orient="auto"
-          >
-            <path d="M0 0L6 3L0 6Z" fill={color} />
-          </marker>
-        </defs>
-
-        <circle cx="4" cy="10" r="2.2" fill="white" stroke={color} strokeWidth="1.4" />
-
-        <path
-          d="M7 10 C16 10 18 4 30 4 H38 C44 4 45 10 49 10"
-          stroke={color}
-          strokeWidth="1.55"
-          strokeLinecap="round"
-          markerEnd={`url(#${markerId})`}
+    <div className="flex h-[64px] items-center justify-center px-1">
+      <div className="relative h-[2px] w-full rounded-full" style={{ backgroundColor: color }}>
+        <span
+          className="absolute left-0 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full border bg-white"
+          style={{ borderColor: color }}
         />
-      </svg>
+        <span
+          className="absolute right-[-1px] top-1/2 h-0 w-0 -translate-y-1/2 border-y-[5px] border-l-[8px] border-y-transparent"
+          style={{ borderLeftColor: color }}
+        />
+      </div>
     </div>
   );
 }
@@ -487,8 +464,8 @@ function DesktopInteractionMap({ process }) {
   }));
 
   return (
-    <div className="hidden xl:block">
-      <div className="grid grid-cols-[154px_52px_148px_52px_154px] items-end justify-center gap-x-2">
+    <div className="min-w-[760px]">
+      <div className="grid grid-cols-[190px_58px_156px_58px_190px] items-end justify-center gap-x-2">
         <div>
           <h3 className="text-[11px] font-semibold text-slate-900">En amont</h3>
           <SectionAccent color="#8B5CF6" />
@@ -505,9 +482,9 @@ function DesktopInteractionMap({ process }) {
       </div>
 
       <div
-        className="mt-3 grid min-h-[320px] grid-cols-[154px_52px_148px_52px_154px] items-center justify-center gap-x-2 gap-y-1.5"
+        className="mt-3 grid min-h-[332px] grid-cols-[190px_58px_156px_58px_190px] items-center justify-center gap-x-2 gap-y-1.5"
         style={{
-          gridTemplateRows: `repeat(${rowCount}, minmax(56px, 1fr))`,
+          gridTemplateRows: `repeat(${rowCount}, minmax(64px, 1fr))`,
         }}
       >
         {rows.map((row, index) => (
@@ -552,71 +529,6 @@ function DesktopInteractionMap({ process }) {
   );
 }
 
-
-function MobileInteractionStack({ process }) {
-  return (
-    <div className="space-y-4 xl:hidden">
-      <div>
-        <h3 className="text-[13px] font-semibold text-slate-900">En amont</h3>
-        <SectionAccent color="#8B5CF6" />
-        <div className="mt-2.5 space-y-2">
-          {(process.upstream ?? []).length > 0 ? (
-            process.upstream.map((item) => (
-              <InteractionNodeCard
-                key={`mobile-upstream-${item.id}`}
-                process={item}
-                side="upstream"
-              />
-            ))
-          ) : (
-            <InteractionNodeCard
-              side="upstream"
-              emptyLabel="Aucun processus en amont"
-            />
-          )}
-        </div>
-      </div>
-
-      <div className="flex justify-center">
-        <div className="rounded-full border border-[#E6DEFA] bg-[#FBF8FF] p-1.5 text-[#7C3AED]">
-          <ArrowRight size={14} strokeWidth={2.3} />
-        </div>
-      </div>
-
-      <div className="flex justify-center">
-        <SelectedProcessCard process={process} />
-      </div>
-
-      <div className="flex justify-center">
-        <div className="rounded-full border border-[#D3F3EC] bg-[#F2FCFA] p-1.5 text-[#0F766E]">
-          <ArrowRight size={14} strokeWidth={2.3} />
-        </div>
-      </div>
-
-      <div>
-        <h3 className="text-[13px] font-semibold text-slate-900">En aval</h3>
-        <SectionAccent color="#14B8A6" />
-        <div className="mt-2.5 space-y-2">
-          {(process.downstream ?? []).length > 0 ? (
-            process.downstream.map((item) => (
-              <InteractionNodeCard
-                key={`mobile-downstream-${item.id}`}
-                process={item}
-                side="downstream"
-              />
-            ))
-          ) : (
-            <InteractionNodeCard
-              side="downstream"
-              emptyLabel="Aucun processus en aval"
-            />
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function EmptyState() {
   return (
     <div className="flex min-h-[320px] flex-col items-center justify-center px-6 text-center">
@@ -650,9 +562,8 @@ function InteractionMapPanel({ selectedProcess }) {
         highlight={selectedProcess.name}
       />
 
-      <div className="mt-4 min-h-[320px]">
+      <div className="mt-4 min-h-[320px] overflow-x-auto pb-2">
         <DesktopInteractionMap process={selectedProcess} />
-        <MobileInteractionStack process={selectedProcess} />
       </div>
     </section>
   );
@@ -811,7 +722,7 @@ export default function InteractionMapPage() {
             <p className="text-[13px] font-medium text-red-600">{error}</p>
           </section>
         ) : (
-          <section className="grid gap-3 xl:grid-cols-[340px_minmax(0,1fr)]">
+          <section className="grid gap-3 lg:grid-cols-[340px_minmax(0,1fr)]">
             <ProcessListPanel
               processes={processes}
               filteredProcesses={filteredProcesses}

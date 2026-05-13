@@ -96,6 +96,19 @@ const auditeurItems = [
   { label: "Paramètres", icon: Settings, to: "/parametres" },
 ];
 
+const dgItems = [
+  { label: "Tableau de bord", icon: LayoutDashboard, to: "/dashboard" },
+  { label: "Organigramme", icon: GitBranch, to: "/organigramme" },
+  {
+    label: "Cartographie",
+    icon: Map,
+    children: [{ label: "Processus", icon: Network, to: "/cartographie/processus" }],
+  },
+  { label: "Planification", icon: Calendar, to: "/planification" },
+  { label: "Support documentaire", icon: FolderOpen, to: "/documents" },
+  { label: "Paramètres", icon: Settings, to: "/parametres" },
+];
+
 function normalizeRoles(roles = []) {
   return roles.map((role) =>
     String(role)
@@ -116,6 +129,10 @@ export function getSidebarItemsByRole(roles = []) {
     normalizedRoles.includes("CHEF DE PROJET") ||
     normalizedRoles.includes("CHEF CELLULE QUALITE");
 
+  const isDg =
+    normalizedRoles.includes("DG") ||
+    normalizedRoles.includes("DIRECTION GENERALE");
+
   const isPilote =
     normalizedRoles.includes("PILOTE") ||
     normalizedRoles.includes("PILOTE DE PROCESSUS");
@@ -125,6 +142,7 @@ export function getSidebarItemsByRole(roles = []) {
     normalizedRoles.includes("AUDITEUR INTERNE");
 
   if (isChefProjet) return chefProjetItems;
+  if (isDg) return dgItems;
   if (isPilote) return piloteItems;
   if (isAuditeur) return auditeurItems;
 
