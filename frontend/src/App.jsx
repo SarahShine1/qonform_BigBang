@@ -14,6 +14,11 @@ import ProcessusPage from "./pages/processus/ProcessusPage";
 import InteractionMapPage from "./pages/cartographie/InteractionMapPage";
 import AuditTerrainPage from "./pages/audit/AuditTerrainPage";
 import DocumentationPage from "./pages/Documentationpage";
+import ChefTachesPage from "./pages/planification/ChefTachesPage";
+import DossierProcessusPage from "./pages/processus/DossierProcessusPage";
+import PreAuditPage from "./pages/audit/PreAuditPage";
+import PVPage from "./pages/pv/PVPage";
+
 
 export default function App() {
   return (
@@ -72,6 +77,28 @@ export default function App() {
                 />
               }
             />
+
+            <Route
+              path="/suivi"
+              element={<PVPage />}
+            />
+            <Route path="/audit/preaudit" element={<PreAuditPage />} />
+            <Route path="/audit/pre-audit" element={<PreAuditPage />} />
+            <Route path="/audit/mes-audits" element={<MesAudits />} />
+            <Route
+              path="/audit/audits-terrain"
+              element={<AuditTerrainPage />}
+            />
+            <Route
+              path="/dashboard-pilote"
+              element={<ModulePlaceholderPage title="Dashboard Pilote" />}
+            />
+            <Route
+              path="/dashboard-auditeur"
+              element={<ModulePlaceholderPage title="Dashboard Auditeur" />}
+            />
+            <Route path="/planification" element={<ChefTachesPage />} />
+
 
             <Route path="/audits" element={<MesAudits />} />
             <Route path="/mes-audits" element={<MesAudits />} />

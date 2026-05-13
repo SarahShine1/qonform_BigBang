@@ -56,6 +56,12 @@ class AuditTerrainListCreateView(APIView):
         if not est_auditeur:
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied("Seuls les auditeurs peuvent créer un audit terrain.")
+        if not request.FILES.get("rapport"):
+            return Response(
+                {"rapport": "Un fichier rapport est obligatoire."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         serializer = AuditTerrainCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 

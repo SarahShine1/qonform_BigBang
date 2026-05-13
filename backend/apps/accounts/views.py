@@ -52,7 +52,12 @@ class MeView(APIView):
 
 
 class ManagedUserListCreateView(APIView):
-    permission_classes = [IsAuthenticated, HasRole("CAQ", "ADMIN", "Admin")]
+    permission_classes = [IsAuthenticated]
+
+    def get_permissions(self):
+        if self.request.method == "GET":
+            return [IsAuthenticated()]
+        return [IsAuthenticated(), HasRole("CAQ", "ADMIN", "Admin")()]
 
     def get(self, request):
         search = str(request.query_params.get("search", "") or "").strip()
@@ -143,7 +148,7 @@ class ManagedUserDetailView(APIView):
 
 
 class RoleListView(APIView):
-    permission_classes = [IsAuthenticated, HasRole("CAQ", "ADMIN", "Admin")]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request):
         roles = Role.objects.all().order_by("libelle")
@@ -159,7 +164,7 @@ class DepartementListView(APIView):
 
 
 class ManagedUserStatsView(APIView):
-    permission_classes = [IsAuthenticated, HasRole("CAQ", "ADMIN", "Admin")]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request):
         stats = {
