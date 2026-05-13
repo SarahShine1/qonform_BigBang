@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
-  BookOpen, ChevronLeft, Eye, GripVertical, Loader2, Pencil, Plus, Save, Trash2,
+  BookOpen, ChevronDown, ChevronRight, ChevronLeft, Eye, GripVertical,
+  Info, Loader2, Pencil, Plus, Save, Trash2,
 } from "lucide-react";
 import AppLayout from "../../components/layout/AppLayout";
 import AddChampPopup from "../../components/template/AddChampPopup";
@@ -22,6 +23,60 @@ import {
 const PURPLE       = "#58148E";
 const PURPLE_LIGHT = "#EDE9FE";
 const BORDER       = "#D1D5DB";
+
+const ISO_ARTICLES = [
+  { num: "1", titre: "Contexte de l'organisme" },
+  { num: "2", titre: "Leadership" },
+  { num: "3", titre: "Planification" },
+  { num: "4", titre: "Support" },
+  { num: "5", titre: "Réalisation des activités opérationnelles" },
+  { num: "6", titre: "Évaluation des performances" },
+  { num: "7", titre: "Amélioration" },
+  { num: "8", titre: "Documents et preuves" },
+];
+
+function CollapsibleIsoHint() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mb-3 overflow-hidden rounded-xl"
+      style={{ border: "1px solid #c4b5fd", background: open ? "linear-gradient(135deg,#f5f3ff,#ede9fe)" : "#faf5ff" }}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="flex w-full items-center gap-2 px-3 py-2 text-left transition hover:bg-violet-50"
+      >
+        <span className="flex h-5 w-5 items-center justify-center rounded-full shrink-0"
+          style={{ backgroundColor: PURPLE }}>
+          <Info size={10} className="text-white" />
+        </span>
+        <span className="flex-1 text-[11px] font-semibold" style={{ color: PURPLE }}>
+          Rappel — Articles standard ISO
+        </span>
+        {open
+          ? <ChevronDown size={13} style={{ color: PURPLE }} />
+          : <ChevronRight size={13} style={{ color: PURPLE }} />}
+      </button>
+      {open && (
+        <div className="px-3 pb-3">
+          <p className="mb-2 text-[10px] text-violet-500 italic">
+            Pour une norme ISO, les sections correspondent généralement aux articles :
+          </p>
+          <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
+            {ISO_ARTICLES.map((a) => (
+              <div key={a.num} className="flex items-center gap-2">
+                <span className="flex h-[17px] w-[17px] shrink-0 items-center justify-center rounded-[4px] text-[8.5px] font-bold text-white"
+                  style={{ backgroundColor: PURPLE }}>
+                  {a.num}
+                </span>
+                <span className="text-[10px] font-medium text-violet-800 leading-tight">{a.titre}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 let _tempCounter = 0;
 const tempId = () => `temp_${++_tempCounter}`;
@@ -437,7 +492,9 @@ export default function NormeTemplatePage() {
         {editMode && (
           <div className="mb-4">
             {addingSect ? (
-              <div className="flex items-center gap-2">
+              <div className="flex flex-col gap-2">
+                <CollapsibleIsoHint />
+                <div className="flex items-center gap-2">
                 <input autoFocus value={newSectName}
                   onChange={(e) => setNewSectName(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") handleAddSection(); if (e.key === "Escape") setAddingSect(false); }}
@@ -454,6 +511,7 @@ export default function NormeTemplatePage() {
                   className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-[12px] font-semibold text-slate-600 hover:bg-slate-50">
                   Annuler
                 </button>
+              </div>
               </div>
             ) : (
               <button type="button" onClick={() => setAddingSect(true)}
