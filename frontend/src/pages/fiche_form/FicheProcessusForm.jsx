@@ -15,7 +15,7 @@ import { getProcessusList } from "../../api/processus.api";
 import {
   getSectionTemplates, getChampTemplates, getFiches,
   createVersionFiche, updateVersionFiche, saveChampFiches,
-  getVersionFiche, getChampsFiche,
+  getVersionFiche, getChampsFiche, getNormes,
 } from "../../api/fiches.api";
 
 // ── Multi-process selector ───────────────────────────────────────────────────
@@ -202,6 +202,7 @@ export default function FicheProcessusForm() {
   const [versionNumero,        setVersionNumero]      = useState(null);
   const [existingVersionId,    setExistingVersionId]  = useState(null);
   const [readOnly,             setReadOnly]           = useState(false);
+  const [normeNom,             setNormeNom]           = useState(null);
   const [loading,              setLoading]            = useState(true);
   const [checkingFiche,        setCheckingFiche]      = useState(false);
   const [saving,               setSaving]             = useState(false);
@@ -242,45 +243,73 @@ export default function FicheProcessusForm() {
       setLoading(true);
       setError(null);
       try {
-        const [rawSections, processus] = await Promise.all([
-          getSectionTemplates(),
+        const [processusList, normesList] = await Promise.all([
           getProcessusList(),
+          getNormes(),
         ]);
-        const sectionsWithChamps = await Promise.all(
-          rawSections
-            .filter((s) => s.est_actif !== false)
-            .sort((a, b) => a.ordre - b.ordre)
-            .map(async (s) => {
-              const champs = await getChampTemplates(s.id_section_template);
-              return {
-                ...s,
-                champs: champs.filter((c) => c.est_actif !== false).sort((a, b) => a.ordre - b.ordre),
-              };
-            })
-        );
-        setSections(sectionsWithChamps);
-        setProcessusList(processus);
+        setProcessusList(processusList);
 
-        if (!isUrlEdit && processusFromQuery) {
-          setSelectedProcessusId(processusFromQuery);
-        }
+        let rawSections;
 
         if (isUrlEdit) {
+          // Must know the version's norm BEFORE loading sections so archived
+          // versions display the sections that actually belong to their norm.
           const [fiche, champsExistants] = await Promise.all([
             getVersionFiche(id),
             getChampsFiche(id),
           ]);
+
+          // Load sections for this version's specific norm (fallback: active norm)
+          rawSections = await getSectionTemplates(
+            fiche.id_norme ? { id_norme: fiche.id_norme } : {}
+          );
+
+          const sectionsWithChamps = await Promise.all(
+            rawSections
+              .filter((s) => s.est_actif !== false)
+              .sort((a, b) => a.ordre - b.ordre)
+              .map(async (s) => {
+                const champs = await getChampTemplates(s.id_section_template);
+                return {
+                  ...s,
+                  champs: champs.filter((c) => c.est_actif !== false).sort((a, b) => a.ordre - b.ordre),
+                };
+              })
+          );
+          setSections(sectionsWithChamps);
+
           setSelectedProcessusId(String(fiche.id_processus));
           setCurrentStatut(fiche.statut ?? "Brouillon");
           setVersionNumero(fiche.numero_version);
           setAmontIds(fiche.liaisons_amont ?? []);
           setAvalIds(fiche.liaisons_aval   ?? []);
           setReadOnly(fiche.statut !== "Brouillon");
+
+          const n = normesList.find((nm) => nm.id_norme === fiche.id_norme);
+          if (n) setNormeNom(`${n.code}:${n.version}`);
+
           const vals = {};
           champsExistants.forEach((c) => {
             vals[c.id_champ_template] = c.valeur_json !== null ? c.valeur_json : c.valeur;
           });
           setFormValues(vals);
+        } else {
+          // New / create mode: use sections from the currently active norm
+          rawSections = await getSectionTemplates();
+          const sectionsWithChamps = await Promise.all(
+            rawSections
+              .filter((s) => s.est_actif !== false)
+              .sort((a, b) => a.ordre - b.ordre)
+              .map(async (s) => {
+                const champs = await getChampTemplates(s.id_section_template);
+                return {
+                  ...s,
+                  champs: champs.filter((c) => c.est_actif !== false).sort((a, b) => a.ordre - b.ordre),
+                };
+              })
+          );
+          setSections(sectionsWithChamps);
+          if (processusFromQuery) setSelectedProcessusId(processusFromQuery);
         }
       } catch (err) {
         setError("Impossible de charger le formulaire.");
@@ -555,9 +584,15 @@ export default function FicheProcessusForm() {
 
           {/* ── Fiche card ── */}
           <div className="overflow-hidden rounded-xl bg-white" style={{ border: `1px solid ${BORDER}` }}>
-            <div className="flex items-center justify-center px-6 py-3"
+            <div className="flex items-center justify-center gap-3 px-6 py-3"
               style={{ backgroundColor: PURPLE, borderBottom: `1px solid ${BORDER}` }}>
               <span className="text-[12px] font-semibold text-white">Fiche Processus</span>
+              {normeNom && (
+                <span className="rounded-full px-2.5 py-0.5 text-[10.5px] font-semibold"
+                  style={{ backgroundColor: "rgba(255,255,255,0.15)", color: "#E9D5FF" }}>
+                  {normeNom}
+                </span>
+              )}
             </div>
 
             {(loading || checkingFiche) && (
