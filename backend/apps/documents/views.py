@@ -31,7 +31,8 @@ ALLOWED_MIME = {
 }
 MAX_SIZE_BYTES = 20 * 1024 * 1024  # 20 MB
 
-# Documents stored locally (not in Supabase)
+# Support documents remain permission-restricted, but new uploads are stored in
+# shared object storage so every user can download them from any machine.
 LOCAL_TYPES = {"Support"}
 
 
@@ -84,6 +85,30 @@ def _serialize_with_urls(docs):
         except Exception:
             urls[doc.id_document] = ""
     return DocumentSerializer(docs, many=True, context={"urls": urls}).data
+
+
+def _normalize_local_storage_path(storage_path: str) -> str:
+    normalized = str(storage_path or "").replace("\\", "/").strip()
+    return normalized.lstrip("/")
+
+
+def _local_abs_path(storage_path: str) -> str:
+    relative_path = _normalize_local_storage_path(storage_path)
+    return os.path.join(settings.MEDIA_ROOT, *relative_path.split("/"))
+
+
+def _is_legacy_local_support_doc(doc) -> bool:
+    if getattr(doc, "type_document", None) != "Support":
+        return False
+
+    relative_path = _normalize_local_storage_path(getattr(doc, "chemin_stockage", ""))
+    if not relative_path:
+        return False
+
+    if relative_path.startswith("documents/"):
+        return True
+
+    return os.path.exists(_local_abs_path(relative_path))
 
 
 # ── Helpers — permissions ─────────────────────────────────────────────────────
@@ -221,7 +246,7 @@ class DocumentUploadView(APIView):
 class DocumentListCreateView(APIView):
     """
     GET  /api/v1/documents/support/   — paginated Support document list
-    POST /api/v1/documents/support/   — upload Support document (CAQ only, local storage)
+    POST /api/v1/documents/support/   — upload Support document (CAQ only, shared storage)
     """
     parser_classes = [MultiPartParser, FormParser]
     permission_classes = [IsAuthenticated]
@@ -252,15 +277,27 @@ class DocumentListCreateView(APIView):
         data = serializer.validated_data
 
         fichier = data.pop("fichier")
-        ext         = os.path.splitext(fichier.name)[1]
-        unique_name = f"{uuid.uuid4().hex}{ext}"
-        upload_dir  = os.path.join(settings.MEDIA_ROOT, "documents")
-        os.makedirs(upload_dir, exist_ok=True)
-        file_path = os.path.join(upload_dir, unique_name)
+        safe_name = _safe_filename(fichier.name or data.get("nom_fichier") or "support")
+        storage_path = f"support/{uuid.uuid4().hex}_{safe_name}"
+        mime = (
+            fichier.content_type
+            or mimetypes.guess_type(fichier.name)[0]
+            or "application/octet-stream"
+        )
 
-        with open(file_path, "wb+") as dest:
-            for chunk in fichier.chunks():
-                dest.write(chunk)
+        try:
+            _upload(storage_path, fichier.read(), mime)
+        except requests.HTTPError as e:
+            body = e.response.text if e.response is not None else str(e)
+            return Response(
+                {"detail": f"Supabase Storage error: {e.response.status_code if e.response is not None else '?'} — {body}"},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+        except Exception as e:
+            return Response(
+                {"detail": f"Erreur lors de l'upload : {e}"},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
 
         try:
             from apps.accounts.models import Utilisateur
@@ -272,7 +309,7 @@ class DocumentListCreateView(APIView):
             **data,
             type_document   = "Support",
             id_uploader     = uploader_id,
-            chemin_stockage = f"documents/{unique_name}",
+            chemin_stockage = storage_path,
             taille          = fichier.size,
             date_upload     = timezone.now(),
         )
@@ -313,7 +350,9 @@ class DocumentDetailView(APIView):
         if doc.type_document in LOCAL_TYPES:
             if not _is_caq(request.user):
                 raise PermissionDenied("Seuls les membres CAQ peuvent supprimer des documents Support.")
-            file_path = os.path.join(settings.MEDIA_ROOT, doc.chemin_stockage)
+
+        if doc.type_document in LOCAL_TYPES and _is_legacy_local_support_doc(doc):
+            file_path = _local_abs_path(doc.chemin_stockage)
             if os.path.exists(file_path):
                 os.remove(file_path)
         else:
@@ -342,6 +381,22 @@ class DocumentDownloadView(APIView):
             except Exception:
                 url = ""
         else:
-            url = request.build_absolute_uri(settings.MEDIA_URL + doc.chemin_stockage)
+            if _is_legacy_local_support_doc(doc):
+                relative_path = _normalize_local_storage_path(doc.chemin_stockage)
+                file_path = _local_abs_path(doc.chemin_stockage)
+                if not os.path.exists(file_path):
+                    return Response(
+                        {"detail": "Fichier introuvable sur le serveur. Reimportez le document."},
+                        status=status.HTTP_404_NOT_FOUND,
+                    )
+                url = request.build_absolute_uri(settings.MEDIA_URL + relative_path)
+            else:
+                try:
+                    url = _signed_url(doc.chemin_stockage)
+                except Exception:
+                    return Response(
+                        {"detail": "Fichier introuvable sur le serveur. Reimportez le document."},
+                        status=status.HTTP_404_NOT_FOUND,
+                    )
 
         return Response({"url": url, "nom_fichier": doc.nom_fichier})
