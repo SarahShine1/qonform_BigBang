@@ -1,4 +1,6 @@
 ﻿from django.urls import path
 from . import views
 
-urlpatterns = []
+urlpatterns = [
+    path("dashboard/", views.pilote_dashboard, name="pilote-dashboard"),
+]

@@ -23,6 +23,7 @@ import DocumentationPage from "./pages/Documentationpage";
 import ChefTachesPage from "./pages/tache/ChefTachesPage";
 import DossierProcessusPage from "./pages/processus/DossierProcessusPage";
 import PreAuditPage from "./pages/audit/PreAuditPage";
+import DashboardPilote from "./pages/pilotage/DashboardPilote";
 import PVPage from "./pages/pv/PVPage";
 
 
@@ -94,10 +95,7 @@ export default function App() {
               path="/audit/audits-terrain"
               element={<AuditTerrainPage />}
             />
-            <Route
-              path="/dashboard-pilote"
-              element={<ModulePlaceholderPage title="Dashboard Pilote" />}
-            />
+            <Route path="/dashboard-pilote" element={<DashboardPilote />} />
             <Route
               path="/dashboard-auditeur"
               element={<DashboardAuditeur />}
