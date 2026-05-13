@@ -50,6 +50,7 @@ LOCAL_APPS = [
     'apps.taches',
     'apps.pv',
 
+
     'core',
 ]
 
@@ -141,6 +142,15 @@ STATIC_URL  = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 MEDIA_URL   = '/media/'
 MEDIA_ROOT  = BASE_DIR / 'media'
+
+# ── Supabase Storage ─────────────────────────────────────
+SUPABASE_URL              = config('SUPABASE_URL', default='')
+SUPABASE_SERVICE_ROLE_KEY = config('SUPABASE_SERVICE_ROLE_KEY', default='')
+SUPABASE_STORAGE_BUCKET   = config('SUPABASE_STORAGE_BUCKET', default='fiche-documents')
+
+# Accept files up to 25 MB in Django (client-side limit is 20 MB)
+DATA_UPLOAD_MAX_MEMORY_SIZE = 25 * 1024 * 1024
+FILE_UPLOAD_MAX_MEMORY_SIZE = 25 * 1024 * 1024
 
 # ── Misc ─────────────────────────────────────────────────
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

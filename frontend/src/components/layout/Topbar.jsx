@@ -6,7 +6,7 @@ import { useTheme } from "../../hooks/useTheme";
 import { SIDEBAR_WIDTH, TOPBAR_HEIGHT } from "./layout.constants";
 import MessagingPanel from "./MessagingPanel";
 
-export default function Topbar({ pageTitle, userName, userRole }) {
+export default function Topbar({ pageTitle, userName, userRole, leftOffset = SIDEBAR_WIDTH, onMenuClick }) {
   const { isDark, toggleTheme } = useTheme();
   const { user } = useAuth();
   const messagingRef = useRef(null);
@@ -93,15 +93,18 @@ export default function Topbar({ pageTitle, userName, userRole }) {
   return (
     <header
       className="fixed top-0 right-0 z-10 flex items-center justify-between border-b border-[#EEE7FA] bg-white px-5 transition-colors dark:border-slate-800 dark:bg-slate-900 xl:px-6"
-      style={{ left: SIDEBAR_WIDTH, height: TOPBAR_HEIGHT }}
+      style={{ left: leftOffset, height: TOPBAR_HEIGHT }}
     >
       <div className="flex items-center gap-3">
-        <button
-          type="button"
-          className="inline-flex h-[34px] w-[34px] items-center justify-center rounded-md text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
-        >
-          <Menu className="h-[18px] w-[18px]" />
-        </button>
+        {onMenuClick && (
+          <button
+            type="button"
+            onClick={onMenuClick}
+            className="inline-flex h-[34px] w-[34px] items-center justify-center rounded-md text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+          >
+            <Menu className="h-[18px] w-[18px]" />
+          </button>
+        )}
         <span className="text-[14px] font-semibold text-slate-900 dark:text-slate-100">{pageTitle}</span>
       </div>
 

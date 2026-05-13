@@ -4,22 +4,23 @@ from django.db import models
 class Document(models.Model):
 
 
+
     TYPE_DOCUMENT_CHOICES = [
         
-   
+
         ("BPMN",               "Diagramme BPMN"),
         ("Rapport",            "Rapport"),
         ("Preuve",             "Preuve"),
         ("Support",            "Support"),
         ("Rapport_audit_fiche","Rapport d'audit fiche"),
         ("PV",                 "PV"),
-
     ]
 
-    TYPE_SUPPORT_CHOICES = [
-        ("Guide", "Guide"),
-        ("Reglementation", "Réglementation"),
-        ("Norme", "Norme"),
+    EVALUATION_CHOICES = [
+        ("Conforme",     "Conforme"),
+        ("Non_conforme", "Non conforme"),
+        ("Partiel",      "Partiel"),
+        ("NA",           "N/A"),
     ]
 
 
@@ -36,12 +37,14 @@ class Document(models.Model):
     type_support    = models.CharField(max_length=50, null=True, blank=True)
     id_audit_field  = models.IntegerField(null=True, blank=True)
     evaluation      = models.CharField(max_length=20, choices=EVALUATION_CHOICES, null=True, blank=True)
+
     id_pv = models.IntegerField(null=True, blank=True)
 
 
     class Meta:
-        managed = False          # Supabase est la source de vérité
+        managed  = False
         db_table = "document"
+        ordering = ["-date_upload"]
 
     def __str__(self):
-        return f"{self.nom_fichier} ({self.type_document})"
+        return self.nom_fichier

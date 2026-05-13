@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import SectionTemplate, ChampTemplate, ColonneTemplate, OptionChamp, VersionFiche, ChampFiche
+from .models import Norme, SectionTemplate, ChampTemplate, ColonneTemplate, OptionChamp, VersionFiche, ChampFiche, ProcessusLiaison
 
 # champ_template utilise 'text'/'checklist'/'tableau'
 # mais la contrainte DB de champ_fiche n'accepte que 'texte'/'liste'
@@ -14,13 +14,22 @@ _TYPE_MAP = {
     "liste": "liste",
 }
 
+CHAMP_TYPE_CHOICES = ["text", "nombre", "date", "booleen", "checklist", "liste", "tableau"]
+
+
+class NormeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Norme
+        fields = ["id_norme", "code", "version", "titre", "date_publication", "est_active", "created_at"]
+        read_only_fields = ["id_norme", "created_at"]
+
 
 class SectionTemplateSerializer(serializers.ModelSerializer):
     class Meta:
         model = SectionTemplate
         fields = [
             "id_section_template", "nom", "description",
-            "ordre", "est_actif", "created_at", "updated_at",
+            "ordre", "est_actif", "id_norme", "created_at", "updated_at",
         ]
         read_only_fields = ["id_section_template", "created_at", "updated_at"]
 
@@ -62,13 +71,29 @@ class ChampTemplateSerializer(serializers.ModelSerializer):
 
 
 class VersionFicheSerializer(serializers.ModelSerializer):
+    liaisons_amont = serializers.SerializerMethodField()
+    liaisons_aval  = serializers.SerializerMethodField()
+
+    def get_liaisons_amont(self, obj):
+        return list(
+            ProcessusLiaison.objects.filter(id_processus_aval=obj.id_processus)
+            .values_list("id_processus_amont", flat=True)
+        )
+
+    def get_liaisons_aval(self, obj):
+        return list(
+            ProcessusLiaison.objects.filter(id_processus_amont=obj.id_processus)
+            .values_list("id_processus_aval", flat=True)
+        )
+
     class Meta:
         model = VersionFiche
         fields = [
             "id_version", "id_processus", "statut", "id_redacteur",
             "numero_version", "commentaire_version",
             "date_creation", "date_derniere_modif", "date_validation",
-            "id_processus_amont", "id_processus_aval",
+            "revue", "commit",
+            "liaisons_amont", "liaisons_aval",
         ]
         read_only_fields = ["id_version", "id_redacteur", "date_creation"]
 
@@ -89,3 +114,40 @@ class ChampFicheSerializer(serializers.ModelSerializer):
 
     def validate_type_champ(self, value):
         return _TYPE_MAP.get(value, "texte")
+
+
+# ── Nested write serializers for template editor ─────────────────────────────
+
+class ColonneWriteSerializer(serializers.Serializer):
+    cle         = serializers.CharField(max_length=50)
+    libelle     = serializers.CharField(max_length=200)
+    placeholder = serializers.CharField(max_length=255, required=False, allow_blank=True, allow_null=True)
+    ordre       = serializers.IntegerField(default=1)
+
+
+class OptionWriteSerializer(serializers.Serializer):
+    valeur  = serializers.CharField(max_length=100)
+    libelle = serializers.CharField(max_length=200)
+    ordre   = serializers.IntegerField(default=1)
+
+
+class ChampTemplateCreateSerializer(serializers.Serializer):
+    id_section_template = serializers.IntegerField()
+    libelle             = serializers.CharField(max_length=255)
+    type_champ          = serializers.ChoiceField(choices=CHAMP_TYPE_CHOICES)
+    est_obligatoire     = serializers.BooleanField(default=False)
+    placeholder         = serializers.CharField(max_length=255, required=False, allow_blank=True, allow_null=True)
+    aide                = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    ordre               = serializers.IntegerField(default=1)
+    colonnes            = ColonneWriteSerializer(many=True, required=False, default=list)
+    options             = OptionWriteSerializer(many=True, required=False, default=list)
+
+    def create(self, validated_data):
+        colonnes = validated_data.pop("colonnes", [])
+        options  = validated_data.pop("options", [])
+        champ = ChampTemplate.objects.create(**validated_data)
+        for col in colonnes:
+            ColonneTemplate.objects.create(id_champ=champ.id_champ_template, **col)
+        for opt in options:
+            OptionChamp.objects.create(id_champ=champ.id_champ_template, **opt)
+        return champ

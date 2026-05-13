@@ -151,7 +151,16 @@ class RoleListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        roles = Role.objects.all().order_by("libelle")
+        roles = list(Role.objects.all().order_by("libelle"))
+        has_dg_role = any(
+            str(role.libelle or "").strip().upper() == "DG"
+            for role in roles
+        )
+
+        if not has_dg_role:
+            roles.append(Role(libelle="DG"))
+            roles.sort(key=lambda role: str(role.libelle or "").lower())
+
         return Response(RoleSerializer(roles, many=True).data)
 
 

@@ -31,6 +31,7 @@ class Departement(models.Model):
 
     id_departement = models.AutoField(primary_key=True)
     nom = models.CharField(max_length=150)
+    code = models.CharField(max_length=20)
 
     class Meta:
         managed = False
