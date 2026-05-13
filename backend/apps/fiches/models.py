@@ -108,6 +108,7 @@ class VersionFiche(models.Model):
     date_validation = models.DateTimeField(blank=True, null=True)
     revue = models.BooleanField(default=False)
     commit = models.IntegerField(default=0)
+    id_norme = models.IntegerField(blank=True, null=True)
 
     class Meta:
         managed = False

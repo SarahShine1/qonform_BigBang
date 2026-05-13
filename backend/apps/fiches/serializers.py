@@ -93,7 +93,7 @@ class VersionFicheSerializer(serializers.ModelSerializer):
             "numero_version", "commentaire_version",
             "date_creation", "date_derniere_modif", "date_validation",
             "revue", "commit",
-            "liaisons_amont", "liaisons_aval",
+            "liaisons_amont", "liaisons_aval", "id_norme",
         ]
         read_only_fields = ["id_version", "id_redacteur", "date_creation"]
 
