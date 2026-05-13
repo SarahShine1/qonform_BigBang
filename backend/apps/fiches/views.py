@@ -77,7 +77,10 @@ class SectionTemplateViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["get"], url_path="champs")
     def champs(self, request, pk=None):
-        section = self.get_object()
+        # Bypass norm-activity filter so archived versions can still fetch
+        # champs for sections belonging to a no-longer-active norm.
+        from django.shortcuts import get_object_or_404
+        section = get_object_or_404(SectionTemplate, pk=pk, est_actif=True)
         champs = ChampTemplate.objects.filter(
             id_section_template=section.pk, est_actif=True
         ).order_by("ordre")
@@ -163,7 +166,13 @@ class VersionFicheViewSet(viewsets.ModelViewSet):
             id_redacteur = self.request.user.utilisateur.id_user
         except Exception:
             id_redacteur = self.request.data.get("id_redacteur")
-        instance = serializer.save(id_redacteur=id_redacteur)
+        # Auto-assign active norm if caller did not supply one
+        id_norme = serializer.validated_data.get("id_norme") or (
+            Norme.objects.filter(est_active=True)
+            .values_list("id_norme", flat=True)
+            .first()
+        )
+        instance = serializer.save(id_redacteur=id_redacteur, id_norme=id_norme)
         _sync_liaisons(
             instance.id_processus,
             self._get_liaison_ids("amont_ids"),

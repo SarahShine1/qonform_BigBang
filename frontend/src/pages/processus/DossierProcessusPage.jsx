@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import {
   ChevronLeft, FileText, History, ClipboardCheck, Paperclip,
   Save, Loader2, Send, CheckCircle2, AlertTriangle, XCircle, X, Lock,
-  Download, Eye, AlertCircle, Archive, ExternalLink, MessageSquare,
+  Download, Eye, AlertCircle, Archive, ExternalLink, MessageSquare, Workflow,
 } from "lucide-react";
 import AppLayout from "../../components/layout/AppLayout";
 import PipelineFiche from "../../components/fiche/PipelineFiche";
@@ -16,7 +16,7 @@ import { getProcessusList } from "../../api/processus.api";
 import {
   getSectionTemplates, getChampTemplates, getFiches,
   createVersionFiche, updateVersionFiche, saveChampFiches, getChampsFiche,
-  openFicheReport,
+  openFicheReport, getNormes,
 } from "../../api/fiches.api";
 import { getDocuments } from "../../api/documents.api";
 import { auditApi } from "../../api/audit.api";
@@ -26,6 +26,7 @@ const TABS = [
   { id: "fiche",    label: "Fiche actuelle",  Icon: FileText       },
   { id: "versions", label: "Versions",         Icon: History        },
   { id: "audit",    label: "Audit fiche",      Icon: ClipboardCheck },
+  { id: "bpmn",     label: "BPMN",             Icon: Workflow       },
   { id: "pieces",   label: "Pièces jointes",   Icon: Paperclip      },
 ];
 
@@ -323,7 +324,7 @@ function FeedbackPanel({ feedback, loading }) {
 }
 
 // ── Fiche Tab ──────────────────────────────────────────────────────────────────
-function FicheTab({ processusId, processus, user, onVersionCreated }) {
+function FicheTab({ processusId, processus, user, normes = [], onVersionCreated }) {
   const [sections,         setSections]         = useState([]);
   const [processusList,    setProcessusList]    = useState([]);
   const [formValues,       setFormValues]       = useState({});
@@ -334,6 +335,8 @@ function FicheTab({ processusId, processus, user, onVersionCreated }) {
   const [existingVersionId, setExistingVersionId] = useState(null);
   const [revue,            setRevue]            = useState(false);
   const [auditDoc,         setAuditDoc]         = useState(null);
+  const [normeNom,         setNormeNom]         = useState(null);
+  const [ficheNormeId,     setFicheNormeId]     = useState(null);
   const [loading,          setLoading]          = useState(true);
   const [saving,           setSaving]           = useState(false);
   const [archiving,        setArchiving]        = useState(false);
@@ -373,11 +376,25 @@ function FicheTab({ processusId, processus, user, onVersionCreated }) {
     async function load() {
       setLoading(true);
       try {
-        const [rawSections, pl, fiches] = await Promise.all([
-          getSectionTemplates(),
+        // Fetch fiche + processus list first so we know which norm's sections to load
+        const [pl, fiches] = await Promise.all([
           getProcessusList(),
           getFiches({ id_processus: processusId }),
         ]);
+        setProcessusList(pl);
+
+        const latestFiche = fiches?.length > 0
+          ? fiches.reduce((a, b) => (a.id_version > b.id_version ? a : b))
+          : null;
+
+        // Archived or no version → active norm (new version follows active norm)
+        // Any other status → sections of that version's own norm
+        const useActiveNorm = !latestFiche || latestFiche.statut === "Archivee";
+        const sectionsParam = (!useActiveNorm && latestFiche.id_norme)
+          ? { id_norme: latestFiche.id_norme }
+          : {};
+
+        const rawSections = await getSectionTemplates(sectionsParam);
         const sectionsWithChamps = await Promise.all(
           rawSections
             .filter(s => s.est_actif !== false)
@@ -388,27 +405,35 @@ function FicheTab({ processusId, processus, user, onVersionCreated }) {
             })
         );
         setSections(sectionsWithChamps);
-        setProcessusList(pl);
 
-        if (fiches && fiches.length > 0) {
-          const fiche = fiches.reduce((a, b) => (a.id_version > b.id_version ? a : b));
-          setExistingVersionId(fiche.id_version);
-          setCurrentStatut(fiche.statut ?? "Brouillon");
-          setVersionNumero(fiche.numero_version);
-          setAmontIds(fiche.liaisons_amont ?? []);
-          setAvalIds(fiche.liaisons_aval ?? []);
-          setRevue(fiche.revue ?? false);
-
-          const champsExistants = await getChampsFiche(fiche.id_version);
+        if (latestFiche) {
+          const champsExistants = await getChampsFiche(latestFiche.id_version);
           const vals = {};
           champsExistants.forEach(c => {
             vals[c.id_champ_template] = c.valeur_json !== null ? c.valeur_json : c.valeur;
           });
           setFormValues(vals);
+          setAmontIds(latestFiche.liaisons_amont ?? []);
+          setAvalIds(latestFiche.liaisons_aval ?? []);
 
-          if (fiche.revue) {
-            const docs = await getDocuments(fiche.id_version);
-            setAuditDoc(docs.find(d => d.type_document === "Rapport_audit_fiche") ?? null);
+          if (latestFiche.statut === "Archivee" && isPilote) {
+            // Open new editable Brouillon pre-filled with archived content
+            setExistingVersionId(null);
+            setCurrentStatut("Brouillon");
+            setVersionNumero(incrementVersion(latestFiche.numero_version));
+            setRevue(false);
+            setFicheNormeId(null);
+          } else {
+            setExistingVersionId(latestFiche.id_version);
+            setCurrentStatut(latestFiche.statut ?? "Brouillon");
+            setVersionNumero(latestFiche.numero_version);
+            setRevue(latestFiche.revue ?? false);
+            setFicheNormeId(latestFiche.statut !== "Archivee" ? (latestFiche.id_norme ?? null) : null);
+
+            if (latestFiche.revue) {
+              const docs = await getDocuments(latestFiche.id_version);
+              setAuditDoc(docs.find(d => d.type_document === "Rapport_audit_fiche") ?? null);
+            }
           }
         }
       } catch (err) {
@@ -419,6 +444,16 @@ function FicheTab({ processusId, processus, user, onVersionCreated }) {
     }
     load();
   }, [processusId]);
+
+  // Derive norm label:
+  // - non-archived existing version → use fiche's own id_norme
+  // - new version or archived → use active norm
+  useEffect(() => {
+    if (!normes.length) return;
+    const normeId = ficheNormeId ?? normes.find(n => n.est_active)?.id_norme;
+    const resolved = normes.find(n => n.id_norme === normeId) ?? null;
+    setNormeNom(resolved ? `${resolved.code}:${resolved.version}` : null);
+  }, [normes, ficheNormeId]);
 
   const handleChange = useCallback((champId, value) => {
     setFormValues(prev => ({ ...prev, [champId]: value }));
@@ -490,16 +525,37 @@ function FicheTab({ processusId, processus, user, onVersionCreated }) {
     try {
       await updateVersionFiche(existingVersionId, { statut: "Archivee" });
       const newVersion = incrementVersion(versionNumero);
+
+      // Re-fetch sections for the active norm — new version follows active norm
+      setLoading(true);
+      const rawSections = await getSectionTemplates();
+      const sectionsWithChamps = await Promise.all(
+        rawSections
+          .filter(s => s.est_actif !== false)
+          .sort((a, b) => a.ordre - b.ordre)
+          .map(async (s) => {
+            const champs = await getChampTemplates(s.id_section_template);
+            return { ...s, champs: champs.filter(c => c.est_actif !== false).sort((a, b) => a.ordre - b.ordre) };
+          })
+      );
+      setSections(sectionsWithChamps);
+      setLoading(false);
+
       setExistingVersionId(null);
       setCurrentStatut("Brouillon");
       setVersionNumero(newVersion);
+      setFormValues({});
+      setAmontIds([]);
+      setAvalIds([]);
       setRevue(false);
       setAuditDoc(null);
+      setFicheNormeId(null);
       setShowArchiveModal(false);
       showNotif("success", `Version ${versionNumero} archivée. Créez la version ${newVersion}.`);
       onVersionCreated?.();
     } catch (err) {
       setError("Erreur lors de l'archivage.");
+      setLoading(false);
       console.error(err);
     } finally {
       setArchiving(false);
@@ -620,9 +676,15 @@ function FicheTab({ processusId, processus, user, onVersionCreated }) {
 
           {/* Fiche form card */}
           <div className="overflow-hidden rounded-xl bg-white" style={{ border: `1px solid ${BORDER}` }}>
-            <div className="flex items-center justify-center px-6 py-3"
+            <div className="flex items-center justify-center gap-3 px-6 py-3"
               style={{ backgroundColor: PURPLE, borderBottom: `1px solid ${BORDER}` }}>
               <span className="text-[12px] font-semibold text-white">Fiche Processus</span>
+              {normeNom && (
+                <span className="rounded-full px-2.5 py-0.5 text-[10.5px] font-semibold"
+                  style={{ backgroundColor: "rgba(255,255,255,0.15)", color: "#E9D5FF" }}>
+                  {normeNom}
+                </span>
+              )}
             </div>
 
             {loading ? (
@@ -748,9 +810,15 @@ function StatutBadge({ statut }) {
   );
 }
 
-function VersionsTab({ versions, loading, processus, onConsulterCurrent }) {
+function VersionsTab({ versions, loading, processus, normes = [], onConsulterCurrent }) {
   const navigate = useNavigate();
   const handleOpenReport = (versionId) => openFicheReport(versionId);
+
+  const getNormeLabel = (version) => {
+    if (!version.id_norme) return null;
+    const n = normes.find(n => n.id_norme === version.id_norme);
+    return n ? `${n.code}:${n.version}` : null;
+  };
 
   if (loading) {
     return (
@@ -799,7 +867,15 @@ function VersionsTab({ versions, loading, processus, onConsulterCurrent }) {
               }}>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[13px] font-bold text-slate-800">Version {version.numero_version}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-[13px] font-bold text-slate-800">Version {version.numero_version}</p>
+                    {getNormeLabel(version) && (
+                      <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                        style={{ backgroundColor: "#EDE9FE", color: PURPLE }}>
+                        {getNormeLabel(version)}
+                      </span>
+                    )}
+                  </div>
                   <p className="text-[11px] text-slate-400 mt-0.5">{fmtDate(version.date_creation ?? version.created_at)}</p>
                   {processus?.pilote_nom && (
                     <p className="text-[11px] text-slate-500 mt-0.5">Pilote : {processus.pilote_nom}</p>
@@ -969,43 +1045,40 @@ function AuditFicheTab({ versions, currentVersion }) {
   );
 }
 
-// ── Pieces Jointes Tab ────────────────────────────────────────────────────────
-function PiecesTab({ versions, currentVersion, isPilote }) {
-  const [versionDocs, setVersionDocs] = useState({});
-  const [loading, setLoading] = useState(true);
+// ── BPMN Tab ──────────────────────────────────────────────────────────────────
+function BpmnTab({ versions, currentVersion, isPilote }) {
+  const [oldBpmns, setOldBpmns] = useState({});
+  const [loading,  setLoading]  = useState(false);
 
-  const canEditDocs = isPilote && currentVersion?.statut === "Brouillon";
+  const canEdit = isPilote && currentVersion?.statut === "Brouillon";
 
   useEffect(() => {
-    async function load() {
-      if (!versions.length) { setLoading(false); return; }
-      setLoading(true);
-      try {
-        const results = await Promise.all(
-          versions.map(v =>
-            getDocuments(v.id_version).then(docs => [v.id_version, docs]).catch(() => [v.id_version, []])
-          )
-        );
-        const map = {};
-        results.forEach(([id, docs]) => { map[id] = docs; });
-        setVersionDocs(map);
-      } finally {
-        setLoading(false);
-      }
-    }
-    load();
+    const oldVersions = versions.slice(1);
+    if (!oldVersions.length) return;
+    setLoading(true);
+    Promise.all(
+      oldVersions.map(v =>
+        getDocuments(v.id_version)
+          .then(docs => [v.id_version, docs.find(d => d.type_document === "BPMN") ?? null])
+          .catch(() => [v.id_version, null])
+      )
+    ).then(results => {
+      const map = {};
+      results.forEach(([id, doc]) => { map[id] = doc; });
+      setOldBpmns(map);
+    }).finally(() => setLoading(false));
   }, [versions]);
 
   return (
     <div className="space-y-4">
-      {/* ── BPMN — version actuelle ── */}
+      {/* ── BPMN version actuelle ── */}
       <div className="overflow-hidden rounded-xl bg-white" style={{ border: `1px solid ${BORDER}` }}>
         <div className="flex items-center justify-between px-5 py-3"
           style={{ backgroundColor: "#F9FAFB", borderBottom: `1px solid ${BORDER}` }}>
           <span className="text-[11px] font-bold uppercase tracking-widest text-slate-500">
             BPMN — Version actuelle
           </span>
-          {!canEditDocs && (
+          {!canEdit && (
             <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-400">
               Lecture seule
             </span>
@@ -1014,7 +1087,7 @@ function PiecesTab({ versions, currentVersion, isPilote }) {
         {currentVersion ? (
           <DocumentSection
             versionId={currentVersion.id_version}
-            readOnly={!canEditDocs}
+            readOnly={!canEdit}
             sectionIndex="▸"
             showBpmn={true}
             showPreuves={false}
@@ -1027,14 +1100,96 @@ function PiecesTab({ versions, currentVersion, isPilote }) {
         )}
       </div>
 
-      {/* ── Preuves — version actuelle ── */}
+      {/* ── BPMN versions précédentes — always read-only ── */}
+      {versions.length > 1 && (
+        <div className="overflow-hidden rounded-xl bg-white" style={{ border: `1px solid ${BORDER}` }}>
+          <div className="flex items-center justify-between px-5 py-3"
+            style={{ backgroundColor: "#F9FAFB", borderBottom: `1px solid ${BORDER}` }}>
+            <span className="text-[11px] font-bold uppercase tracking-widest text-slate-500">
+              BPMN — Versions précédentes
+            </span>
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-400">
+              Lecture seule
+            </span>
+          </div>
+          {loading ? (
+            <div className="flex items-center justify-center py-8 text-[12px] text-slate-400">
+              <Loader2 size={16} className="animate-spin mr-2" style={{ color: PURPLE }} /> Chargement…
+            </div>
+          ) : (
+            <div className="divide-y" style={{ borderColor: BORDER }}>
+              {versions.slice(1).map(v => {
+                const bpmn = oldBpmns[v.id_version];
+                return (
+                  <div key={v.id_version} className="px-5 py-4">
+                    <p className="mb-2 text-[12px] font-bold text-slate-700">Version {v.numero_version}</p>
+                    {!bpmn ? (
+                      <p className="text-[11.5px] italic text-slate-400">Aucun diagramme BPMN.</p>
+                    ) : (
+                      <div className="flex items-center gap-3 rounded-xl border px-4 py-3"
+                        style={{ borderColor: "#C4B5FD" }}>
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
+                          style={{ backgroundColor: "#EDE9FE" }}>
+                          <FileText size={18} style={{ color: PURPLE }} strokeWidth={1.5} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[12.5px] font-semibold text-slate-700">{bpmn.nom_fichier}</p>
+                          {bpmn.taille && <p className="text-[10.5px] text-slate-400">{(bpmn.taille / 1024).toFixed(0)} Ko</p>}
+                        </div>
+                        {bpmn.url && (
+                          <a href={bpmn.url} target="_blank" rel="noopener noreferrer"
+                            className="flex shrink-0 items-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold transition hover:bg-slate-100"
+                            style={{ color: PURPLE }}>
+                            <ExternalLink size={12} /> Voir
+                          </a>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Pieces Jointes Tab (preuves only) ─────────────────────────────────────────
+function PiecesTab({ versions, currentVersion, isPilote }) {
+  const [oldPreuves, setOldPreuves] = useState({});
+  const [loading,    setLoading]    = useState(false);
+
+  const canEdit = isPilote && currentVersion?.statut === "Brouillon";
+
+  useEffect(() => {
+    const oldVersions = versions.slice(1);
+    if (!oldVersions.length) return;
+    setLoading(true);
+    Promise.all(
+      oldVersions.map(v =>
+        getDocuments(v.id_version)
+          .then(docs => [v.id_version, docs.filter(d => d.type_document === "Preuve")])
+          .catch(() => [v.id_version, []])
+      )
+    ).then(results => {
+      const map = {};
+      results.forEach(([id, docs]) => { map[id] = docs; });
+      setOldPreuves(map);
+    }).finally(() => setLoading(false));
+  }, [versions]);
+
+  return (
+    <div className="space-y-4">
+      {/* ── Preuves version actuelle ── */}
       <div className="overflow-hidden rounded-xl bg-white" style={{ border: `1px solid ${BORDER}` }}>
         <div className="flex items-center justify-between px-5 py-3"
           style={{ backgroundColor: "#F9FAFB", borderBottom: `1px solid ${BORDER}` }}>
           <span className="text-[11px] font-bold uppercase tracking-widest text-slate-500">
             Preuves — Version actuelle
           </span>
-          {!canEditDocs && (
+          {!canEdit && (
             <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-400">
               Lecture seule
             </span>
@@ -1043,7 +1198,7 @@ function PiecesTab({ versions, currentVersion, isPilote }) {
         {currentVersion ? (
           <DocumentSection
             versionId={currentVersion.id_version}
-            readOnly={!canEditDocs}
+            readOnly={!canEdit}
             sectionIndex="▸"
             showBpmn={false}
             showPreuves={true}
@@ -1056,51 +1211,47 @@ function PiecesTab({ versions, currentVersion, isPilote }) {
         )}
       </div>
 
-      {/* ── Documents par version ── */}
-      {loading ? (
-        <div className="flex items-center justify-center py-8 text-[12px] text-slate-400">
-          <Loader2 size={16} className="animate-spin mr-2" style={{ color: PURPLE }} /> Chargement…
-        </div>
-      ) : versions.length > 1 && (
+      {/* ── Preuves versions précédentes ── */}
+      {versions.length > 1 && (
         <div className="overflow-hidden rounded-xl bg-white" style={{ border: `1px solid ${BORDER}` }}>
-          <div className="flex items-center gap-3 px-5 py-3"
+          <div className="flex items-center justify-between px-5 py-3"
             style={{ backgroundColor: "#F9FAFB", borderBottom: `1px solid ${BORDER}` }}>
             <span className="text-[11px] font-bold uppercase tracking-widest text-slate-500">
-              BPMN &amp; Preuves — Versions précédentes
+              Preuves — Versions précédentes
+            </span>
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-400">
+              Lecture seule
             </span>
           </div>
-          <div className="divide-y" style={{ borderColor: BORDER }}>
-            {versions.slice(1).map(v => {
-              const docs = versionDocs[v.id_version] ?? [];
-              const bpmn = docs.find(d => d.type_document === "BPMN");
-              const preuves = docs.filter(d => d.type_document === "Preuve");
-              return (
-                <div key={v.id_version} className="px-5 py-4">
-                  <p className="mb-2 text-[12px] font-bold text-slate-700">Version {v.numero_version}</p>
-                  {docs.length === 0 ? (
-                    <p className="text-[11.5px] italic text-slate-400">Aucun document.</p>
-                  ) : (
-                    <div className="space-y-1.5">
-                      {bpmn && (
-                        <div className="flex items-center gap-2 text-[12px]">
-                          <span className="rounded bg-purple-100 px-1.5 py-0.5 text-[9px] font-bold text-purple-700">BPMN</span>
-                          <a href={bpmn.url} target="_blank" rel="noopener noreferrer"
-                            className="truncate font-medium text-slate-600 hover:underline">{bpmn.nom_fichier}</a>
-                        </div>
-                      )}
-                      {preuves.map(p => (
-                        <div key={p.id_document} className="flex items-center gap-2 text-[12px]">
-                          <span className="rounded bg-green-100 px-1.5 py-0.5 text-[9px] font-bold text-green-700">Preuve</span>
-                          <a href={p.url} target="_blank" rel="noopener noreferrer"
-                            className="truncate font-medium text-slate-600 hover:underline">{p.nom_fichier}</a>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+          {loading ? (
+            <div className="flex items-center justify-center py-8 text-[12px] text-slate-400">
+              <Loader2 size={16} className="animate-spin mr-2" style={{ color: PURPLE }} /> Chargement…
+            </div>
+          ) : (
+            <div className="divide-y" style={{ borderColor: BORDER }}>
+              {versions.slice(1).map(v => {
+                const preuves = oldPreuves[v.id_version] ?? [];
+                return (
+                  <div key={v.id_version} className="px-5 py-4">
+                    <p className="mb-2 text-[12px] font-bold text-slate-700">Version {v.numero_version}</p>
+                    {preuves.length === 0 ? (
+                      <p className="text-[11.5px] italic text-slate-400">Aucune preuve.</p>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {preuves.map(p => (
+                          <div key={p.id_document} className="flex items-center gap-2 text-[12px]">
+                            <span className="rounded bg-green-100 px-1.5 py-0.5 text-[9px] font-bold text-green-700">Preuve</span>
+                            <a href={p.url} target="_blank" rel="noopener noreferrer"
+                              className="truncate font-medium text-slate-600 hover:underline">{p.nom_fichier}</a>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -1116,6 +1267,7 @@ export default function DossierProcessusPage() {
   const [activeTab,       setActiveTab]       = useState("fiche");
   const [processus,       setProcessus]       = useState(null);
   const [versions,        setVersions]        = useState([]);
+  const [normes,          setNormes]          = useState([]);
   const [loadingProcessus, setLoadingProcessus] = useState(true);
 
   const userName  = `${user?.prenom ?? ""} ${user?.nom ?? ""}`.trim() || user?.email || "Utilisateur";
@@ -1132,12 +1284,14 @@ export default function DossierProcessusPage() {
     async function load() {
       setLoadingProcessus(true);
       try {
-        const [processusList, fiches] = await Promise.all([
+        const [processusList, fiches, normesList] = await Promise.all([
           getProcessusList(),
           getFiches({ id_processus: processusId }),
+          getNormes(),
         ]);
         setProcessus(processusList.find(p => String(p.id_processus) === String(processusId)) ?? null);
         setVersions((fiches ?? []).sort((a, b) => b.id_version - a.id_version));
+        setNormes(normesList ?? []);
       } catch (e) {
         console.error(e);
       } finally {
@@ -1242,6 +1396,7 @@ export default function DossierProcessusPage() {
               processusId={processusId}
               processus={processus}
               user={user}
+              normes={normes}
               onVersionCreated={refreshVersions}
             />
           )}
@@ -1250,11 +1405,19 @@ export default function DossierProcessusPage() {
               versions={versions}
               loading={loadingProcessus}
               processus={processus}
+              normes={normes}
               onConsulterCurrent={() => setActiveTab("fiche")}
             />
           )}
           {activeTab === "audit" && (
             <AuditFicheTab versions={versions} currentVersion={currentVersion} />
+          )}
+          {activeTab === "bpmn" && (
+            <BpmnTab
+              versions={versions}
+              currentVersion={currentVersion}
+              isPilote={isPilote}
+            />
           )}
           {activeTab === "pieces" && (
             <PiecesTab
