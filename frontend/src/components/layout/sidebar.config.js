@@ -11,6 +11,7 @@ import {
   Network,
   Settings,
   Users,
+  ClipboardListIcon
 } from "lucide-react";
 
 const chefProjetItems = [
