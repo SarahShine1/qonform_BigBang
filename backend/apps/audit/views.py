@@ -338,12 +338,12 @@ def audit_dashboard(request):
     rapports = build_recent_reports(published, conformity_by_version)
 
     alertes = [
-        {"type": "warning", "message": f"{len(reauditer)} fiche(s) corrigee(s) attendent un reaudit."},
-        {"type": "danger", "message": f"{task_stats['en_retard']} tache(s) sont en retard."},
+        {"type": "warning", "message": f"{len(reauditer)} fiche(s) corrigée(s) attendent un réaudit."},
+        {"type": "danger", "message": f"{task_stats['en_retard']} tâche(s) sont en retard."},
         {"type": "danger", "message": f"{nc_gravite.get('Majeure', 0) + nc_gravite.get('Critique', 0)} NC majeures ou critiques sont ouvertes."},
         {
             "type": "info",
-            "message": f"{sum(1 for row in published if not row.get('rapport_nom'))} audit(s) publie(s) n'ont pas encore de rapport reference.",
+            "message": f"{sum(1 for row in published if not row.get('rapport_nom'))} audit(s) publié(s) n'ont pas encore de rapport référencé.",
         },
     ]
 
@@ -367,14 +367,14 @@ def audit_dashboard(request):
             "fichesParStatut": [
                 {"label": "Soumises", "value": len([row for row in soumises if not row.get("revue")])},
                 {"label": "En cours d'audit", "value": len(en_revision)},
-                {"label": "A reauditer", "value": len(reauditer)},
-                {"label": "Auditees / publiees", "value": len(published)},
+                {"label": "À réauditer", "value": len(reauditer)},
+                {"label": "Auditées / publiées", "value": len(published)},
             ],
             "tachesParStatut": [
-                {"label": "A faire", "value": task_stats["a_faire"]},
+                {"label": "À faire", "value": task_stats["a_faire"]},
                 {"label": "En cours", "value": task_stats["en_cours"]},
                 {"label": "En retard", "value": task_stats["en_retard"]},
-                {"label": "Terminees", "value": task_stats["terminees"]},
+                {"label": "Terminées", "value": task_stats["terminees"]},
             ],
             "tachesParPriorite": [
                 {"label": "Haute", "value": task_stats["priorite_haute"]},
@@ -542,7 +542,7 @@ def build_clause_scores(evaluations):
     ]
 
 
-MONTH_LABELS = ["Jan", "Fev", "Mar", "Avr", "Mai", "Juin", "Juil", "Aout", "Sep", "Oct", "Nov", "Dec"]
+MONTH_LABELS = ["Jan", "Fév", "Mar", "Avr", "Mai", "Juin", "Juil", "Août", "Sep", "Oct", "Nov", "Déc"]
 
 
 def build_audit_evolution(published):
