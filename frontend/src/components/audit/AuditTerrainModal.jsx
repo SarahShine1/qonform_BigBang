@@ -45,16 +45,14 @@ export default function AuditTerrainModal({ onClose, onSubmit, departements }) {
 
     if (!form.id_departement) return setError("Veuillez sélectionner un département.");
     if (!form.date_audit) return setError("La date d'audit est requise.");
+    if (!fichier) return setError("Un rapport d'audit (fichier) est obligatoire."); // ← ajouté
 
     const fd = new FormData();
     fd.append("id_departement", form.id_departement);
     fd.append("date_audit", form.date_audit);
-   
     if (form.observation) fd.append("observation", form.observation);
-    if (fichier) {
-      fd.append("rapport", fichier);
-      fd.append("nom_rapport", form.nom_rapport || fichier.name);
-    }
+    fd.append("rapport", fichier);
+    fd.append("nom_rapport", form.nom_rapport || fichier.name);
 
     setLoading(true);
     try {
@@ -135,8 +133,6 @@ export default function AuditTerrainModal({ onClose, onSubmit, departements }) {
             />
           </div>
 
-         
-
           {/* Observation */}
           <div>
             <label className="block text-[11px] font-medium text-slate-600 mb-1">
@@ -151,10 +147,10 @@ export default function AuditTerrainModal({ onClose, onSubmit, departements }) {
             />
           </div>
 
-          {/* Upload rapport */}
+          {/* Upload rapport — OBLIGATOIRE */}
           <div>
             <label className="block text-[11px] font-medium text-slate-600 mb-1">
-              Rapport d'audit 
+              Rapport d'audit <span className="text-red-400">*</span>
             </label>
             <div
               onClick={() => fileRef.current?.click()}
