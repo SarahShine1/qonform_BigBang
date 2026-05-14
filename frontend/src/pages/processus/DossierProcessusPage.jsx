@@ -70,6 +70,27 @@ const incrementVersion = (vStr) => {
   return `${major + 1}.0`;
 };
 
+const getNormeLabel = (version, normes) => {
+  if (!version?.id_norme || !normes?.length) return null;
+  const n = normes.find(n => n.id_norme === version.id_norme);
+  return n ? `${n.code}:${n.version}` : null;
+};
+
+function VersionNormeHeader({ version, normes }) {
+  const label = getNormeLabel(version, normes);
+  return (
+    <div className="mb-2 flex items-center gap-2">
+      <span className="text-[12px] font-bold text-slate-700">Version {version.numero_version}</span>
+      {label && (
+        <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
+          style={{ backgroundColor: "#EDE9FE", color: PURPLE }}>
+          {label}
+        </span>
+      )}
+    </div>
+  );
+}
+
 // ── Multi-process selector ────────────────────────────────────────────────────
 function MultiProcessSelect({ value, onChange, options, disabled }) {
   const [open, setOpen] = useState(false);
@@ -417,10 +438,21 @@ function FicheTab({ processusId, processus, user, normes = [], onVersionCreated 
           setAvalIds(latestFiche.liaisons_aval ?? []);
 
           if (latestFiche.statut === "Archivee" && isPilote) {
-            // Open new editable Brouillon pre-filled with archived content
+            // Find the last version belonging to the active norm to compute next number
+            const normesList = await getNormes();
+            const activeNorme = normesList.find(n => n.est_active);
+            let baseVersion = latestFiche.numero_version;
+            if (activeNorme) {
+              const fichesByNorm = fiches.filter(f => f.id_norme === activeNorme.id_norme);
+              if (fichesByNorm.length > 0) {
+                baseVersion = fichesByNorm.reduce((a, b) =>
+                  parseFloat(a.numero_version) > parseFloat(b.numero_version) ? a : b
+                ).numero_version;
+              }
+            }
             setExistingVersionId(null);
             setCurrentStatut("Brouillon");
-            setVersionNumero(incrementVersion(latestFiche.numero_version));
+            setVersionNumero(incrementVersion(baseVersion));
             setRevue(false);
             setFicheNormeId(null);
           } else {
@@ -820,6 +852,12 @@ function VersionsTab({ versions, loading, processus, normes = [], onConsulterCur
     return n ? `${n.code}:${n.version}` : null;
   };
 
+  // Show only versions belonging to the active norm
+  const activeNormeId = normes.find(n => n.est_active)?.id_norme ?? null;
+  const filteredVersions = activeNormeId
+    ? versions.filter(v => v.id_norme === activeNormeId)
+    : versions;
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16 text-[12px] text-slate-400">
@@ -828,11 +866,11 @@ function VersionsTab({ versions, loading, processus, normes = [], onConsulterCur
     );
   }
 
-  if (versions.length === 0) {
+  if (filteredVersions.length === 0) {
     return (
       <div className="rounded-xl bg-white px-6 py-10 text-center text-[13px] text-slate-400"
         style={{ border: `1px solid ${BORDER}` }}>
-        Aucune version publiée pour ce processus.
+        Aucune version pour la norme active.
       </div>
     );
   }
@@ -842,7 +880,7 @@ function VersionsTab({ versions, loading, processus, normes = [], onConsulterCur
       {/* Vertical line */}
       <div className="absolute left-[19px] top-0 bottom-0 w-[2px] bg-slate-200" />
 
-      {versions.map((version, idx) => {
+      {filteredVersions.map((version, idx) => {
         const isCurrent = idx === 0;
         return (
           <div key={version.id_version} className="relative flex items-start gap-4 pb-6">
@@ -955,9 +993,15 @@ function AuditDocCard({ doc, versionId }) {
   );
 }
 
-function AuditFicheTab({ versions, currentVersion }) {
+function AuditFicheTab({ versions, currentVersion, normes = [] }) {
   const [docs, setDocs] = useState({});
   const [loading, setLoading] = useState(true);
+
+  const activeNormeId = normes.find(n => n.est_active)?.id_norme ?? null;
+  const oldVersions = (activeNormeId
+    ? versions.filter(v => v.id_norme === activeNormeId)
+    : versions
+  ).filter(v => v.id_version !== currentVersion?.id_version);
 
   useEffect(() => {
     async function load() {
@@ -1015,7 +1059,7 @@ function AuditFicheTab({ versions, currentVersion }) {
       </div>
 
       {/* Rapports versions précédentes */}
-      {versions.length > 1 && (
+      {oldVersions.length > 0 && (
         <div className="overflow-hidden rounded-xl bg-white" style={{ border: `1px solid ${BORDER}` }}>
           <div className="flex items-center gap-3 px-5 py-3"
             style={{ backgroundColor: "#F9FAFB", borderBottom: `1px solid ${BORDER}` }}>
@@ -1024,9 +1068,9 @@ function AuditFicheTab({ versions, currentVersion }) {
             </span>
           </div>
           <div className="divide-y" style={{ borderColor: BORDER }}>
-            {versions.slice(1).map(v => (
+            {oldVersions.map(v => (
               <div key={v.id_version} className="px-5 py-4">
-                <p className="mb-2 text-[12px] font-bold text-slate-700">Version {v.numero_version}</p>
+                <VersionNormeHeader version={v} normes={normes} />
                 {(docs[v.id_version] ?? []).length === 0 ? (
                   <p className="text-[11.5px] italic text-slate-400">Aucun rapport d'audit.</p>
                 ) : (
@@ -1046,14 +1090,19 @@ function AuditFicheTab({ versions, currentVersion }) {
 }
 
 // ── BPMN Tab ──────────────────────────────────────────────────────────────────
-function BpmnTab({ versions, currentVersion, isPilote }) {
+function BpmnTab({ versions, currentVersion, isPilote, normes = [] }) {
   const [oldBpmns, setOldBpmns] = useState({});
   const [loading,  setLoading]  = useState(false);
 
   const canEdit = isPilote && currentVersion?.statut === "Brouillon";
 
+  const activeNormeId = normes.find(n => n.est_active)?.id_norme ?? null;
+  const oldVersions = (activeNormeId
+    ? versions.filter(v => v.id_norme === activeNormeId)
+    : versions
+  ).filter(v => v.id_version !== currentVersion?.id_version);
+
   useEffect(() => {
-    const oldVersions = versions.slice(1);
     if (!oldVersions.length) return;
     setLoading(true);
     Promise.all(
@@ -1067,7 +1116,7 @@ function BpmnTab({ versions, currentVersion, isPilote }) {
       results.forEach(([id, doc]) => { map[id] = doc; });
       setOldBpmns(map);
     }).finally(() => setLoading(false));
-  }, [versions]);
+  }, [versions, activeNormeId]);
 
   return (
     <div className="space-y-4">
@@ -1101,7 +1150,7 @@ function BpmnTab({ versions, currentVersion, isPilote }) {
       </div>
 
       {/* ── BPMN versions précédentes — always read-only ── */}
-      {versions.length > 1 && (
+      {oldVersions.length > 0 && (
         <div className="overflow-hidden rounded-xl bg-white" style={{ border: `1px solid ${BORDER}` }}>
           <div className="flex items-center justify-between px-5 py-3"
             style={{ backgroundColor: "#F9FAFB", borderBottom: `1px solid ${BORDER}` }}>
@@ -1118,11 +1167,11 @@ function BpmnTab({ versions, currentVersion, isPilote }) {
             </div>
           ) : (
             <div className="divide-y" style={{ borderColor: BORDER }}>
-              {versions.slice(1).map(v => {
+              {oldVersions.map(v => {
                 const bpmn = oldBpmns[v.id_version];
                 return (
                   <div key={v.id_version} className="px-5 py-4">
-                    <p className="mb-2 text-[12px] font-bold text-slate-700">Version {v.numero_version}</p>
+                    <VersionNormeHeader version={v} normes={normes} />
                     {!bpmn ? (
                       <p className="text-[11.5px] italic text-slate-400">Aucun diagramme BPMN.</p>
                     ) : (
@@ -1157,14 +1206,19 @@ function BpmnTab({ versions, currentVersion, isPilote }) {
 }
 
 // ── Pieces Jointes Tab (preuves only) ─────────────────────────────────────────
-function PiecesTab({ versions, currentVersion, isPilote }) {
+function PiecesTab({ versions, currentVersion, isPilote, normes = [] }) {
   const [oldPreuves, setOldPreuves] = useState({});
   const [loading,    setLoading]    = useState(false);
 
   const canEdit = isPilote && currentVersion?.statut === "Brouillon";
 
+  const activeNormeId = normes.find(n => n.est_active)?.id_norme ?? null;
+  const oldVersions = (activeNormeId
+    ? versions.filter(v => v.id_norme === activeNormeId)
+    : versions
+  ).filter(v => v.id_version !== currentVersion?.id_version);
+
   useEffect(() => {
-    const oldVersions = versions.slice(1);
     if (!oldVersions.length) return;
     setLoading(true);
     Promise.all(
@@ -1178,7 +1232,7 @@ function PiecesTab({ versions, currentVersion, isPilote }) {
       results.forEach(([id, docs]) => { map[id] = docs; });
       setOldPreuves(map);
     }).finally(() => setLoading(false));
-  }, [versions]);
+  }, [versions, activeNormeId]);
 
   return (
     <div className="space-y-4">
@@ -1212,7 +1266,7 @@ function PiecesTab({ versions, currentVersion, isPilote }) {
       </div>
 
       {/* ── Preuves versions précédentes ── */}
-      {versions.length > 1 && (
+      {oldVersions.length > 0 && (
         <div className="overflow-hidden rounded-xl bg-white" style={{ border: `1px solid ${BORDER}` }}>
           <div className="flex items-center justify-between px-5 py-3"
             style={{ backgroundColor: "#F9FAFB", borderBottom: `1px solid ${BORDER}` }}>
@@ -1229,11 +1283,11 @@ function PiecesTab({ versions, currentVersion, isPilote }) {
             </div>
           ) : (
             <div className="divide-y" style={{ borderColor: BORDER }}>
-              {versions.slice(1).map(v => {
+              {oldVersions.map(v => {
                 const preuves = oldPreuves[v.id_version] ?? [];
                 return (
                   <div key={v.id_version} className="px-5 py-4">
-                    <p className="mb-2 text-[12px] font-bold text-slate-700">Version {v.numero_version}</p>
+                    <VersionNormeHeader version={v} normes={normes} />
                     {preuves.length === 0 ? (
                       <p className="text-[11.5px] italic text-slate-400">Aucune preuve.</p>
                     ) : (
@@ -1410,13 +1464,14 @@ export default function DossierProcessusPage() {
             />
           )}
           {activeTab === "audit" && (
-            <AuditFicheTab versions={versions} currentVersion={currentVersion} />
+            <AuditFicheTab versions={versions} currentVersion={currentVersion} normes={normes} />
           )}
           {activeTab === "bpmn" && (
             <BpmnTab
               versions={versions}
               currentVersion={currentVersion}
               isPilote={isPilote}
+              normes={normes}
             />
           )}
           {activeTab === "pieces" && (
@@ -1424,6 +1479,7 @@ export default function DossierProcessusPage() {
               versions={versions}
               currentVersion={currentVersion}
               isPilote={isPilote}
+              normes={normes}
             />
           )}
         </div>
