@@ -14,16 +14,18 @@ import MaturityPage from "./pages/maturity/MaturityPage";
 import ModulePlaceholderPage from "./pages/shared/ModulePlaceholderPage";
 import FicheProcessusForm from "./pages/fiche_form/FicheProcessusForm";
 import ProcessusPage from "./pages/processus/ProcessusPage";
-import ChefTachesPage from "./pages/tache/ChefTachesPage";
 import CanevasFichePage from "./pages/canevas/CanevasFichePage";
 import NormeTemplatePage from "./pages/canevas/NormeTemplatePage";
 import InteractionMapPage from "./pages/cartographie/InteractionMapPage";
 import AuditTerrainPage from "./pages/audit/AuditTerrainPage";
 import DashboardAuditeur from "./pages/audit/DashboardAuditeur";
 import DocumentationPage from "./pages/Documentationpage";
+import ChefTachesPage from "./pages/tache/ChefTachesPage";
 import DossierProcessusPage from "./pages/processus/DossierProcessusPage";
 import PreAuditPage from "./pages/audit/PreAuditPage";
 import DashboardPilote from "./pages/pilotage/DashboardPilote";
+import PVPage from "./pages/pv/PVPage";
+
 
 export default function App() {
   return (
@@ -85,10 +87,7 @@ export default function App() {
                 element={<InteractionMapPage />}
               />
             </Route>
-            <Route
-              path="/suivi"
-              element={<ModulePlaceholderPage title="Suivi" />}
-            />
+            <Route path="/suivi" element={<PVPage />} />
             <Route path="/audit/preaudit" element={<PreAuditPage />} />
             <Route path="/audit/pre-audit" element={<PreAuditPage />} />
             <Route path="/audit/mes-audits" element={<MesAudits />} />
@@ -102,6 +101,7 @@ export default function App() {
               element={<DashboardAuditeur />}
             />
             <Route path="/planification" element={<ChefTachesPage />} />
+
 
             <Route path="/audits" element={<MesAudits />} />
             <Route path="/mes-audits" element={<MesAudits />} />

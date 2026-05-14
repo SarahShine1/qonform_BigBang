@@ -11,6 +11,7 @@ import {
   Network,
   Settings,
   Users,
+  ClipboardListIcon
 } from "lucide-react";
 
 const chefProjetItems = [
@@ -104,7 +105,14 @@ const dgItems = [
     icon: Map,
     children: [{ label: "Processus", icon: Network, to: "/cartographie/processus" }],
   },
-  { label: "Planification", icon: Calendar, to: "/planification" },
+  {
+    label: "Planif et suivi",
+    icon: Calendar,
+    children: [
+      { label: "Planification", icon: Calendar, to: "/planification" },
+      { label: "Suivi", icon: ClipboardList, to: "/suivi" },
+    ],
+  },
   { label: "Support documentaire", icon: FolderOpen, to: "/documents" },
   { label: "Paramètres", icon: Settings, to: "/parametres" },
 ];
