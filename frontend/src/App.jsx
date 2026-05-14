@@ -26,6 +26,7 @@ import PreAuditPage from "./pages/audit/PreAuditPage";
 import DashboardPilote from "./pages/pilotage/DashboardPilote";
 import DashboardCAQ from "./pages/caq/DashboardCAQ";
 import PVPage from "./pages/pv/PVPage";
+import DashboardDG from "./pages/pilotage/DashboardDG";
 import ParametresPage from "./pages/settings/ParametresPage";
 
 
@@ -41,12 +42,23 @@ export default function App() {
             <Route path="/accueil" element={<AccueilPage />} />
 
             <Route
-              path="/dashboard"
               element={
-               <DashboardCAQ />
+                <RoleProtectedRoute
+                  roles={["DG", "Direction generale", "Direction générale"]}
+                />
               }
-            />
+            >
+              <Route path="/dashboard-DG" element={<DashboardDG />} />
+            </Route>
 
+            <Route
+              element={
+                <RoleProtectedRoute roles={["CAQ", "ADMIN", "Admin"]} />
+              }
+            >
+            <Route path="/dashboard" element={<DashboardCAQ />} />
+            </Route>
+            
             <Route path="/organigramme" element={<Organigramme />} />
             <Route
               path="/gestion-utilisateurs"
@@ -98,7 +110,6 @@ export default function App() {
               path="/dashboard-auditeur"
               element={<DashboardAuditeur />}
             />
-            <Route path="/dashboard" element={<DashboardCAQ />} />
             <Route path="/planification" element={<ChefTachesPage />} />
 
 
