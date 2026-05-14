@@ -22,12 +22,12 @@ def django_db_setup(django_db_setup, django_db_blocker):
     created and migrations are applied.
     """
     from django.db import connection
-    from apps.accounts.models import Utilisateur, Role, UserRole
+    from apps.accounts.models import Departement, Utilisateur, Role, UserRole
 
     with django_db_blocker.unblock():
         with connection.schema_editor() as schema_editor:
             # Create tables for unmanaged models
-            for model in (Role, Utilisateur, UserRole):
+            for model in (Departement, Role, Utilisateur, UserRole):
                 try:
                     schema_editor.create_model(model)
                 except Exception:

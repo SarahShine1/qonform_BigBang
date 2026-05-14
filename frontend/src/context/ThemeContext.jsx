@@ -23,6 +23,7 @@ export function ThemeProvider({ children }) {
     () => ({
       theme,
       isDark: theme === "dark",
+      setTheme,
       toggleTheme: () => setTheme((current) => (current === "dark" ? "light" : "dark")),
     }),
     [theme],

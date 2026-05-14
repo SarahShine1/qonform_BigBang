@@ -26,6 +26,7 @@ import PreAuditPage from "./pages/audit/PreAuditPage";
 import DashboardPilote from "./pages/pilotage/DashboardPilote";
 import DashboardCAQ from "./pages/caq/DashboardCAQ";
 import PVPage from "./pages/pv/PVPage";
+import ParametresPage from "./pages/settings/ParametresPage";
 
 
 export default function App() {
@@ -134,16 +135,7 @@ export default function App() {
 
             <Route path="/niveau-maturite" element={<MaturityPage />} />
 
-            <Route
-              path="/parametres"
-              element={
-                <ModulePlaceholderPage
-                  pageTitle="Parametres"
-                  title="Parametres"
-                  description="Les parametres de la plateforme pourront etre completes ici sans changer la navigation actuelle."
-                />
-              }
-            />
+            <Route path="/parametres" element={<ParametresPage />} />
           </Route>
 
           <Route

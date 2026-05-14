@@ -81,6 +81,13 @@ body {
   overflow: hidden;
 }
 
+:root[data-density="compact"] .page-content {
+  padding-top: 10px !important;
+  padding-right: 14px !important;
+  padding-bottom: 10px !important;
+  padding-left: 14px !important;
+}
+
 @keyframes login-showcase-scroll {
   0% {
     transform: translateX(0);
