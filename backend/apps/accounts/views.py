@@ -1,20 +1,28 @@
 from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework import status
+from rest_framework.exceptions import NotFound
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
-from .models import Departement, Role, Utilisateur
+from .models import Departement, Role, Utilisateur, UtilisateurSettings
 from .permissions import HasRole
 from .serializers import (
+    ChangePasswordSerializer,
     CustomTokenObtainPairSerializer,
     DepartementSerializer,
     ManagedUserSerializer,
     ManagedUserWriteSerializer,
+    ProfilePhotoUploadSerializer,
     RoleSerializer,
+    UserPreferencesSerializer,
+    UserProfileUpdateSerializer,
+    UserSettingsSerializer,
+    build_user_preferences,
 )
 from .utils import get_active_role_labels_for_user, get_auth_user_for_utilisateur
 
@@ -49,6 +57,26 @@ class MeView(APIView):
                 "departement": departement_id,
             }
         )
+
+
+def get_current_utilisateur(user):
+    utilisateur = Utilisateur.objects.filter(auth=user).first()
+
+    if not utilisateur:
+        utilisateur = Utilisateur.objects.filter(email__iexact=user.email).first()
+
+    if not utilisateur:
+        raise NotFound("Profil utilisateur introuvable.")
+
+    return utilisateur
+
+
+def get_or_create_user_settings(utilisateur):
+    settings_obj, _ = UtilisateurSettings.objects.get_or_create(
+        utilisateur=utilisateur,
+        defaults={"preferences": build_user_preferences()},
+    )
+    return settings_obj
 
 
 class ManagedUserListCreateView(APIView):
@@ -201,3 +229,105 @@ class ManagedUserStatsView(APIView):
                 stats["auditeurs"] += 1
 
         return Response(stats)
+
+
+class UserSettingsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        utilisateur = get_current_utilisateur(request.user)
+        serializer = UserSettingsSerializer(utilisateur, context={"request": request})
+        return Response(serializer.data)
+
+    @transaction.atomic
+    def patch(self, request):
+        utilisateur = get_current_utilisateur(request.user)
+        serializer = UserProfileUpdateSerializer(
+            utilisateur,
+            data=request.data,
+            partial=True,
+        )
+        serializer.is_valid(raise_exception=True)
+        utilisateur = serializer.save()
+
+        return Response(
+            UserSettingsSerializer(utilisateur, context={"request": request}).data
+        )
+
+
+class ProfilePhotoUploadView(APIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    @transaction.atomic
+    def post(self, request):
+        utilisateur = get_current_utilisateur(request.user)
+        serializer = ProfilePhotoUploadSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        settings_obj = get_or_create_user_settings(utilisateur)
+        previous_photo_name = settings_obj.photo_profil.name if settings_obj.photo_profil else ""
+        settings_obj.photo_profil = serializer.validated_data["photo"]
+        settings_obj.save(update_fields=["photo_profil"])
+
+        if previous_photo_name and previous_photo_name != settings_obj.photo_profil.name:
+            settings_obj.photo_profil.storage.delete(previous_photo_name)
+
+        photo_url = None
+        if settings_obj.photo_profil:
+            photo_url = request.build_absolute_uri(settings_obj.photo_profil.url)
+
+        return Response(
+            {
+                "photo_profil": photo_url,
+                "message": "La photo de profil a ete mise a jour avec succes.",
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class ChangePasswordView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @transaction.atomic
+    def post(self, request):
+        serializer = ChangePasswordSerializer(
+            data=request.data,
+            context={"request": request},
+        )
+        serializer.is_valid(raise_exception=True)
+
+        request.user.set_password(serializer.validated_data["new_password"])
+        request.user.save(update_fields=["password"])
+
+        return Response(
+            {"message": "Le mot de passe a ete modifie avec succes."},
+            status=status.HTTP_200_OK,
+        )
+
+
+class UserPreferencesView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @transaction.atomic
+    def patch(self, request):
+        utilisateur = get_current_utilisateur(request.user)
+        settings_obj = get_or_create_user_settings(utilisateur)
+
+        serializer = UserPreferencesSerializer(
+            settings_obj,
+            data=request.data,
+            partial=True,
+        )
+        serializer.is_valid(raise_exception=True)
+
+        settings_obj.preferences = serializer.validated_data["preferences"]
+        settings_obj.save(update_fields=["preferences"])
+
+        return Response(
+            {
+                "preferences": build_user_preferences(settings_obj.preferences),
+                "message": "Les preferences ont ete enregistrees avec succes.",
+            },
+            status=status.HTTP_200_OK,
+        )
