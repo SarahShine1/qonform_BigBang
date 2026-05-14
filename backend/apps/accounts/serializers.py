@@ -10,6 +10,7 @@ from .models import Departement, Role, User, Utilisateur, UtilisateurSettings
 from .utils import (
     get_auth_user_for_utilisateur,
     get_active_role_labels_for_user,
+    get_profile_photo_url,
     normalize_role_names,
     split_full_name,
     sync_roles_for_user,
@@ -78,6 +79,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
     def validate(self, attrs):
         validated_data = super().validate(attrs)
+        request = self.context.get("request")
 
         email = attrs.get(self.username_field)
 
@@ -89,6 +91,11 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         if not utilisateur.est_actif:
             raise AuthenticationFailed("Compte désactivé. Contactez l'administrateur.")
 
+        try:
+            settings_obj = utilisateur.settings
+        except UtilisateurSettings.DoesNotExist:
+            settings_obj = None
+
         validated_data["user"] = {
             "id_user": utilisateur.id_user,
             "nom": utilisateur.nom,
@@ -96,6 +103,10 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             "email": utilisateur.email,
             "roles": get_active_role_labels_for_user(utilisateur.id_user),
             "departement": utilisateur.id_departement,
+            "photo_profil": get_profile_photo_url(
+                settings_obj.photo_profil if settings_obj else None,
+                request=request,
+            ),
         }
 
         return validated_data
@@ -496,8 +507,7 @@ class UserSettingsSerializer(serializers.Serializer):
             return None
 
         request = self.context.get("request")
-        url = settings_obj.photo_profil.url
-        return request.build_absolute_uri(url) if request else url
+        return get_profile_photo_url(settings_obj.photo_profil, request=request)
 
     def get_preferences(self, obj):
         settings_obj = self._get_settings(obj)
