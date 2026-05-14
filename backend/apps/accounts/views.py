@@ -24,7 +24,14 @@ from .serializers import (
     UserSettingsSerializer,
     build_user_preferences,
 )
-from .utils import get_active_role_labels_for_user, get_auth_user_for_utilisateur
+from .utils import (
+    delete_profile_photo_from_storage,
+    get_active_role_labels_for_user,
+    get_auth_user_for_utilisateur,
+    get_profile_photo_url,
+    profile_storage_is_configured,
+    upload_profile_photo_to_storage,
+)
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
@@ -46,6 +53,7 @@ class MeView(APIView):
         departement_id = payload.get("departement_id")
 
         utilisateur = Utilisateur.objects.get(email=email)
+        settings_obj = UtilisateurSettings.objects.filter(utilisateur=utilisateur).first()
 
         return Response(
             {
@@ -55,6 +63,10 @@ class MeView(APIView):
                 "email": email,
                 "roles": roles,
                 "departement": departement_id,
+                "photo_profil": get_profile_photo_url(
+                    settings_obj.photo_profil if settings_obj else None,
+                    request=request,
+                ),
             }
         )
 
@@ -267,15 +279,26 @@ class ProfilePhotoUploadView(APIView):
 
         settings_obj = get_or_create_user_settings(utilisateur)
         previous_photo_name = settings_obj.photo_profil.name if settings_obj.photo_profil else ""
-        settings_obj.photo_profil = serializer.validated_data["photo"]
-        settings_obj.save(update_fields=["photo_profil"])
+        uploaded_photo = serializer.validated_data["photo"]
 
-        if previous_photo_name and previous_photo_name != settings_obj.photo_profil.name:
-            settings_obj.photo_profil.storage.delete(previous_photo_name)
+        if profile_storage_is_configured():
+            storage_path = upload_profile_photo_to_storage(uploaded_photo, utilisateur.id_user)
+            settings_obj.photo_profil.name = storage_path
+            settings_obj.save(update_fields=["photo_profil"])
 
-        photo_url = None
-        if settings_obj.photo_profil:
-            photo_url = request.build_absolute_uri(settings_obj.photo_profil.url)
+            if previous_photo_name and previous_photo_name != storage_path:
+                try:
+                    delete_profile_photo_from_storage(previous_photo_name)
+                except Exception:
+                    pass
+        else:
+            settings_obj.photo_profil = uploaded_photo
+            settings_obj.save(update_fields=["photo_profil"])
+
+            if previous_photo_name and previous_photo_name != settings_obj.photo_profil.name:
+                settings_obj.photo_profil.storage.delete(previous_photo_name)
+
+        photo_url = get_profile_photo_url(settings_obj.photo_profil, request=request)
 
         return Response(
             {

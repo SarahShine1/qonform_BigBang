@@ -933,7 +933,42 @@ class MySettingsApiTests(APITestCase):
                 )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertIn("/media/profiles/", response.data["photo_profil"])
+        self.assertIn("profiles/", response.data["photo_profil"])
 
         settings_obj = UtilisateurSettings.objects.get(utilisateur=self.utilisateur)
         self.assertTrue(bool(settings_obj.photo_profil))
+
+    def test_login_response_contains_profile_photo_when_available(self):
+        with TemporaryDirectory() as temp_media_root:
+            with override_settings(MEDIA_ROOT=temp_media_root):
+                upload_response = self.client.post(
+                    "/api/v1/auth/me/photo/",
+                    {"photo": self._build_test_image()},
+                    format="multipart",
+                )
+                self.assertEqual(upload_response.status_code, status.HTTP_200_OK)
+
+                fresh_client = APIClient()
+                login_response = fresh_client.post(
+                    "/api/v1/auth/token/",
+                    {"email": "settings@esi.dz", "password": "settingspass123"},
+                    format="json",
+                )
+
+        self.assertEqual(login_response.status_code, status.HTTP_200_OK)
+        self.assertIn("profiles/", login_response.data["user"]["photo_profil"])
+
+    def test_me_endpoint_contains_profile_photo_when_available(self):
+        with TemporaryDirectory() as temp_media_root:
+            with override_settings(MEDIA_ROOT=temp_media_root):
+                upload_response = self.client.post(
+                    "/api/v1/auth/me/photo/",
+                    {"photo": self._build_test_image()},
+                    format="multipart",
+                )
+                self.assertEqual(upload_response.status_code, status.HTTP_200_OK)
+
+                response = self.client.get("/api/v1/auth/me/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("profiles/", response.data["photo_profil"])
