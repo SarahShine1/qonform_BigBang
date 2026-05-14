@@ -272,3 +272,146 @@ def pilote_dashboard(request):
         },
         "timeline": timeline,
     })
+
+   
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def caq_dashboard(request):
+    """
+    GET /api/v1/pilotage/caq/dashboard/
+ 
+    Renvoie toutes les métriques pour le DashboardCAQ.jsx :
+      - kpis
+      - ficheStatus
+      - processusByType
+      - tasksDistribution
+      - departmentStatus
+    """
+    with connection.cursor() as cursor:
+ 
+        # 1. Total processus
+        cursor.execute("SELECT COUNT(*) FROM processus")
+        total_processus = cursor.fetchone()[0] or 0
+        cursor.execute("SELECT type_process FROM processus")
+        all_processus_types = _dictfetchall(cursor)
+ 
+        # 2. Versions fiches actives + type processus + département
+        cursor.execute(
+            """
+            SELECT
+                vf.id_version,
+                vf.statut,
+                p.type_process,
+                d.nom AS departement_nom
+            FROM version_fiche vf
+            JOIN processus p       ON p.id_processus   = vf.id_processus
+            LEFT JOIN departement d ON d.id_departement = p.id_departement
+            WHERE vf.statut IN ('Brouillon', 'Soumise', 'En_revision', 'Publiee')
+            """
+        )
+        fiches = _dictfetchall(cursor)
+ 
+        # 3. Scores de conformité (uniquement les Publiées)
+        published_ids = [f["id_version"] for f in fiches if f["statut"] == "Publiee"]
+        conformity_by_version = _load_conformity(cursor, published_ids)
+ 
+        # 4. Tâches planifiées (toutes)
+        cursor.execute("SELECT statut FROM tache_planifiee")
+        all_tasks = _dictfetchall(cursor)
+ 
+        # 5. NC ouvertes
+        cursor.execute(
+            "SELECT COUNT(*) FROM nc WHERE date_cloture IS NULL"
+        )
+        total_nc_ouvertes = cursor.fetchone()[0] or 0
+ 
+    # ── Calculs ───────────────────────────────────────────────────────────────
+ 
+    # ficheStatus
+    fiche_counts = {"Publiee": 0, "En_revision": 0, "Soumise": 0, "Brouillon": 0}
+    for f in fiches:
+        if f["statut"] in fiche_counts:
+            fiche_counts[f["statut"]] += 1
+ 
+    total_fiches = sum(fiche_counts.values()) or 1
+    fiches_publiees_taux = round((fiche_counts["Publiee"] / total_fiches) * 100)
+ 
+    # processusByType
+    type_counts = defaultdict(int)
+    for p in all_processus_types:
+        type_counts[p.get("type_process") or "Autre"] += 1
+ 
+    processus_by_type = [
+        {"name": name, "value": count}
+        for name, count in sorted(type_counts.items())
+    ]
+ 
+    # departmentStatus
+    dept_map = defaultdict(
+        lambda: {"publiee": 0, "en_revision": 0, "soumise": 0, "brouillon": 0}
+    )
+    for f in fiches:
+        dept = f.get("departement_nom") or "Non assigné"
+        s = f["statut"]
+        if s == "Publiee":        dept_map[dept]["publiee"]     += 1
+        elif s == "En_revision":  dept_map[dept]["en_revision"] += 1
+        elif s == "Soumise":      dept_map[dept]["soumise"]     += 1
+        elif s == "Brouillon":    dept_map[dept]["brouillon"]   += 1
+ 
+    department_status = [
+        {"department": dept, **counts}
+        for dept, counts in sorted(dept_map.items())
+    ]
+ 
+    # tasksDistribution — mapping identique aux STATUT_CHOICES du modèle
+    task_dist = {"Terminée": 0, "En cours": 0, "En attente": 0, "Annulée": 0}
+    task_total = len(all_tasks)
+    task_done  = 0
+ 
+    for t in all_tasks:
+        raw = (t.get("statut") or "").strip()
+        if raw == "Terminée":
+            task_dist["Terminée"] += 1
+            task_done += 1
+        elif raw == "En cours":
+            task_dist["En cours"] += 1
+        elif raw == "Annulée":
+            task_dist["Annulée"] += 1
+        else:
+            # "Planifiée" → "En attente" dans l'UI
+            task_dist["En attente"] += 1
+ 
+    taux_avancement = round((task_done / task_total) * 100) if task_total else 0
+ 
+    tasks_distribution = [
+        {"name": name, "value": value}
+        for name, value in task_dist.items()
+    ]
+ 
+    # tauxConformiteGlobal
+    scores = list(conformity_by_version.values())
+    taux_conformite_global = round(sum(scores) / len(scores)) if scores else 0
+ 
+    # ── Réponse ───────────────────────────────────────────────────────────────
+    return Response(
+        {
+            "kpis": {
+                "totalProcessus":       total_processus,
+                "fichesPubblieeTaux":   fiches_publiees_taux,
+                "tauxAvancementTaches": taux_avancement,
+                "nonConformites":       total_nc_ouvertes,
+                "tauxConformiteGlobal": taux_conformite_global,
+            },
+            # Clés identiques au MOCK_DATA.ficheStatus du frontend
+            "ficheStatus": {
+                "Publiee":    fiche_counts["Publiee"],
+                "EnRevision": fiche_counts["En_revision"],
+                "Soumise":    fiche_counts["Soumise"],
+                "Brouillon":  fiche_counts["Brouillon"],
+            },
+            "processusByType":   processus_by_type,
+            "tasksDistribution": tasks_distribution,
+            "departmentStatus":  department_status,
+        }
+    )
+ 
