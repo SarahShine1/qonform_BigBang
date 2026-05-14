@@ -4,6 +4,8 @@ import os
 import re
 import uuid
 
+from django.conf import settings
+from django.core.mail import send_mail
 import requests
 from django.conf import settings
 from django.db import connection
@@ -91,6 +93,36 @@ def get_auth_user_for_utilisateur(utilisateur):
     return User.objects.filter(email__iexact=email).first()
 
 
+def send_user_invitation_email(utilisateur, temporary_password):
+    """
+    Send the initial account credentials to a newly created user.
+
+    The message intentionally avoids localhost links because Qonform is not
+    deployed yet and local URLs would only work on the developer machine.
+    """
+
+    prenom = str(getattr(utilisateur, "prenom", "") or "").strip() or "Utilisateur"
+    email = str(getattr(utilisateur, "email", "") or "").strip()
+
+    subject = "Votre compte Qonform a été créé"
+    body = (
+        f"Bonjour {prenom},\n\n"
+        "Votre compte Qonform a été créé.\n\n"
+        f"Email : {email}\n"
+        f"Mot de passe temporaire : {temporary_password}\n\n"
+        "Veuillez vous connecter à la plateforme Qonform lorsque l’accès "
+        "vous sera communiqué, puis changer votre mot de passe.\n\n"
+        "Cordialement,\n"
+        "L’équipe Qonform"
+    )
+
+    send_mail(
+        subject=subject,
+        message=body,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[email],
+        fail_silently=False,
+    )
 def _profile_bucket():
     return (
         getattr(settings, "SUPABASE_PROFILE_BUCKET", "")

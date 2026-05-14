@@ -1,3 +1,6 @@
+import logging
+import socket
+
 from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
@@ -32,6 +35,13 @@ from .utils import (
     profile_storage_is_configured,
     upload_profile_photo_to_storage,
 )
+from .utils import (
+    get_active_role_labels_for_user,
+    get_auth_user_for_utilisateur,
+    send_user_invitation_email,
+)
+
+logger = logging.getLogger(__name__)
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
@@ -137,14 +147,44 @@ class ManagedUserListCreateView(APIView):
 
         return Response(ManagedUserSerializer(users, many=True).data)
 
-    @transaction.atomic
     def post(self, request):
         serializer = ManagedUserWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         utilisateur = serializer.save()
 
+        if getattr(serializer, "send_invitation_requested", False):
+            try:
+                send_user_invitation_email(
+                    utilisateur,
+                    serializer.temporary_password,
+                )
+            except Exception as exc:
+                logger.exception(
+                    "Invitation email failed after user creation for %s",
+                    utilisateur.email,
+                )
+                detail = "Utilisateur créé, mais l’email n’a pas pu être envoyé."
+                if isinstance(exc, (TimeoutError, socket.timeout)):
+                    detail = (
+                        "Utilisateur créé, mais l’email n’a pas pu être envoyé. "
+                        "Impossible de joindre le serveur SMTP."
+                    )
+                # Keep the created user to avoid duplicate creation on retry.
+                return Response(
+                    {
+                        "detail": detail,
+                        "email_sent": False,
+                        "user": ManagedUserSerializer(utilisateur).data,
+                    },
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+
         return Response(
-            ManagedUserSerializer(utilisateur).data,
+            {
+                **ManagedUserSerializer(utilisateur).data,
+                "detail": "Utilisateur créé avec succès.",
+                "email_sent": getattr(serializer, "send_invitation_requested", False),
+            },
             status=status.HTTP_201_CREATED,
         )
 

@@ -3,6 +3,7 @@ from copy import deepcopy
 from django.contrib.auth.password_validation import validate_password
 from django.core.validators import FileExtensionValidator
 from rest_framework import serializers
+from django.db import transaction
 from rest_framework_simplejwt.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
@@ -193,6 +194,11 @@ class ManagedUserWriteSerializer(serializers.Serializer):
 
     est_actif = serializers.BooleanField(required=False)
     departement = serializers.IntegerField(required=False, allow_null=True)
+    send_invitation = serializers.BooleanField(
+        required=False,
+        default=False,
+        write_only=True,
+    )
 
     roles = serializers.ListField(
         child=serializers.CharField(),
@@ -277,35 +283,41 @@ class ManagedUserWriteSerializer(serializers.Serializer):
     def create(self, validated_data):
         roles = validated_data.pop("roles", [])
         validated_data.pop("full_name", None)
+        send_invitation = validated_data.pop("send_invitation", False)
 
         email = validated_data["email"]
-        password = validated_data.pop("password")
+        temporary_password = validated_data.pop("password")
         est_actif = validated_data.pop("est_actif", True)
         departement = validated_data.pop("departement", None)
 
-        auth_user = User.objects.create_user(
-            username=email,
-            email=email,
-            password=password,
-            is_active=est_actif,
-        )
+        with transaction.atomic():
+            auth_user = User.objects.create_user(
+                username=email,
+                email=email,
+                password=temporary_password,
+                is_active=est_actif,
+            )
 
-        utilisateur = Utilisateur.objects.create(
-            auth=auth_user,
-            nom=validated_data["nom"],
-            prenom=validated_data["prenom"],
-            email=email,
-            est_actif=est_actif,
-            id_departement=departement,
-        )
+            utilisateur = Utilisateur.objects.create(
+                auth=auth_user,
+                nom=validated_data["nom"],
+                prenom=validated_data["prenom"],
+                email=email,
+                est_actif=est_actif,
+                id_departement=departement,
+            )
 
-        sync_roles_for_user(utilisateur.id_user, roles)
+            sync_roles_for_user(utilisateur.id_user, roles)
+
+        self.send_invitation_requested = send_invitation
+        self.temporary_password = temporary_password
 
         return utilisateur
 
     def update(self, instance, validated_data):
         roles = validated_data.pop("roles", None)
         validated_data.pop("full_name", None)
+        validated_data.pop("send_invitation", None)
         password = validated_data.pop("password", None)
 
         auth_user = get_auth_user_for_utilisateur(instance)
