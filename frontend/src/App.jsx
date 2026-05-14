@@ -24,6 +24,7 @@ import ChefTachesPage from "./pages/tache/ChefTachesPage";
 import DossierProcessusPage from "./pages/processus/DossierProcessusPage";
 import PreAuditPage from "./pages/audit/PreAuditPage";
 import DashboardPilote from "./pages/pilotage/DashboardPilote";
+import DashboardCAQ from "./pages/caq/DashboardCAQ";
 import PVPage from "./pages/pv/PVPage";
 
 
@@ -41,11 +42,7 @@ export default function App() {
             <Route
               path="/dashboard"
               element={
-                <ModulePlaceholderPage
-                  pageTitle="Tableau de bord"
-                  title="Tableau de bord"
-                  description="Cette section servira de vue de pilotage et pourra etre reliee a des donnees reelles plus tard."
-                />
+               <DashboardCAQ />
               }
             />
 
@@ -100,6 +97,7 @@ export default function App() {
               path="/dashboard-auditeur"
               element={<DashboardAuditeur />}
             />
+            <Route path="/dashboard" element={<DashboardCAQ />} />
             <Route path="/planification" element={<ChefTachesPage />} />
 
 
