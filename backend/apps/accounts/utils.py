@@ -145,6 +145,11 @@ def upload_profile_photo_to_storage(file_obj, utilisateur_id: int) -> str:
     return storage_path
 
 
+def _looks_like_shared_profile_path(stored_name: str) -> bool:
+    normalized = str(stored_name or "").replace("\\", "/").strip().lstrip("/")
+    return bool(re.match(r"^profiles/\d+/.+", normalized))
+
+
 def get_profile_photo_url(photo_field, request=None, expires_in: int = 3600):
     if not photo_field:
         return None
@@ -167,19 +172,24 @@ def get_profile_photo_url(photo_field, request=None, expires_in: int = 3600):
         if local_url:
             return request.build_absolute_uri(local_url) if request else local_url
 
-    if profile_storage_is_configured():
-        sign_url = (
-            f"{settings.SUPABASE_URL}/storage/v1/object/sign/"
-            f"{_profile_bucket()}/{stored_name}"
-        )
-        response = requests.post(
-            sign_url,
-            json={"expiresIn": expires_in},
-            headers=_storage_headers(),
-        )
-        response.raise_for_status()
-        signed = response.json().get("signedURL", "")
-        return f"{settings.SUPABASE_URL}/storage/v1{signed}" if signed else None
+    if profile_storage_is_configured() and _looks_like_shared_profile_path(stored_name):
+        try:
+            sign_url = (
+                f"{settings.SUPABASE_URL}/storage/v1/object/sign/"
+                f"{_profile_bucket()}/{stored_name}"
+            )
+            response = requests.post(
+                sign_url,
+                json={"expiresIn": expires_in},
+                headers=_storage_headers(),
+                timeout=10,
+            )
+            response.raise_for_status()
+            signed = response.json().get("signedURL", "")
+            if signed:
+                return f"{settings.SUPABASE_URL}/storage/v1{signed}"
+        except requests.RequestException:
+            pass
 
     try:
         fallback_url = photo_field.url
