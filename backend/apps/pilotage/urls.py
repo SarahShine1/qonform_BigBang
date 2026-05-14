@@ -5,4 +5,5 @@ urlpatterns = [
     path("dashboard/", views.pilote_dashboard, name="pilote-dashboard"),
     path("dashboard-dg/", views.dg_dashboard, name="dg-dashboard"),
 
+    path("caq/dashboard/", views.caq_dashboard, name="caq-dashboard"),
 ]

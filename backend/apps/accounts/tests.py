@@ -11,7 +11,11 @@ The unmanaged models (Utilisateur, Role, UserRole) are made managed in
 conftest.py so their tables are created in the SQLite test database.
 """
 from datetime import date, timedelta
+from unittest.mock import patch
+from io import BytesIO
+from tempfile import TemporaryDirectory
 
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.db import connection
 from rest_framework.test import APIClient, APITestCase
@@ -19,8 +23,9 @@ from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from PIL import Image
 
-from apps.accounts.models import User, Utilisateur, Role, UserRole
+from apps.accounts.models import Departement, Role, User, UserRole, Utilisateur, UtilisateurSettings
 from apps.accounts.permissions import HasRole
 
 
@@ -726,6 +731,7 @@ class ExpiredRoleExclusionTests(APITestCase):
 class ManagedUsersApiTests(APITestCase):
     @classmethod
     def setUpTestData(cls):
+        Departement.objects.create(id_departement=3, nom="Qualite", code="QLT")
         cls.admin_user, cls.admin_utilisateur = make_user(
             username="manager_user",
             email="manager@esi.dz",
@@ -748,6 +754,18 @@ class ManagedUsersApiTests(APITestCase):
 
     def setUp(self):
         self.client = APIClient()
+
+    def build_create_payload(self, **overrides):
+        payload = {
+            "full_name": "Rima Bouali",
+            "email": "rima@esi.dz",
+            "password": "securepass123",
+            "est_actif": True,
+            "roles": ["Auditeur interne"],
+            "send_invitation": False,
+        }
+        payload.update(overrides)
+        return payload
 
     def authenticate(self):
         response = self.client.post(
@@ -774,22 +792,58 @@ class ManagedUsersApiTests(APITestCase):
         target = next(item for item in response.data if item["email"] == "target@esi.dz")
         self.assertIn("Pilote", target["roles"])
 
-    def test_create_user_endpoint_creates_auth_profile_and_roles(self):
+    @patch("apps.accounts.views.send_user_invitation_email")
+    def test_create_user_endpoint_creates_auth_profile_and_roles(self, send_email_mock):
         self.authenticate()
-        payload = {
-            "full_name": "Rima Bouali",
-            "email": "rima@esi.dz",
-            "password": "securepass123",
-            "departement": 3,
-            "est_actif": True,
-            "roles": ["Auditeur interne"],
-        }
+        payload = self.build_create_payload()
         response = self.client.post("/api/v1/auth/users/", payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data["email"], "rima@esi.dz")
         self.assertIn("Auditeur interne", response.data["roles"])
+        self.assertFalse(response.data["email_sent"])
+        self.assertNotIn("password", response.data)
         self.assertTrue(User.objects.filter(email="rima@esi.dz").exists())
         self.assertTrue(Utilisateur.objects.filter(email="rima@esi.dz").exists())
+        send_email_mock.assert_not_called()
+
+    @patch("apps.accounts.views.send_user_invitation_email")
+    def test_create_user_endpoint_sends_invitation_email_when_requested(self, send_email_mock):
+        self.authenticate()
+        payload = self.build_create_payload(
+            email="invitation@esi.dz",
+            send_invitation=True,
+        )
+        response = self.client.post("/api/v1/auth/users/", payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(response.data["email_sent"])
+        self.assertNotIn("password", response.data)
+        send_email_mock.assert_called_once()
+
+        utilisateur_arg, password_arg = send_email_mock.call_args.args
+        self.assertEqual(utilisateur_arg.email, "invitation@esi.dz")
+        self.assertEqual(password_arg, "securepass123")
+
+    @patch(
+        "apps.accounts.views.send_user_invitation_email",
+        side_effect=Exception("SMTP failure"),
+    )
+    def test_create_user_endpoint_returns_clear_error_when_email_fails(self, _send_email_mock):
+        self.authenticate()
+        payload = self.build_create_payload(
+            email="smtp-error@esi.dz",
+            send_invitation=True,
+        )
+        response = self.client.post("/api/v1/auth/users/", payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_500_INTERNAL_SERVER_ERROR)
+        self.assertFalse(response.data["email_sent"])
+        self.assertIn("detail", response.data)
+        self.assertIn("user", response.data)
+        self.assertEqual(response.data["user"]["email"], "smtp-error@esi.dz")
+        self.assertNotIn("password", response.data["user"])
+        self.assertTrue(User.objects.filter(email="smtp-error@esi.dz").exists())
+        self.assertTrue(Utilisateur.objects.filter(email="smtp-error@esi.dz").exists())
 
     def test_patch_user_updates_roles_and_status(self):
         self.authenticate()
@@ -812,3 +866,158 @@ class ManagedUsersApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.target_utilisateur.refresh_from_db()
         self.assertFalse(self.target_utilisateur.est_actif)
+
+
+class MySettingsApiTests(APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user, cls.utilisateur = make_user(
+            username="settings_user",
+            email="settings@esi.dz",
+            password="settingspass123",
+            nom="Saadi",
+            prenom="Lina",
+            est_actif=True,
+            roles=["Auditeur"],
+        )
+
+    def setUp(self):
+        self.client = APIClient()
+        response = self.client.post(
+            "/api/v1/auth/token/",
+            {"email": "settings@esi.dz", "password": "settingspass123"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {response.data['access']}")
+
+    def _build_test_image(self, name="avatar.png", image_format="PNG"):
+        file_obj = BytesIO()
+        image = Image.new("RGB", (16, 16), color="#6B21D9")
+        image.save(file_obj, format=image_format)
+        file_obj.seek(0)
+        return SimpleUploadedFile(
+            name,
+            file_obj.getvalue(),
+            content_type="image/png" if image_format == "PNG" else "image/jpeg",
+        )
+
+    def test_get_my_settings_returns_defaults(self):
+        response = self.client.get("/api/v1/auth/me/settings/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["email"], "settings@esi.dz")
+        self.assertEqual(response.data["nom"], "Saadi")
+        self.assertEqual(response.data["prenom"], "Lina")
+        self.assertEqual(response.data["preferences"]["theme"], "light")
+        self.assertTrue(response.data["preferences"]["notifications"]["messagerie"])
+
+    def test_patch_my_settings_updates_profile_names_only(self):
+        response = self.client.patch(
+            "/api/v1/auth/me/settings/",
+            {"nom": "Haddad", "prenom": "Maya", "email": "blocked@esi.dz"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.utilisateur.refresh_from_db()
+        self.user.refresh_from_db()
+        self.assertEqual(self.utilisateur.nom, "Haddad")
+        self.assertEqual(self.utilisateur.prenom, "Maya")
+        self.assertEqual(self.utilisateur.email, "settings@esi.dz")
+        self.assertEqual(self.user.email, "settings@esi.dz")
+
+    def test_patch_preferences_persists_values(self):
+        payload = {
+            "theme": "dark",
+            "density": "normal",
+            "notifications": {
+                "messagerie": False,
+                "audits": True,
+                "taches": False,
+                "documents": True,
+            },
+        }
+        response = self.client.patch("/api/v1/auth/me/preferences/", payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        settings_obj = UtilisateurSettings.objects.get(utilisateur=self.utilisateur)
+        self.assertEqual(settings_obj.preferences["theme"], "dark")
+        self.assertEqual(settings_obj.preferences["density"], "normal")
+        self.assertFalse(settings_obj.preferences["notifications"]["messagerie"])
+        self.assertFalse(settings_obj.preferences["notifications"]["taches"])
+
+    def test_change_password_rejects_wrong_current_password(self):
+        response = self.client.post(
+            "/api/v1/auth/me/change-password/",
+            {
+                "current_password": "wrongpass",
+                "new_password": "newsecurepass123",
+                "confirm_password": "newsecurepass123",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("current_password", response.data)
+
+    def test_change_password_accepts_valid_payload(self):
+        response = self.client.post(
+            "/api/v1/auth/me/change-password/",
+            {
+                "current_password": "settingspass123",
+                "new_password": "newsecurepass123",
+                "confirm_password": "newsecurepass123",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password("newsecurepass123"))
+
+    def test_upload_profile_photo_updates_photo_url(self):
+        with TemporaryDirectory() as temp_media_root:
+            with override_settings(MEDIA_ROOT=temp_media_root):
+                response = self.client.post(
+                    "/api/v1/auth/me/photo/",
+                    {"photo": self._build_test_image()},
+                    format="multipart",
+                )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("profiles/", response.data["photo_profil"])
+
+        settings_obj = UtilisateurSettings.objects.get(utilisateur=self.utilisateur)
+        self.assertTrue(bool(settings_obj.photo_profil))
+
+    def test_login_response_contains_profile_photo_when_available(self):
+        with TemporaryDirectory() as temp_media_root:
+            with override_settings(MEDIA_ROOT=temp_media_root):
+                upload_response = self.client.post(
+                    "/api/v1/auth/me/photo/",
+                    {"photo": self._build_test_image()},
+                    format="multipart",
+                )
+                self.assertEqual(upload_response.status_code, status.HTTP_200_OK)
+
+                fresh_client = APIClient()
+                login_response = fresh_client.post(
+                    "/api/v1/auth/token/",
+                    {"email": "settings@esi.dz", "password": "settingspass123"},
+                    format="json",
+                )
+
+        self.assertEqual(login_response.status_code, status.HTTP_200_OK)
+        self.assertIn("profiles/", login_response.data["user"]["photo_profil"])
+
+    def test_me_endpoint_contains_profile_photo_when_available(self):
+        with TemporaryDirectory() as temp_media_root:
+            with override_settings(MEDIA_ROOT=temp_media_root):
+                upload_response = self.client.post(
+                    "/api/v1/auth/me/photo/",
+                    {"photo": self._build_test_image()},
+                    format="multipart",
+                )
+                self.assertEqual(upload_response.status_code, status.HTTP_200_OK)
+
+                response = self.client.get("/api/v1/auth/me/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("profiles/", response.data["photo_profil"])

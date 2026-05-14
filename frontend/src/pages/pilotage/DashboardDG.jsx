@@ -106,18 +106,18 @@ function CartographieQualite({ data }) {
   );
 }
 
-function MaturiteGlobale() {
-  return (
+function MaturiteGlobale({ value = "0/5", score = 0 }) {
+    return (
     <div className="h-[235px] rounded-2xl border border-violet-100 bg-white p-4 shadow-sm">
       <div className="mb-2 flex justify-between">
         <h2 className="text-[15px] font-bold text-slate-900">Maturité globale</h2>
-        <span className="rounded-lg bg-orange-50 px-2 py-1 text-[11px] font-bold text-orange-500">Niveau 3/5</span>
+        <span className="rounded-lg bg-orange-50 px-2 py-1 text-[11px] font-bold text-orange-500">Niveau {value}</span>
       </div>
 
       <div className="flex justify-center">
-        <div className="flex h-[135px] w-[135px] items-center justify-center rounded-full" style={{ background: "conic-gradient(#fb923c 0deg 210deg, #eee7ff 210deg 360deg)" }}>
+        <div className="flex h-[135px] w-[135px] items-center justify-center rounded-full" style={{ background: `conic-gradient(#fb923c 0deg ${Number(score || 0) * 3.6}deg, #eee7ff ${Number(score || 0) * 3.6}deg 360deg)` }}>
           <div className="flex h-[82px] w-[82px] flex-col items-center justify-center rounded-full bg-white">
-            <span className="text-[26px] font-bold text-orange-500">3/5</span>
+            <span className="text-[26px] font-bold text-orange-500">{value}</span>
             <span className="text-[11px] text-slate-500">maturité</span>
           </div>
         </div>
@@ -174,7 +174,7 @@ export default function DashboardDG() {
 
   return (
     <AppLayout pageTitle="Dashboard Direction Générale" userName={userName} userRole={userRole} contentClassName="bg-[#f8fafc] overflow-hidden">
-      <div className="h-full overflow-hidden px-5 py-3">
+      <div className="h-full overflow-hidden px-5 ">
         <div className="mb-3">
           <h1 className="text-[22px] font-bold text-slate-900">Tableau de bord Direction Générale</h1>
           <p className="text-[13px] text-slate-500">Vue exécutive de suivi du projet qualité.</p>
