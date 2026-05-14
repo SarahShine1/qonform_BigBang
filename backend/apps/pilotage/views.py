@@ -89,6 +89,7 @@ def pilote_dashboard(request):
     }
 
     with connection.cursor() as cursor:
+        # First try processus explicitly assigned to this pilote
         cursor.execute(
             """
             SELECT p.id_processus, p.code_process, p.nom AS processus_nom, p.type_process
@@ -99,6 +100,17 @@ def pilote_dashboard(request):
             [user_id],
         )
         processus_list = _dictfetchall(cursor)
+
+        # If none are assigned yet, show all processus (id_pilote assignment not implemented)
+        if not processus_list:
+            cursor.execute(
+                """
+                SELECT p.id_processus, p.code_process, p.nom AS processus_nom, p.type_process
+                FROM processus p
+                ORDER BY p.nom
+                """
+            )
+            processus_list = _dictfetchall(cursor)
 
         if not processus_list:
             return Response(empty)
