@@ -11,6 +11,7 @@ The unmanaged models (Utilisateur, Role, UserRole) are made managed in
 conftest.py so their tables are created in the SQLite test database.
 """
 from datetime import date, timedelta
+from unittest.mock import patch
 
 from django.test import TestCase, override_settings
 from django.db import connection
@@ -749,6 +750,18 @@ class ManagedUsersApiTests(APITestCase):
     def setUp(self):
         self.client = APIClient()
 
+    def build_create_payload(self, **overrides):
+        payload = {
+            "full_name": "Rima Bouali",
+            "email": "rima@esi.dz",
+            "password": "securepass123",
+            "est_actif": True,
+            "roles": ["Auditeur interne"],
+            "send_invitation": False,
+        }
+        payload.update(overrides)
+        return payload
+
     def authenticate(self):
         response = self.client.post(
             "/api/v1/auth/token/",
@@ -774,22 +787,58 @@ class ManagedUsersApiTests(APITestCase):
         target = next(item for item in response.data if item["email"] == "target@esi.dz")
         self.assertIn("Pilote", target["roles"])
 
-    def test_create_user_endpoint_creates_auth_profile_and_roles(self):
+    @patch("apps.accounts.views.send_user_invitation_email")
+    def test_create_user_endpoint_creates_auth_profile_and_roles(self, send_email_mock):
         self.authenticate()
-        payload = {
-            "full_name": "Rima Bouali",
-            "email": "rima@esi.dz",
-            "password": "securepass123",
-            "departement": 3,
-            "est_actif": True,
-            "roles": ["Auditeur interne"],
-        }
+        payload = self.build_create_payload()
         response = self.client.post("/api/v1/auth/users/", payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data["email"], "rima@esi.dz")
         self.assertIn("Auditeur interne", response.data["roles"])
+        self.assertFalse(response.data["email_sent"])
+        self.assertNotIn("password", response.data)
         self.assertTrue(User.objects.filter(email="rima@esi.dz").exists())
         self.assertTrue(Utilisateur.objects.filter(email="rima@esi.dz").exists())
+        send_email_mock.assert_not_called()
+
+    @patch("apps.accounts.views.send_user_invitation_email")
+    def test_create_user_endpoint_sends_invitation_email_when_requested(self, send_email_mock):
+        self.authenticate()
+        payload = self.build_create_payload(
+            email="invitation@esi.dz",
+            send_invitation=True,
+        )
+        response = self.client.post("/api/v1/auth/users/", payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(response.data["email_sent"])
+        self.assertNotIn("password", response.data)
+        send_email_mock.assert_called_once()
+
+        utilisateur_arg, password_arg = send_email_mock.call_args.args
+        self.assertEqual(utilisateur_arg.email, "invitation@esi.dz")
+        self.assertEqual(password_arg, "securepass123")
+
+    @patch(
+        "apps.accounts.views.send_user_invitation_email",
+        side_effect=Exception("SMTP failure"),
+    )
+    def test_create_user_endpoint_returns_clear_error_when_email_fails(self, _send_email_mock):
+        self.authenticate()
+        payload = self.build_create_payload(
+            email="smtp-error@esi.dz",
+            send_invitation=True,
+        )
+        response = self.client.post("/api/v1/auth/users/", payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_500_INTERNAL_SERVER_ERROR)
+        self.assertFalse(response.data["email_sent"])
+        self.assertIn("detail", response.data)
+        self.assertIn("user", response.data)
+        self.assertEqual(response.data["user"]["email"], "smtp-error@esi.dz")
+        self.assertNotIn("password", response.data["user"])
+        self.assertTrue(User.objects.filter(email="smtp-error@esi.dz").exists())
+        self.assertTrue(Utilisateur.objects.filter(email="smtp-error@esi.dz").exists())
 
     def test_patch_user_updates_roles_and_status(self):
         self.authenticate()

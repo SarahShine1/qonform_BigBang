@@ -144,6 +144,26 @@ SUPABASE_URL              = config('SUPABASE_URL', default='')
 SUPABASE_SERVICE_ROLE_KEY = config('SUPABASE_SERVICE_ROLE_KEY', default='')
 SUPABASE_STORAGE_BUCKET   = config('SUPABASE_STORAGE_BUCKET', default='fiche-documents')
 
+# Email
+EMAIL_BACKEND = config(
+    'EMAIL_BACKEND',
+    default='django.core.mail.backends.console.EmailBackend',
+)
+EMAIL_HOST = config('EMAIL_HOST', default='')
+EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
+EMAIL_TIMEOUT = config('EMAIL_TIMEOUT', default=20, cast=int)
+EMAIL_USE_TLS = config(
+    'EMAIL_USE_TLS',
+    default=True,
+    cast=lambda value: str(value).strip().lower() in ('1', 'true', 'yes', 'on'),
+)
+EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
+EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
+DEFAULT_FROM_EMAIL = config(
+    'DEFAULT_FROM_EMAIL',
+    default='Qonform <no-reply@qonform.local>',
+)
+
 # Accept files up to 25 MB in Django (client-side limit is 20 MB)
 DATA_UPLOAD_MAX_MEMORY_SIZE = 25 * 1024 * 1024
 FILE_UPLOAD_MAX_MEMORY_SIZE = 25 * 1024 * 1024

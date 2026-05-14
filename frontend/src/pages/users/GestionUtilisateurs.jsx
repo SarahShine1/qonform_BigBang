@@ -252,6 +252,7 @@ export default function GestionUtilisateurs() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [createError, setCreateError] = useState("");
+  const [createNotice, setCreateNotice] = useState("");
 
   const userName =
     `${user?.prenom || ""} ${user?.nom || ""}`.trim() ||
@@ -316,6 +317,7 @@ export default function GestionUtilisateurs() {
   const handleCreateUser = async (payload) => {
     setSubmitting(true);
     setCreateError("");
+    setCreateNotice("");
 
     try {
       const createdUser = await usersApi.createUser(payload);
@@ -327,10 +329,38 @@ export default function GestionUtilisateurs() {
       ]);
 
       setModalOpen(false);
+      setCreateNotice(
+        createdUser.email_sent
+          ? ""
+          : "Utilisateur créé avec succès, sans envoi d’email.",
+      );
 
       const freshStats = await usersApi.getStats();
       setStats({ ...defaultStats, ...freshStats });
     } catch (createRequestError) {
+      const partialUser = createRequestError?.response?.data?.user;
+
+      if (partialUser) {
+        const departmentLookup = buildDepartmentLookup(departments);
+
+        setUsers((current) => [
+          normalizeUser(partialUser, departmentLookup),
+          ...current,
+        ]);
+        setModalOpen(false);
+        setCreateError("");
+        setCreateNotice(apiErrorMessage(createRequestError));
+
+        try {
+          const freshStats = await usersApi.getStats();
+          setStats({ ...defaultStats, ...freshStats });
+        } catch (statsError) {
+          console.error("Impossible de rafraichir les statistiques:", statsError);
+        }
+
+        return;
+      }
+
       setCreateError(apiErrorMessage(createRequestError));
     } finally {
       setSubmitting(false);
@@ -437,6 +467,12 @@ export default function GestionUtilisateurs() {
           {error ? (
             <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-600 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300">
               {error}
+            </div>
+          ) : null}
+
+          {createNotice ? (
+            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
+              {createNotice}
             </div>
           ) : null}
 
