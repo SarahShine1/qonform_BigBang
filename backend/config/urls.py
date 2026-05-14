@@ -33,12 +33,21 @@ urlpatterns = [
     path('api/v1/documents/',  include('apps.documents.urls')),
     path('api/v1/pilotage/',   include('apps.pilotage.urls')),
     path('api/v1/diagnostic/', include('apps.diagnostic.urls')),
+    path('api/v1/maturity/',   include('apps.maturity.urls')),
+
+
     path('api/v1/taches/',     include('apps.taches.urls')),
+    path('api/v1/pv/',         include('apps.pv.urls')),
+
+
 ]
+
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 
 if settings.DEBUG and 'debug_toolbar' in settings.INSTALLED_APPS:
     import debug_toolbar
     urlpatterns = [path('__debug__/', include(debug_toolbar.urls))] + urlpatterns
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 

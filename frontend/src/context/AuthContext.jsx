@@ -119,6 +119,21 @@ export function AuthProvider({ children }) {
     _logout();
   }, [_logout]);
 
+  const updateUser = useCallback((nextUserData) => {
+    setUser((currentUser) => {
+      const resolvedUser =
+        typeof nextUserData === "function"
+          ? nextUserData(currentUser)
+          : { ...(currentUser || {}), ...(nextUserData || {}) };
+
+      if (resolvedUser) {
+        localStorage.setItem("user", JSON.stringify(resolvedUser));
+      }
+
+      return resolvedUser;
+    });
+  }, []);
+
   // ── Mount: hydrate from localStorage ─────────────────────────────────────
   useEffect(() => {
     const { access, user: storedUser } = readAuthFromStorage();
@@ -154,7 +169,7 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, isAuthenticated, login, logout, loading }}
+      value={{ user, isAuthenticated, login, logout, loading, updateUser }}
     >
       {children}
     </AuthContext.Provider>

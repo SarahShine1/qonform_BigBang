@@ -4,6 +4,11 @@ import './index.css'
 import App from './App.jsx'
 import { ThemeProvider } from './context/ThemeContext.jsx'
 
+const storedDensity = window.localStorage.getItem("qonforme-density");
+if (storedDensity === "compact" || storedDensity === "normal") {
+  document.documentElement.setAttribute("data-density", storedDensity);
+}
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <ThemeProvider>

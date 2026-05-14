@@ -46,7 +46,12 @@ LOCAL_APPS = [
     'apps.documents',
     'apps.pilotage',
     'apps.diagnostic',
+    'apps.maturity',
+
     'apps.taches',
+    'apps.pv',
+
+
     'core',
 ]
 
@@ -143,6 +148,7 @@ MEDIA_ROOT  = BASE_DIR / 'media'
 SUPABASE_URL              = config('SUPABASE_URL', default='')
 SUPABASE_SERVICE_ROLE_KEY = config('SUPABASE_SERVICE_ROLE_KEY', default='')
 SUPABASE_STORAGE_BUCKET   = config('SUPABASE_STORAGE_BUCKET', default='fiche-documents')
+SUPABASE_PROFILE_BUCKET   = config('SUPABASE_PROFILE_BUCKET', default=SUPABASE_STORAGE_BUCKET)
 
 # Email
 EMAIL_BACKEND = config(

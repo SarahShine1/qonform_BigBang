@@ -14,14 +14,20 @@ import MaturityPage from "./pages/maturity/MaturityPage";
 import ModulePlaceholderPage from "./pages/shared/ModulePlaceholderPage";
 import FicheProcessusForm from "./pages/fiche_form/FicheProcessusForm";
 import ProcessusPage from "./pages/processus/ProcessusPage";
-import ChefTachesPage from "./pages/tache/ChefTachesPage";
 import CanevasFichePage from "./pages/canevas/CanevasFichePage";
 import NormeTemplatePage from "./pages/canevas/NormeTemplatePage";
 import InteractionMapPage from "./pages/cartographie/InteractionMapPage";
 import AuditTerrainPage from "./pages/audit/AuditTerrainPage";
+import DashboardAuditeur from "./pages/audit/DashboardAuditeur";
 import DocumentationPage from "./pages/Documentationpage";
+import ChefTachesPage from "./pages/tache/ChefTachesPage";
 import DossierProcessusPage from "./pages/processus/DossierProcessusPage";
 import PreAuditPage from "./pages/audit/PreAuditPage";
+import DashboardPilote from "./pages/pilotage/DashboardPilote";
+import DashboardCAQ from "./pages/caq/DashboardCAQ";
+import PVPage from "./pages/pv/PVPage";
+import ParametresPage from "./pages/settings/ParametresPage";
+
 
 export default function App() {
   return (
@@ -37,11 +43,7 @@ export default function App() {
             <Route
               path="/dashboard"
               element={
-                <ModulePlaceholderPage
-                  pageTitle="Tableau de bord"
-                  title="Tableau de bord"
-                  description="Cette section servira de vue de pilotage et pourra etre reliee a des donnees reelles plus tard."
-                />
+               <DashboardCAQ />
               }
             />
 
@@ -83,10 +85,7 @@ export default function App() {
                 element={<InteractionMapPage />}
               />
             </Route>
-            <Route
-              path="/suivi"
-              element={<ModulePlaceholderPage title="Suivi" />}
-            />
+            <Route path="/suivi" element={<PVPage />} />
             <Route path="/audit/preaudit" element={<PreAuditPage />} />
             <Route path="/audit/pre-audit" element={<PreAuditPage />} />
             <Route path="/audit/mes-audits" element={<MesAudits />} />
@@ -94,15 +93,14 @@ export default function App() {
               path="/audit/audits-terrain"
               element={<AuditTerrainPage />}
             />
-            <Route
-              path="/dashboard-pilote"
-              element={<ModulePlaceholderPage title="Dashboard Pilote" />}
-            />
+            <Route path="/dashboard-pilote" element={<DashboardPilote />} />
             <Route
               path="/dashboard-auditeur"
-              element={<ModulePlaceholderPage title="Dashboard Auditeur" />}
+              element={<DashboardAuditeur />}
             />
+            <Route path="/dashboard" element={<DashboardCAQ />} />
             <Route path="/planification" element={<ChefTachesPage />} />
+
 
             <Route path="/audits" element={<MesAudits />} />
             <Route path="/mes-audits" element={<MesAudits />} />
@@ -137,16 +135,7 @@ export default function App() {
 
             <Route path="/niveau-maturite" element={<MaturityPage />} />
 
-            <Route
-              path="/parametres"
-              element={
-                <ModulePlaceholderPage
-                  pageTitle="Parametres"
-                  title="Parametres"
-                  description="Les parametres de la plateforme pourront etre completes ici sans changer la navigation actuelle."
-                />
-              }
-            />
+            <Route path="/parametres" element={<ParametresPage />} />
           </Route>
 
           <Route
