@@ -260,3 +260,108 @@ def pilote_dashboard(request):
         },
         "timeline": timeline,
     })
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def dg_dashboard(request):
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT COUNT(*) AS total FROM processus")
+        total_processus = cursor.fetchone()[0]
+
+        cursor.execute("""
+            SELECT COUNT(DISTINCT id_processus) AS total
+            FROM version_fiche
+            WHERE statut = 'Publiee'
+        """)
+        processus_publies = cursor.fetchone()[0]
+
+        cursor.execute("""
+            SELECT COUNT(*) AS total
+            FROM audit_terrain
+            WHERE date_realisation IS NOT NULL
+        """)
+        audits_clotures = cursor.fetchone()[0]
+        cursor.execute("""
+            SELECT COUNT(*) 
+            FROM processus_liaison
+        """)
+        interactions_definies = cursor.fetchone()[0]
+
+
+        cursor.execute("""
+            SELECT COUNT(*) AS total
+            FROM version_fiche
+            WHERE statut = 'Publiee'
+        """)
+
+        
+        audits_total = cursor.fetchone()[0]
+
+        cursor.execute("""
+            SELECT id_version
+            FROM version_fiche
+            WHERE statut = 'Publiee'
+        """)
+        cursor.execute("""
+            SELECT COUNT(*)
+            FROM version_fiche
+            WHERE statut = 'En révision'
+        """)
+
+        en_revision = cursor.fetchone()[0]
+        
+        version_ids = [row[0] for row in cursor.fetchall()]
+
+        conformity_by_version = _load_conformity(cursor, version_ids)
+        scores = list(conformity_by_version.values())
+        taux_conformite = round(sum(scores) / len(scores)) if scores else 0
+
+    processus_publies_taux = round((processus_publies / total_processus) * 100) if total_processus else 0
+    audits_clotures_taux = round((audits_clotures / audits_total) * 100) if audits_total else 0
+
+    maturite_score = 60
+
+    avancement_global = round(
+        (processus_publies_taux * 0.30)
+        + (taux_conformite * 0.35)
+        + (audits_clotures_taux * 0.20)
+        + (maturite_score * 0.15)
+    )
+
+    return Response({
+        "taux_processus_publies": round((processus_publies / total_processus) * 100) if total_processus else 0,
+        "processus_en_revision": en_revision,
+        "taux_processus_revision": round((en_revision / total_processus) * 100) if total_processus else 0,
+        "interactions_definies": interactions_definies,
+        "taux_interactions": round((interactions_definies / total_processus) * 100) if total_processus else 0,
+        "avancement_global": avancement_global,
+
+        "processus_publies": f"{processus_publies}/{total_processus}",
+        "processus_publies_taux": processus_publies_taux,
+
+        "audits_clotures": f"{audits_clotures}/{audits_total}",
+        "audits_clotures_taux": audits_clotures_taux,
+
+        "conformite_iso": taux_conformite,
+        "processus_actifs": total_processus,
+
+        "maturite_globale": "3/5",
+        "maturite_score": maturite_score,
+
+        "modules": [
+            {"name": "Cartographie", "value": processus_publies_taux},
+            {"name": "Documentation", "value": processus_publies_taux},
+            {"name": "Audit", "value": audits_clotures_taux},
+            {"name": "Conformité ISO", "value": taux_conformite},
+            {"name": "Maturité", "value": maturite_score},
+        ],
+
+        "month_comparison": [
+            {"day": "01", "thisMonth": 22, "previousMonth": 16},
+            {"day": "05", "thisMonth": 35, "previousMonth": 26},
+            {"day": "10", "thisMonth": 48, "previousMonth": 38},
+            {"day": "15", "thisMonth": 61, "previousMonth": 44},
+            {"day": "20", "thisMonth": 72, "previousMonth": 58},
+            {"day": "25", "thisMonth": 78, "previousMonth": 67},
+            {"day": "30", "thisMonth": 83, "previousMonth": 71},
+        ],
+    })

@@ -25,7 +25,7 @@ import DossierProcessusPage from "./pages/processus/DossierProcessusPage";
 import PreAuditPage from "./pages/audit/PreAuditPage";
 import DashboardPilote from "./pages/pilotage/DashboardPilote";
 import PVPage from "./pages/pv/PVPage";
-
+import DashboardDG from "./pages/pilotage/DashboardDG";
 
 export default function App() {
   return (
@@ -39,16 +39,15 @@ export default function App() {
             <Route path="/accueil" element={<AccueilPage />} />
 
             <Route
-              path="/dashboard"
               element={
-                <ModulePlaceholderPage
-                  pageTitle="Tableau de bord"
-                  title="Tableau de bord"
-                  description="Cette section servira de vue de pilotage et pourra etre reliee a des donnees reelles plus tard."
+                <RoleProtectedRoute
+                  roles={["DG", "Direction generale", "Direction générale"]}
                 />
               }
-            />
-
+            >
+              <Route path="/dashboard" element={<DashboardDG />} />
+            </Route>
+            
             <Route path="/organigramme" element={<Organigramme />} />
             <Route
               path="/gestion-utilisateurs"
