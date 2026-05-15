@@ -1,4 +1,4 @@
-import { Bell, Menu, MessageSquare, Moon, Sun, Filter } from "lucide-react";
+import { Bell, Menu, MessageSquare, Moon, Sun, ClipboardCheck, CheckCircle, XCircle, Edit3 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { messagingApi } from "../../api/messages.api";
 import { useAuth } from "../../hooks/useAuth";
@@ -76,6 +76,19 @@ export default function Topbar({ pageTitle, userName, userRole, leftOffset = SID
         return "bg-blue-600";
       default:
         return "bg-violet-600";
+    }
+  };
+
+  const getTaskIcon = (typeNotification) => {
+    switch (typeNotification) {
+      case "TACHE_TERMINEE":
+        return CheckCircle;
+      case "TACHE_ANNULEE":
+        return XCircle;
+      case "TACHE_MODIFIEE":
+        return Edit3;
+      default:
+        return ClipboardCheck;
     }
   };
 
@@ -279,13 +292,6 @@ export default function Topbar({ pageTitle, userName, userRole, leftOffset = SID
               Non lues ({notificationUnreadCount})
             </button>
           </div>
-          <button
-            type="button"
-            className="p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
-            title="Filtrer"
-          >
-            <Filter className="h-4 w-4" />
-          </button>
         </div>
       </div>
 
@@ -314,20 +320,27 @@ export default function Topbar({ pageTitle, userName, userRole, leftOffset = SID
                       : "bg-violet-50/70 hover:bg-violet-100/70 dark:bg-slate-800 dark:hover:bg-slate-700"
                 }`}
               >
-                {/* Avatar */}
-                <div className={`mt-0.5 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-[12px] font-semibold ${
-                  isTaskNotification(notification)
-                    ? "bg-red-500 text-white"
-                    : `${getAvatarColor(notification.type_notification)} text-white`
-                }`}>
-                  {getInitials(notification.titre)}
-                </div>
+                {/* Avatar / task icon */}
+                {isTaskNotification(notification) ? (
+                  <div className="mt-0.5 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-red-50 text-red-600">
+                    {(() => {
+                      const Icon = getTaskIcon(notification.type_notification);
+                      return <Icon className="h-5 w-5" />;
+                    })()}
+                  </div>
+                ) : (
+                  <div className={`mt-0.5 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-[12px] font-semibold text-white ${
+                    getAvatarColor(notification.type_notification)
+                  }`}>
+                    {getInitials(notification.titre)}
+                  </div>
+                )}
 
                 {/* Contenu */}
                 <div className="min-w-0 flex-1">
                   <p className={`line-clamp-1 text-[13px] font-bold ${
                     isTaskNotification(notification)
-                      ? "text-slate-900"
+                      ? "text-red-700"
                       : notification.lu
                         ? "text-slate-700 dark:text-slate-300"
                         : "text-slate-900 dark:text-white"
