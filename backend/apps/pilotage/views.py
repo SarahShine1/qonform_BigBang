@@ -4,7 +4,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from apps.maturity.models import MaturityRequirementResponse
-
+from collections import defaultdict
 EVALUATION_SCORE = {"Conforme": 100, "Partiel": 50, "Non_conforme": 0}
 
 
