@@ -1,4 +1,4 @@
-import { Bell, Menu, MessageSquare, Moon, Sun, ClipboardCheck, CheckCircle, XCircle, Edit3 } from "lucide-react";
+import { Bell, Menu, MessageSquare, Moon, Sun, ClipboardCheck, CheckCircle, XCircle, Edit3, FileText } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { messagingApi } from "../../api/messages.api";
 import { useAuth } from "../../hooks/useAuth";
@@ -27,6 +27,9 @@ export default function Topbar({ pageTitle, userName, userRole, leftOffset = SID
       loadNotifications();
     }
   }, [user]);
+
+  const isPvNotification = (notification) =>
+  notification.type_notification === "PV_CREE";
 
   const notificationUnreadCount = notifications.filter((n) => !n.lu).length;
   
@@ -60,6 +63,15 @@ export default function Topbar({ pageTitle, userName, userRole, leftOffset = SID
   const getInitials = (title) => {
     return title?.split(" ")[0]?.[0]?.toUpperCase() || "N";
   };
+  
+  const getPvIcon = (typeNotification) => {
+  switch (typeNotification) {
+    case "PV_CREE":
+      return FileText;
+    default:
+      return FileText;
+  }
+};
 
   const isTaskNotification = (notification) =>
     String(notification.type_notification || "").startsWith("TACHE_");
@@ -74,8 +86,10 @@ export default function Topbar({ pageTitle, userName, userRole, leftOffset = SID
         return "bg-red-600";
       case "TACHE_DEMARREE":
         return "bg-blue-600";
+        
       default:
         return "bg-violet-600";
+      
     }
   };
 
@@ -328,6 +342,13 @@ export default function Topbar({ pageTitle, userName, userRole, leftOffset = SID
                       return <Icon className="h-5 w-5" />;
                     })()}
                   </div>
+                ) : isPvNotification(notification) ? (
+                  <div className="mt-0.5 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-700">
+                    {(() => {
+                      const Icon = getPvIcon(notification.type_notification);
+                      return <Icon className="h-5 w-5" />;
+                    })()}
+                  </div>
                 ) : (
                   <div className={`mt-0.5 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-[12px] font-semibold text-white ${
                     getAvatarColor(notification.type_notification)
@@ -341,9 +362,11 @@ export default function Topbar({ pageTitle, userName, userRole, leftOffset = SID
                   <p className={`line-clamp-1 text-[13px] font-bold ${
                     isTaskNotification(notification)
                       ? "text-red-700"
-                      : notification.lu
-                        ? "text-slate-700 dark:text-slate-300"
-                        : "text-slate-900 dark:text-white"
+                      : isPvNotification(notification)
+                        ? "text-blue-700 dark:text-blue-400"
+                        : notification.lu
+                          ? "text-slate-700 dark:text-slate-300"
+                          : "text-slate-900 dark:text-white"
                   }`}>
                     {notification.titre}
                   </p>
