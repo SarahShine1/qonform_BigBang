@@ -14,14 +14,18 @@ import MaturityPage from "./pages/maturity/MaturityPage";
 import ModulePlaceholderPage from "./pages/shared/ModulePlaceholderPage";
 import FicheProcessusForm from "./pages/fiche_form/FicheProcessusForm";
 import ProcessusPage from "./pages/processus/ProcessusPage";
-import ChefTachesPage from "./pages/tache/ChefTachesPage";
 import CanevasFichePage from "./pages/canevas/CanevasFichePage";
 import NormeTemplatePage from "./pages/canevas/NormeTemplatePage";
 import InteractionMapPage from "./pages/cartographie/InteractionMapPage";
 import AuditTerrainPage from "./pages/audit/AuditTerrainPage";
+import DashboardAuditeur from "./pages/audit/DashboardAuditeur";
 import DocumentationPage from "./pages/Documentationpage";
+import ChefTachesPage from "./pages/tache/ChefTachesPage";
 import DossierProcessusPage from "./pages/processus/DossierProcessusPage";
 import PreAuditPage from "./pages/audit/PreAuditPage";
+import DashboardPilote from "./pages/pilotage/DashboardPilote";
+import PVPage from "./pages/pv/PVPage";
+
 
 export default function App() {
   return (
@@ -62,23 +66,28 @@ export default function App() {
               }
             />
 
-            <Route
-              path="/cartographie/canevas-fiche"
-              element={<CanevasFichePage />}
-            />
-            <Route
-              path="/cartographie/canevas-fiche/:id"
-              element={<NormeTemplatePage />}
-            />
             <Route path="/cartographie/processus" element={<ProcessusPage />} />
             <Route
-              path="/cartographie/interactions"
-              element={<InteractionMapPage />}
-            />
-            <Route
-              path="/suivi"
-              element={<ModulePlaceholderPage title="Suivi" />}
-            />
+              element={
+                <RoleProtectedRoute
+                  excludedRoles={["DG", "Direction generale", "Direction générale"]}
+                />
+              }
+            >
+              <Route
+                path="/cartographie/canevas-fiche"
+                element={<CanevasFichePage />}
+              />
+              <Route
+                path="/cartographie/canevas-fiche/:id"
+                element={<NormeTemplatePage />}
+              />
+              <Route
+                path="/cartographie/interactions"
+                element={<InteractionMapPage />}
+              />
+            </Route>
+            <Route path="/suivi" element={<PVPage />} />
             <Route path="/audit/preaudit" element={<PreAuditPage />} />
             <Route path="/audit/pre-audit" element={<PreAuditPage />} />
             <Route path="/audit/mes-audits" element={<MesAudits />} />
@@ -86,15 +95,13 @@ export default function App() {
               path="/audit/audits-terrain"
               element={<AuditTerrainPage />}
             />
-            <Route
-              path="/dashboard-pilote"
-              element={<ModulePlaceholderPage title="Dashboard Pilote" />}
-            />
+            <Route path="/dashboard-pilote" element={<DashboardPilote />} />
             <Route
               path="/dashboard-auditeur"
-              element={<ModulePlaceholderPage title="Dashboard Auditeur" />}
+              element={<DashboardAuditeur />}
             />
             <Route path="/planification" element={<ChefTachesPage />} />
+
 
             <Route path="/audits" element={<MesAudits />} />
             <Route path="/mes-audits" element={<MesAudits />} />
@@ -114,7 +121,6 @@ export default function App() {
               }
             />
 
-            {/* Gestion processus */}
             <Route
               path="/gestion-processus/dossier/:id"
               element={<DossierProcessusPage />}

@@ -2,6 +2,7 @@
 from . import views
 
 urlpatterns = [
+    path("dashboard/", views.audit_dashboard, name="audit-dashboard"),
     path("fiches/", views.fiches_audit_list, name="audit-fiches-list"),
     path("fiches/<int:id_version>/", views.fiche_audit_detail, name="audit-fiche-detail"),
     path("fiches/<int:id_version>/start/", views.start_audit_execution, name="audit-fiche-start"),

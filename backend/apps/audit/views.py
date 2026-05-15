@@ -1,7 +1,9 @@
 from collections import defaultdict
+from datetime import date
+from html import escape
 
 from django.db import connection, transaction
-from django.http import HttpResponse
+from django.http import StreamingHttpResponse
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -113,6 +115,15 @@ def serialize_fiche_card(row):
         "statut_fiche": version_status,
         "statut_audit": VERSION_STATUS_LABELS.get(version_status, version_status),
         "rapport_pdf": row.get("rapport_pdf"),
+        "revue": bool(row.get("revue")),
+        "audit_kind": "reaudit" if row.get("revue") else "new",
+        "auditeur": {
+            "id_user": row.get("id_auditeur"),
+            "nom": row.get("auditeur_nom"),
+            "prenom": row.get("auditeur_prenom"),
+        }
+        if row.get("id_auditeur")
+        else None,
         "date_creation": row.get("date_creation"),
         "date_validation": row.get("date_validation"),
         "processus": {
@@ -144,6 +155,7 @@ def fiches_audit_list(request):
                 vf.id_version,
                 vf.numero_version,
                 vf.statut AS statut_fiche,
+                vf.revue,
                 vf.date_creation,
                 vf.date_validation,
                 p.id_processus,
@@ -160,18 +172,48 @@ def fiches_audit_list(request):
                     WHEN at.id_audit IS NOT NULL THEN 'En_cours'
                     ELSE 'Planifie'
                 END AS audit_statut,
-                at.rapport_pdf
+                at.rapport_pdf,
+                COALESCE(audit_owner.id_auditeur, at.id_auditeur) AS id_auditeur
+                ,auditeur.nom AS auditeur_nom
+                ,auditeur.prenom AS auditeur_prenom
             FROM version_fiche vf
             JOIN processus p ON p.id_processus = vf.id_processus
             LEFT JOIN departement d ON d.id_departement = p.id_departement
             LEFT JOIN utilisateur u ON u.id_user = vf.id_redacteur
             LEFT JOIN LATERAL (
-                SELECT id_audit, date_realisation, rapport_pdf
+                SELECT id_audit, id_auditeur, date_realisation, rapport_pdf
                 FROM audit_terrain
                 WHERE audit_terrain.id_processus = vf.id_processus
                 ORDER BY created_at DESC NULLS LAST, id_audit DESC
                 LIMIT 1
             ) at ON TRUE
+            LEFT JOIN LATERAL (
+                SELECT owner.id_auditeur
+                FROM (
+                    SELECT ce.id_auditeur, MAX(ce.date_evaluation) AS activity_date
+                    FROM checklist_evaluation ce
+                    WHERE ce.id_version = vf.id_version
+                    GROUP BY ce.id_auditeur
+
+                    UNION ALL
+
+                    SELECT nc.id_auditeur, MAX(nc.date_detection) AS activity_date
+                    FROM nc
+                    WHERE nc.id_version = vf.id_version
+                    GROUP BY nc.id_auditeur
+
+                    UNION ALL
+
+                    SELECT at2.id_auditeur, MAX(at2.created_at) AS activity_date
+                    FROM audit_terrain at2
+                    WHERE at2.id_processus = vf.id_processus
+                    GROUP BY at2.id_auditeur
+                ) owner
+                WHERE owner.id_auditeur IS NOT NULL
+                ORDER BY owner.activity_date DESC NULLS LAST
+                LIMIT 1
+            ) audit_owner ON TRUE
+            LEFT JOIN utilisateur auditeur ON auditeur.id_user = COALESCE(audit_owner.id_auditeur, at.id_auditeur)
             WHERE vf.statut IN ('Soumise', 'En_revision', 'Publiee')
             ORDER BY
                 CASE vf.statut
@@ -214,9 +256,396 @@ def fiche_audit_report(request, id_version):
     disposition = "attachment" if request.query_params.get("download") == "1" else "inline"
     filename = detail["rapport"]["fichier"]
 
-    response = HttpResponse(html, content_type="text/html; charset=utf-8")
+    # Use a streaming response so Django Debug Toolbar cannot inject its panel
+    # into the report HTML while DEBUG=True.
+    response = StreamingHttpResponse([html], content_type="text/html; charset=utf-8")
     response["Content-Disposition"] = f'{disposition}; filename="{filename}"'
     return response
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def audit_dashboard(request):
+    auditeur_id = get_auditeur_id(request)
+    if not auditeur_id:
+        return Response({"detail": "Auditeur introuvable."}, status=status.HTTP_400_BAD_REQUEST)
+
+    today = date.today()
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT COUNT(*) AS total FROM processus")
+        total_processus = dictfetchone(cursor)["total"] or 0
+
+        cursor.execute(
+            """
+            SELECT
+                vf.id_version,
+                vf.id_processus,
+                vf.numero_version,
+                vf.statut,
+                vf.revue,
+                vf.date_creation,
+                vf.date_validation,
+                p.code_process,
+                p.nom AS processus_nom,
+                d.nom AS departement_nom,
+                doc.nom_fichier AS rapport_nom,
+                doc.date_upload AS rapport_date,
+                at.date_realisation
+            FROM version_fiche vf
+            JOIN processus p ON p.id_processus = vf.id_processus
+            LEFT JOIN departement d ON d.id_departement = p.id_departement
+            LEFT JOIN LATERAL (
+                SELECT id_audit, date_realisation
+                FROM audit_terrain
+                WHERE audit_terrain.id_processus = vf.id_processus
+                  AND audit_terrain.id_auditeur = %s
+                ORDER BY created_at DESC NULLS LAST, id_audit DESC
+                LIMIT 1
+            ) at ON TRUE
+            LEFT JOIN LATERAL (
+                SELECT nom_fichier, date_upload
+                FROM document
+                WHERE document.id_version = vf.id_version
+                  AND document.type_document = 'Rapport_audit_fiche'
+                ORDER BY date_upload DESC NULLS LAST, id_document DESC
+                LIMIT 1
+            ) doc ON TRUE
+            WHERE vf.statut IN ('Soumise', 'En_revision', 'Publiee')
+            ORDER BY vf.date_creation DESC NULLS LAST, vf.id_version DESC
+            """,
+            [auditeur_id],
+        )
+        fiches = dictfetchall(cursor)
+
+        version_ids = [row["id_version"] for row in fiches]
+        conformity_by_version = load_conformity_scores(cursor, version_ids)
+
+        cursor.execute(
+            """
+            SELECT statut, priorite, date_fin
+            FROM tache_planifiee
+            WHERE id_responsable = %s
+            """,
+            [auditeur_id],
+        )
+        taches = dictfetchall(cursor)
+
+        cursor.execute(
+            """
+            SELECT id_tache, intitule, type_tache, priorite, statut, date_debut, date_fin
+            FROM tache_planifiee
+            WHERE id_responsable = %s
+            ORDER BY date_fin ASC, id_tache DESC
+            LIMIT 8
+            """,
+            [auditeur_id],
+        )
+        taches_planifiees = dictfetchall(cursor)
+
+        cursor.execute(
+            """
+            SELECT nc.id_nc, nc.titre, nc.date_cloture
+            FROM nc
+            WHERE nc.id_auditeur = %s
+            """,
+            [auditeur_id],
+        )
+        ncs = dictfetchall(cursor)
+
+        cursor.execute(
+            """
+            SELECT ce.resultat, ce.id_critere, c.nom AS critere_nom, st.nom AS section_nom
+            FROM checklist_evaluation ce
+            LEFT JOIN critere_evaluation c ON c.id_critere = ce.id_critere
+            LEFT JOIN section_template st ON st.id_section_template = ce.id_section_template
+            WHERE ce.id_auditeur = %s
+            """,
+            [auditeur_id],
+        )
+        evaluations = dictfetchall(cursor)
+
+    published = [row for row in fiches if row["statut"] == "Publiee"]
+    audited_process_ids = {row["id_processus"] for row in published}
+    coverage = round((len(audited_process_ids) / total_processus) * 100) if total_processus else 0
+    soumises = [row for row in fiches if row["statut"] == "Soumise"]
+    en_revision = [row for row in fiches if row["statut"] == "En_revision"]
+    reauditer = [row for row in soumises if row.get("revue")]
+    final_scores = [conformity_by_version.get(row["id_version"], 0) for row in published]
+    average_conformity = round(sum(final_scores) / len(final_scores)) if final_scores else 0
+
+    task_stats = build_task_stats(taches, today)
+    resultats = build_result_categories(final_scores)
+    nc_gravite = build_nc_gravity(ncs)
+    clause_scores = build_clause_scores(evaluations)
+    evolution = build_audit_evolution(published)
+    rapports = build_recent_reports(published, conformity_by_version)
+
+    alertes = [
+        {"type": "warning", "message": f"{len(reauditer)} fiche(s) corrigée(s) attendent un réaudit."},
+        {"type": "danger", "message": f"{task_stats['en_retard']} tâche(s) sont en retard."},
+        {"type": "danger", "message": f"{nc_gravite.get('Majeure', 0) + nc_gravite.get('Critique', 0)} NC majeures ou critiques sont ouvertes."},
+        {
+            "type": "info",
+            "message": f"{sum(1 for row in published if not row.get('rapport_nom'))} audit(s) publié(s) n'ont pas encore de rapport référencé.",
+        },
+    ]
+
+    return Response(
+        {
+            "kpis": {
+                "processusAudites": len(audited_process_ids),
+                "totalProcessus": total_processus,
+                "couverture": coverage,
+                "fichesAAuditer": len(soumises),
+                "auditsEnCours": len(en_revision),
+                "fichesAReauditer": len(reauditer),
+                "tachesEnRetard": task_stats["en_retard"],
+                "tachesPrioritaires": task_stats["prioritaires"],
+            },
+            "progressionAudits": {
+                "audites": len(audited_process_ids),
+                "restants": max(total_processus - len(audited_process_ids), 0),
+                "pourcentage": coverage,
+            },
+            "fichesParStatut": [
+                {"label": "Soumises", "value": len([row for row in soumises if not row.get("revue")])},
+                {"label": "En cours d'audit", "value": len(en_revision)},
+                {"label": "À réauditer", "value": len(reauditer)},
+                {"label": "Auditées / publiées", "value": len(published)},
+            ],
+            "tachesParStatut": [
+                {"label": "À faire", "value": task_stats["a_faire"]},
+                {"label": "En cours", "value": task_stats["en_cours"]},
+                {"label": "En retard", "value": task_stats["en_retard"]},
+                {"label": "Terminées", "value": task_stats["terminees"]},
+            ],
+            "tachesParPriorite": [
+                {"label": "Haute", "value": task_stats["priorite_haute"]},
+                {"label": "Moyenne", "value": task_stats["priorite_moyenne"]},
+                {"label": "Basse", "value": task_stats["priorite_basse"]},
+            ],
+            "tauxMoyenConformite": average_conformity,
+            "resultatsAudits": resultats,
+            "ncParGravite": [{"label": key, "value": value} for key, value in nc_gravite.items()],
+            "conformiteParClause": clause_scores,
+            "evolutionAudits": evolution,
+            "tachesPlanifiees": serialize_dashboard_tasks(taches_planifiees, today),
+            "alertes": alertes,
+            "rapportsRecents": rapports,
+        }
+    )
+
+
+def load_conformity_scores(cursor, version_ids):
+    if not version_ids:
+        return {}
+
+    scores = defaultdict(list)
+    cursor.execute(
+        """
+        SELECT id_version, resultat
+        FROM checklist_evaluation
+        WHERE id_version = ANY(%s)
+          AND resultat IS NOT NULL
+          AND resultat <> 'NA'
+        """,
+        [version_ids],
+    )
+    for row in dictfetchall(cursor):
+        score = EVALUATION_SCORE.get(row["resultat"])
+        if score is not None:
+            scores[row["id_version"]].append(score)
+
+    cursor.execute(
+        """
+        SELECT id_version, evaluation AS resultat
+        FROM document
+        WHERE id_version = ANY(%s)
+          AND type_document IN ('BPMN', 'Preuve')
+          AND evaluation IS NOT NULL
+          AND evaluation <> 'NA'
+        """,
+        [version_ids],
+    )
+    for row in dictfetchall(cursor):
+        score = EVALUATION_SCORE.get(row["resultat"])
+        if score is not None:
+            scores[row["id_version"]].append(score)
+
+    return {
+        version_id: round(sum(values) / len(values))
+        for version_id, values in scores.items()
+        if values
+    }
+
+
+def normalize_task_status(value):
+    normalized = str(value or "").strip().lower()
+    normalized = normalized.replace("Ã©", "e").replace("é", "e")
+    if "termin" in normalized:
+        return "terminee"
+    if "cours" in normalized:
+        return "en_cours"
+    if "annul" in normalized:
+        return "annulee"
+    return "a_faire"
+
+
+def build_task_stats(taches, today):
+    stats = {
+        "a_faire": 0,
+        "en_cours": 0,
+        "en_retard": 0,
+        "terminees": 0,
+        "prioritaires": 0,
+        "priorite_haute": 0,
+        "priorite_moyenne": 0,
+        "priorite_basse": 0,
+    }
+    for task in taches:
+        status_key = normalize_task_status(task.get("statut"))
+        if status_key == "terminee":
+            stats["terminees"] += 1
+        elif status_key == "en_cours":
+            stats["en_cours"] += 1
+        else:
+            stats["a_faire"] += 1
+
+        if task.get("date_fin") and task["date_fin"] < today and status_key != "terminee":
+            stats["en_retard"] += 1
+
+        priority = str(task.get("priorite") or "").lower()
+        if "haute" in priority:
+            stats["priorite_haute"] += 1
+            stats["prioritaires"] += 1
+        elif "basse" in priority:
+            stats["priorite_basse"] += 1
+        else:
+            stats["priorite_moyenne"] += 1
+    return stats
+
+
+def build_result_categories(scores):
+    categories = {
+        "Conforme": 0,
+        "Quasi-conforme": 0,
+        "En progression": 0,
+        "Non-conforme": 0,
+    }
+    for score in scores:
+        if score >= 90:
+            categories["Conforme"] += 1
+        elif score >= 75:
+            categories["Quasi-conforme"] += 1
+        elif score >= 60:
+            categories["En progression"] += 1
+        else:
+            categories["Non-conforme"] += 1
+    return [{"label": key, "value": value} for key, value in categories.items()]
+
+
+def build_nc_gravity(ncs):
+    counts = {"Mineure": 0, "Majeure": 0, "Critique": 0}
+    for item in ncs:
+        if item.get("date_cloture"):
+            continue
+        _, severity = parse_nc_title(item.get("titre"))
+        counts[severity or "Mineure"] = counts.get(severity or "Mineure", 0) + 1
+    return counts
+
+
+ISO_AXES = [
+    ("§4.4 Processus du SMQ", ("processus", "smq", "contexte")),
+    ("§6.1 Risques et opportunites", ("risque", "opportun")),
+    ("§6.2 Objectifs qualite", ("objectif", "qualite")),
+    ("§7.5 Informations documentees", ("document", "preuve", "enregistrement")),
+    ("§9.1 Surveillance et mesure", ("surveillance", "mesure", "kpi", "performance")),
+    ("§10.2 NC et actions correctives", ("dysfonction", "action corrective", "non-conform")),
+]
+
+
+def build_clause_scores(evaluations):
+    buckets = {label: [] for label, _ in ISO_AXES}
+    for item in evaluations:
+        score = EVALUATION_SCORE.get(item.get("resultat"))
+        if score is None:
+            continue
+        text = f"{item.get('critere_nom') or ''} {item.get('section_nom') or ''}".lower()
+        for label, keywords in ISO_AXES:
+            if any(keyword in text for keyword in keywords):
+                buckets[label].append(score)
+                break
+
+    return [
+        {
+            "label": label,
+            "value": round(sum(values) / len(values)) if values else 0,
+        }
+        for label, values in buckets.items()
+    ]
+
+
+MONTH_LABELS = ["Jan", "Fév", "Mar", "Avr", "Mai", "Juin", "Juil", "Août", "Sep", "Oct", "Nov", "Déc"]
+
+
+def build_audit_evolution(published):
+    counts = defaultdict(int)
+    for row in published:
+        date_value = row.get("date_realisation") or row.get("date_validation") or row.get("rapport_date")
+        if not date_value:
+            continue
+        key = (date_value.year, date_value.month)
+        counts[key] += 1
+
+    if not counts:
+        return []
+
+    return [
+        {"label": f"{MONTH_LABELS[month - 1]} {str(year)[-2:]}", "value": counts[(year, month)]}
+        for year, month in sorted(counts.keys())[-12:]
+    ]
+
+
+def build_recent_reports(published, conformity_by_version):
+    reports = [row for row in published if row.get("rapport_nom")]
+    reports.sort(key=lambda row: date_sort_value(row.get("rapport_date") or row.get("date_validation")), reverse=True)
+    return [
+        {
+            "id_version": row["id_version"],
+            "nom": row.get("rapport_nom") or f"Rapport audit - {row.get('code_process')}",
+            "processus": row.get("processus_nom"),
+            "date": row.get("rapport_date") or row.get("date_validation"),
+            "taux": conformity_by_version.get(row["id_version"], 0),
+        }
+        for row in reports[:5]
+    ]
+
+
+def date_sort_value(value):
+    if not value:
+        return date.min.toordinal()
+    if hasattr(value, "date"):
+        value = value.date()
+    return value.toordinal()
+
+
+def serialize_dashboard_tasks(tasks, today):
+    items = []
+    for task in tasks:
+        status_key = normalize_task_status(task.get("statut"))
+        items.append(
+            {
+                "id": task.get("id_tache"),
+                "intitule": task.get("intitule"),
+                "type": task.get("type_tache"),
+                "priorite": task.get("priorite"),
+                "statut": task.get("statut"),
+                "date_debut": task.get("date_debut"),
+                "date_fin": task.get("date_fin"),
+                "en_retard": bool(task.get("date_fin") and task["date_fin"] < today and status_key != "terminee"),
+            }
+        )
+    return items
 
 
 @api_view(["POST"])
@@ -396,6 +825,7 @@ def load_fiche_audit_detail(id_version):
                 vf.numero_version,
                 vf.statut,
                 vf."commit" AS audit_commit,
+                vf.revue,
                 vf.date_creation,
                 vf.date_derniere_modif,
                 vf.date_validation,
@@ -720,6 +1150,7 @@ def load_fiche_audit_detail(id_version):
         "numero_version": fiche["numero_version"],
         "statut": fiche["statut"],
         "commit": fiche.get("audit_commit") or 0,
+        "revue": bool(fiche.get("revue")),
         "date_creation": fiche["date_creation"],
         "date_derniere_modif": fiche.get("date_derniere_modif"),
         "date_validation": fiche.get("date_validation"),
@@ -1401,6 +1832,9 @@ def replace_non_conformities(cursor, id_version, auditeur_id, non_conformities, 
 
 
 def render_report_html(detail):
+    def h(value):
+        return escape(str(value or ""))
+
     status_labels = {
         "conforme": "Conforme",
         "partiel": "Partiellement conforme",
@@ -1451,28 +1885,53 @@ def render_report_html(detail):
                 f"<li><strong>{item['titre']}</strong> - {action.get('description') or 'Action à préciser'} ({action.get('statut') or 'A faire'})</li>"
             )
 
+    metrics = detail.get("metrics") or {}
+    conclusion = get_report_conclusion(detail.get("taux_conformite") or 0)
+
     return f"""<!doctype html>
 <html lang="fr">
   <head>
     <meta charset="utf-8" />
     <title>{detail["rapport"]["titre"]}</title>
     <style>
-      body{{font-family:Arial,sans-serif;color:#1f2937;margin:32px}}
+      *{{box-sizing:border-box}}
+      body{{font-family:Arial,sans-serif;color:#1f2937;margin:32px;background:#fff}}
+      .audit-report-content{{max-width:980px;margin:0 auto}}
+      nav,aside,button,svg,.no-print,.theme-toggle,.floating,.app-shell{{display:none!important}}
       h1{{color:#4c1d95}}
       h2{{margin-top:24px;color:#111827}}
       table{{width:100%;border-collapse:collapse;margin-top:16px}}
       th,td{{border:1px solid #e5e7eb;padding:10px;text-align:left;font-size:13px;vertical-align:top}}
       th{{background:#f3f0ff;color:#4c1d95}}
       .score{{font-size:28px;color:#047857;font-weight:700}}
+      .metrics{{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:18px 0}}
+      .metric{{border:1px solid #e5e7eb;border-radius:8px;padding:10px;background:#fafafa}}
+      .metric span{{display:block;font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700}}
+      .metric strong{{display:block;margin-top:6px;color:#4c1d95;font-size:18px}}
+      @media print{{
+        @page{{margin:14mm}}
+        body{{margin:0}}
+        nav,aside,button,svg,a[href="#"],.no-print,.theme-toggle,.floating,.app-shell{{display:none!important}}
+        .audit-report-content{{max-width:none}}
+        h1,h2{{break-after:avoid}}
+        table,tr{{break-inside:avoid}}
+      }}
     </style>
   </head>
   <body>
+    <main class="audit-report-content">
     <h1>{detail["rapport"]["titre"]}</h1>
     <p><strong>Code :</strong> {detail["processus"]["code_process"]}</p>
     <p><strong>Processus :</strong> {detail["processus"]["nom"]}</p>
     <p><strong>Pilote :</strong> {detail["processus"].get("pilote") or "Non renseigné"}</p>
     <p><strong>Auditeur :</strong> {format_user(detail["audit"]["auditeur"].get("prenom"), detail["audit"]["auditeur"].get("nom")) or "Non renseigné"}</p>
     <p><strong>Date :</strong> {detail["audit"].get("date_realisation") or detail.get("date_validation") or detail.get("date_creation") or ""}</p>
+    <div class="metrics">
+      <div class="metric"><span>Completude</span><strong>{metrics.get("taux_completude_moyen", 0)}%</strong></div>
+      <div class="metric"><span>Checklist</span><strong>{metrics.get("score_checklist", 0)}%</strong></div>
+      <div class="metric"><span>BPMN</span><strong>{metrics.get("score_bpmn", 0)}%</strong></div>
+      <div class="metric"><span>Preuves</span><strong>{metrics.get("score_preuves", 0)}%</strong></div>
+    </div>
     <p class="score">Taux de conformité : {detail["taux_conformite"]}%</p>
 
     <h2>Exigences évaluées</h2>
@@ -1496,8 +1955,19 @@ def render_report_html(detail):
       </thead>
       <tbody>{''.join(nc_rows) or "<tr><td colspan='4'>Aucune NC relevée.</td></tr>"}</tbody>
     </table>
+    <h2>Conclusion</h2>
+    <p>{h(conclusion)}</p>
+    </main>
   </body>
 </html>"""
+
+
+def get_report_conclusion(rate):
+    if rate >= 80:
+        return "Fiche globalement conforme."
+    if rate >= 50:
+        return "Fiche partiellement conforme, ameliorations necessaires."
+    return "Fiche non conforme, actions correctives prioritaires."
 
 
 def calculate_compliance_rate(evaluations):

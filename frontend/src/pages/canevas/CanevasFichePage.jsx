@@ -18,9 +18,9 @@ import {
   toggleNormeActive,
 } from "../../api/fiches.api";
 
-const PURPLE = "#58148E";
+const PURPLE       = "#58148E";
 const PURPLE_LIGHT = "#EDE9FE";
-const BORDER = "#D1D5DB";
+const BORDER       = "#D1D5DB";
 
 const fmtDate = (d) =>
   d
@@ -31,6 +31,7 @@ const fmtDate = (d) =>
       })
     : "—";
 
+// ── Add norme modal ───────────────────────────────────────────────────────────
 function AddNormeForm({ onSave, onCancel, saving }) {
   const [form, setForm] = useState({
     code: "",
@@ -43,32 +44,35 @@ function AddNormeForm({ onSave, onCancel, saving }) {
     "w-full rounded-lg border px-3 py-2 text-[12.5px] text-slate-700 outline-none focus:ring-1 focus:ring-[#58148E]/30";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+      style={{ fontFamily: "'DM Sans', sans-serif" }}
+    >
       <div
-        className="w-full max-w-md rounded-2xl bg-white shadow-2xl"
-        style={{ border: "1px solid #E5E7EB" }}
+        className="w-full max-w-md rounded-2xl bg-white shadow-2xl overflow-hidden"
+        style={{ border: "1px solid #E5E7EB", minWidth: 400 }}
       >
+        {/* Purple header */}
         <div
           className="flex items-center justify-between px-6 py-4"
-          style={{ borderBottom: `1px solid ${BORDER}` }}
+          style={{ backgroundColor: PURPLE }}
         >
-          <p className="text-[14px] font-bold text-slate-800">Nouvelle norme</p>
+          <p className="text-[14px] font-bold text-white">Nouvelle norme</p>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="flex h-6 w-6 items-center justify-center rounded-full text-white/70 transition hover:bg-white/20 text-[18px] leading-none"
+          >
+            ×
+          </button>
         </div>
+
         <div className="space-y-3 px-6 py-4">
           {[
-            { key: "code", label: "Code", placeholder: "ex : ISO 9001" },
-            { key: "version", label: "Version", placeholder: "ex : 2015" },
-            {
-              key: "titre",
-              label: "Titre",
-              placeholder: "Systèmes de management de la qualité…",
-            },
-            {
-              key: "date_publication",
-              label: "Date de publication",
-              placeholder: "",
-              type: "date",
-            },
+            { key: "code",             label: "Code",                placeholder: "ex : ISO 9001" },
+            { key: "version",          label: "Version",             placeholder: "ex : 2015" },
+            { key: "titre",            label: "Titre",               placeholder: "Systèmes de management de la qualité…" },
+            { key: "date_publication", label: "Date de publication", placeholder: "", type: "date" },
           ].map(({ key, label, placeholder, type = "text" }) => (
             <div key={key}>
               <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-slate-400">
@@ -85,6 +89,7 @@ function AddNormeForm({ onSave, onCancel, saving }) {
             </div>
           ))}
         </div>
+
         <div
           className="flex items-center justify-end gap-2 px-6 py-4"
           style={{ borderTop: `1px solid ${BORDER}` }}
@@ -111,6 +116,7 @@ function AddNormeForm({ onSave, onCancel, saving }) {
   );
 }
 
+// ── Norme card ────────────────────────────────────────────────────────────────
 function NormeCard({ norme, onToggle, onDelete, onOpen }) {
   return (
     <div
@@ -118,19 +124,13 @@ function NormeCard({ norme, onToggle, onDelete, onOpen }) {
       style={{ borderColor: norme.est_active ? PURPLE : BORDER }}
       onClick={onOpen}
     >
-      {/* Icon */}
       <div
         className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
         style={{ backgroundColor: norme.est_active ? PURPLE : PURPLE_LIGHT }}
       >
-        <BookOpen
-          size={18}
-          style={{ color: norme.est_active ? "#fff" : PURPLE }}
-          strokeWidth={1.8}
-        />
+        <BookOpen size={18} style={{ color: norme.est_active ? "#fff" : PURPLE }} strokeWidth={1.8} />
       </div>
 
-      {/* Info */}
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <p className="truncate text-[13px] font-semibold text-slate-800">
@@ -147,17 +147,11 @@ function NormeCard({ norme, onToggle, onDelete, onOpen }) {
         </div>
         <div className="mt-0.5 flex flex-wrap items-center gap-3 text-[11px] text-slate-400">
           <span>Version {norme.version}</span>
-          {norme.date_publication && (
-            <span>Publiée le {fmtDate(norme.date_publication)}</span>
-          )}
+          {norme.date_publication && <span>Publiée le {fmtDate(norme.date_publication)}</span>}
         </div>
       </div>
 
-      {/* Actions */}
-      <div
-        className="flex shrink-0 items-center gap-1"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="flex shrink-0 items-center gap-1" onClick={(e) => e.stopPropagation()}>
         <button
           type="button"
           title={norme.est_active ? "Désactiver" : "Activer"}
@@ -168,11 +162,7 @@ function NormeCard({ norme, onToggle, onDelete, onOpen }) {
             color: norme.est_active ? PURPLE : "#6B7280",
           }}
         >
-          {norme.est_active ? (
-            <ToggleRight size={15} />
-          ) : (
-            <ToggleLeft size={15} />
-          )}
+          {norme.est_active ? <ToggleRight size={15} /> : <ToggleLeft size={15} />}
           {norme.est_active ? "Active" : "Activer"}
         </button>
         <button
@@ -188,32 +178,26 @@ function NormeCard({ norme, onToggle, onDelete, onOpen }) {
   );
 }
 
+// ── Page ──────────────────────────────────────────────────────────────────────
 export default function CanevasFichePage() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const [normes, setNormes] = useState([]);
+  const [normes,  setNormes]  = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [confirm, setConfirm] = useState(null); // { type: "toggle"|"delete", norme }
+  const [saving,  setSaving]  = useState(false);
+  const [confirm, setConfirm] = useState(null);
 
-  const userName =
-    `${user?.prenom ?? ""} ${user?.nom ?? ""}`.trim() ||
-    user?.email ||
-    "Utilisateur";
+  const userName = `${user?.prenom ?? ""} ${user?.nom ?? ""}`.trim() || user?.email || "Utilisateur";
   const userRole = user?.roles?.[0] ?? "";
 
   const load = () => {
     setLoading(true);
-    getNormes()
-      .then(setNormes)
-      .finally(() => setLoading(false));
+    getNormes().then(setNormes).finally(() => setLoading(false));
   };
 
-  useEffect(() => {
-    load();
-  }, []);
+  useEffect(() => { load(); }, []);
 
   const handleCreate = async (data) => {
     setSaving(true);
@@ -227,12 +211,9 @@ export default function CanevasFichePage() {
   };
 
   const handleToggle = async (norme) => {
-    if (!norme.est_active) {
-      const active = normes.find((n) => n.est_active);
-      if (active) {
-        setConfirm({ type: "toggle", norme });
-        return;
-      }
+    if (!norme.est_active && normes.find((n) => n.est_active)) {
+      setConfirm({ type: "toggle", norme });
+      return;
     }
     await doToggle(norme);
   };
@@ -244,13 +225,9 @@ export default function CanevasFichePage() {
         if (n.id_norme === updated.id_norme) return updated;
         if (updated.est_active) return { ...n, est_active: false };
         return n;
-      }),
+      })
     );
     setConfirm(null);
-  };
-
-  const handleDelete = (norme) => {
-    setConfirm({ type: "delete", norme });
   };
 
   const doDelete = async (norme) => {
@@ -260,32 +237,21 @@ export default function CanevasFichePage() {
   };
 
   return (
-    <AppLayout
-      pageTitle="Canevas fiche"
-      userName={userName}
-      userRole={userRole}
-    >
-      <div className="mx-auto max-w-3xl">
-        {/* Header */}
-        <div className="mb-4 flex items-center justify-between">
-          <div>
-            <h1 className="text-[16px] font-bold text-slate-800"></h1>
-            <p className="text-[11.5px] text-slate-400">
-              Une seule norme peut être active à la fois. Les sections de la
-              fiche sont liées à la norme active.
-            </p>
-          </div>
+    <AppLayout pageTitle="Canevas fiche" userName={userName} userRole={userRole}>
+      <div style={{ fontFamily: "'DM Sans', sans-serif" }}>
+
+        {/* Top bar */}
+        <div className="mb-5 flex items-center justify-between">
+          <p className="text-[11.5px] text-slate-400">
+            Une seule norme peut être active à la fois. Les sections de la fiche sont liées à la norme active.
+          </p>
           <button
             type="button"
             onClick={() => setShowAdd(true)}
             className="flex items-center gap-2 rounded-xl px-4 py-2 text-[12px] font-semibold text-white shadow transition"
             style={{ backgroundColor: PURPLE }}
-            onMouseEnter={(e) =>
-              (e.currentTarget.style.backgroundColor = "#45107A")
-            }
-            onMouseLeave={(e) =>
-              (e.currentTarget.style.backgroundColor = PURPLE)
-            }
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#45107A")}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = PURPLE)}
           >
             <Plus size={14} /> Ajouter une norme
           </button>
@@ -301,9 +267,7 @@ export default function CanevasFichePage() {
         {!loading && normes.length === 0 && (
           <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 py-16">
             <BookOpen size={28} className="text-slate-300" />
-            <p className="text-[13px] text-slate-400">
-              Aucune norme enregistrée
-            </p>
+            <p className="text-[13px] text-slate-400">Aucune norme enregistrée</p>
             <button
               type="button"
               onClick={() => setShowAdd(true)}
@@ -320,17 +284,14 @@ export default function CanevasFichePage() {
             <NormeCard
               key={norme.id_norme}
               norme={norme}
-              onOpen={() =>
-                navigate(`/cartographie/canevas-fiche/${norme.id_norme}`)
-              }
+              onOpen={() => navigate(`/cartographie/canevas-fiche/${norme.id_norme}`)}
               onToggle={() => handleToggle(norme)}
-              onDelete={() => handleDelete(norme)}
+              onDelete={() => setConfirm({ type: "delete", norme })}
             />
           ))}
         </div>
       </div>
 
-      {/* Add norme popup */}
       {showAdd && (
         <AddNormeForm
           saving={saving}
@@ -339,7 +300,6 @@ export default function CanevasFichePage() {
         />
       )}
 
-      {/* Toggle confirmation */}
       {confirm?.type === "toggle" && (
         <ConfirmationPopup
           title="Changer la norme active ?"
@@ -350,7 +310,6 @@ export default function CanevasFichePage() {
         />
       )}
 
-      {/* Delete confirmation */}
       {confirm?.type === "delete" && (
         <ConfirmationPopup
           title="Supprimer cette norme ?"
