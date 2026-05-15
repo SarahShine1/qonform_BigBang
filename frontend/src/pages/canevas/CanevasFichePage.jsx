@@ -3,9 +3,6 @@ import { useNavigate } from "react-router-dom";
 import {
   BookOpen,
   CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
-  Info,
   Plus,
   ToggleLeft,
   ToggleRight,
@@ -25,159 +22,6 @@ const PURPLE       = "#58148E";
 const PURPLE_LIGHT = "#EDE9FE";
 const BORDER       = "#D1D5DB";
 
-const ISO_ARTICLES = [
-  { num: "1", titre: "Contexte de l'organisme" },
-  { num: "2", titre: "Leadership" },
-  { num: "3", titre: "Planification" },
-  { num: "4", titre: "Support" },
-  { num: "5", titre: "Réalisation des activités opérationnelles" },
-  { num: "6", titre: "Évaluation des performances" },
-  { num: "7", titre: "Amélioration" },
-  { num: "8", titre: "Documents et preuves" },
-];
-
-// ── ISO Reminder panel content (shared) ──────────────────────────────────────
-function IsoArticlesList() {
-  return (
-    <>
-      <p className="mb-3 text-[10.5px] italic leading-relaxed text-violet-500">
-        Pour une norme ISO, les sections de votre fiche correspondent généralement aux articles suivants :
-      </p>
-      <div className="space-y-2">
-        {ISO_ARTICLES.map((a) => (
-          <div key={a.num} className="flex items-center gap-2.5">
-            <span
-              className="flex h-[20px] w-[20px] shrink-0 items-center justify-center rounded-[5px] text-[9.5px] font-bold text-white"
-              style={{ backgroundColor: PURPLE }}
-            >
-              {a.num}
-            </span>
-            <span className="text-[11px] font-medium leading-tight text-violet-900">{a.titre}</span>
-          </div>
-        ))}
-      </div>
-    </>
-  );
-}
-
-// ── Sidebar ISO panel (page principale, right side) ───────────────────────────
-function IsoSidePanel({ open, onToggle }) {
-  return (
-    <div className="flex shrink-0 items-start" style={{ width: open ? 256 : 32 }}>
-      {open ? (
-        <div
-          className="relative w-64 overflow-hidden rounded-2xl"
-          style={{
-            background: "linear-gradient(160deg, #f5f3ff 0%, #ede9fe 55%, #ddd6fe 100%)",
-            border: "1px solid #c4b5fd",
-          }}
-        >
-          {/* Decorative blob */}
-          <div
-            className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full opacity-25"
-            style={{ background: "radial-gradient(circle, #7c3aed, transparent)" }}
-          />
-          {/* Header */}
-          <div className="flex items-center justify-between px-4 pt-4 pb-2">
-            <div className="flex items-center gap-2">
-              <span
-                className="flex h-6 w-6 items-center justify-center rounded-full"
-                style={{ backgroundColor: PURPLE }}
-              >
-                <Info size={12} className="text-white" />
-              </span>
-              <p className="text-[11.5px] font-bold" style={{ color: PURPLE }}>
-                Rappel ISO
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={onToggle}
-              title="Masquer"
-              className="flex h-6 w-6 items-center justify-center rounded-lg transition hover:bg-violet-100"
-              style={{ color: PURPLE }}
-            >
-              <ChevronRight size={14} />
-            </button>
-          </div>
-          <div className="px-4 pb-4">
-            <IsoArticlesList />
-          </div>
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={onToggle}
-          title="Afficher le rappel ISO"
-          className="flex h-8 w-8 items-center justify-center rounded-xl transition hover:bg-violet-100"
-          style={{ border: "1px solid #c4b5fd", backgroundColor: PURPLE_LIGHT, color: PURPLE }}
-        >
-          <ChevronLeft size={14} />
-        </button>
-      )}
-    </div>
-  );
-}
-
-// ── Fixed ISO panel (inside popup backdrop) ───────────────────────────────────
-function IsoFixedPanel({ open, onToggle }) {
-  return (
-    <div className="absolute left-6 top-1/2 -translate-y-1/2 z-10">
-      {open ? (
-        <div
-          className="relative w-60 overflow-hidden rounded-2xl shadow-xl"
-          style={{
-            background: "linear-gradient(160deg, #f5f3ff 0%, #ede9fe 55%, #ddd6fe 100%)",
-            border: "1px solid #c4b5fd",
-          }}
-        >
-          {/* Decorative blob */}
-          <div
-            className="pointer-events-none absolute -right-8 -top-8 h-28 w-28 rounded-full opacity-20"
-            style={{ background: "radial-gradient(circle, #7c3aed, transparent)" }}
-          />
-          {/* Header */}
-          <div className="flex items-center justify-between px-4 pt-4 pb-2">
-            <div className="flex items-center gap-2">
-              <span
-                className="flex h-6 w-6 items-center justify-center rounded-full"
-                style={{ backgroundColor: PURPLE }}
-              >
-                <Info size={12} className="text-white" />
-              </span>
-              <p className="text-[11.5px] font-bold" style={{ color: PURPLE }}>
-                Rappel ISO
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={onToggle}
-              title="Masquer"
-              className="flex h-6 w-6 items-center justify-center rounded-lg transition hover:bg-violet-100"
-              style={{ color: PURPLE }}
-            >
-              <ChevronLeft size={14} />
-            </button>
-          </div>
-          <div className="px-4 pb-4">
-            <IsoArticlesList />
-          </div>
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={onToggle}
-          title="Afficher le rappel ISO"
-          className="flex h-9 w-9 items-center justify-center rounded-xl shadow-lg transition hover:scale-105"
-          style={{ border: "1px solid #c4b5fd", backgroundColor: PURPLE, color: "#fff" }}
-        >
-          <Info size={15} />
-        </button>
-      )}
-    </div>
-  );
-}
-
 const fmtDate = (d) =>
   d
     ? new Date(d).toLocaleDateString("fr-FR", {
@@ -195,7 +39,6 @@ function AddNormeForm({ onSave, onCancel, saving }) {
     titre: "",
     date_publication: "",
   });
-  const [isoOpen, setIsoOpen] = useState(true);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const inputCls =
     "w-full rounded-lg border px-3 py-2 text-[12.5px] text-slate-700 outline-none focus:ring-1 focus:ring-[#58148E]/30";
@@ -205,119 +48,69 @@ function AddNormeForm({ onSave, onCancel, saving }) {
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
       style={{ fontFamily: "'DM Sans', sans-serif" }}
     >
-      {/* Row: form (left) + ISO panel (right, aligned to bottom) */}
-      <div className="flex items-end gap-4">
-
-        {/* ── Form modal ── */}
+      <div
+        className="w-full max-w-md rounded-2xl bg-white shadow-2xl overflow-hidden"
+        style={{ border: "1px solid #E5E7EB", minWidth: 400 }}
+      >
+        {/* Purple header */}
         <div
-          className="w-full max-w-md rounded-2xl bg-white shadow-2xl overflow-hidden"
-          style={{ border: "1px solid #E5E7EB", minWidth: 400 }}
+          className="flex items-center justify-between px-6 py-4"
+          style={{ backgroundColor: PURPLE }}
         >
-          {/* Purple header */}
-          <div
-            className="flex items-center justify-between px-6 py-4"
-            style={{ backgroundColor: PURPLE }}
-          >
-            <p className="text-[14px] font-bold text-white">Nouvelle norme</p>
-            <button
-              type="button"
-              onClick={onCancel}
-              className="flex h-6 w-6 items-center justify-center rounded-full text-white/70 transition hover:bg-white/20 text-[18px] leading-none"
-            >
-              ×
-            </button>
-          </div>
-
-          <div className="space-y-3 px-6 py-4">
-            {[
-              { key: "code",             label: "Code",                placeholder: "ex : ISO 9001" },
-              { key: "version",          label: "Version",             placeholder: "ex : 2015" },
-              { key: "titre",            label: "Titre",               placeholder: "Systèmes de management de la qualité…" },
-              { key: "date_publication", label: "Date de publication", placeholder: "", type: "date" },
-            ].map(({ key, label, placeholder, type = "text" }) => (
-              <div key={key}>
-                <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                  {label}
-                </label>
-                <input
-                  type={type}
-                  value={form[key]}
-                  onChange={(e) => set(key, e.target.value)}
-                  placeholder={placeholder}
-                  className={inputCls}
-                  style={{ borderColor: BORDER }}
-                />
-              </div>
-            ))}
-          </div>
-
-          <div
-            className="flex items-center justify-end gap-2 px-6 py-4"
-            style={{ borderTop: `1px solid ${BORDER}` }}
-          >
-            <button
-              type="button"
-              onClick={onCancel}
-              className="rounded-xl border border-slate-200 bg-white px-5 py-2 text-[12px] font-semibold text-slate-600 hover:bg-slate-50 transition"
-            >
-              Annuler
-            </button>
-            <button
-              type="button"
-              disabled={!form.code || !form.titre || saving}
-              onClick={() => onSave(form)}
-              className="rounded-xl px-5 py-2 text-[12px] font-semibold text-white transition disabled:opacity-50"
-              style={{ backgroundColor: PURPLE }}
-            >
-              {saving ? "Création…" : "Créer"}
-            </button>
-          </div>
-        </div>
-
-        {/* ── ISO panel to the right ── */}
-        {isoOpen ? (
-          <div
-            className="relative w-56 overflow-hidden rounded-2xl shadow-xl self-end mb-2"
-            style={{
-              background: "linear-gradient(160deg, #f5f3ff 0%, #ede9fe 55%, #ddd6fe 100%)",
-              border: "1px solid #c4b5fd",
-            }}
-          >
-            <div className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full opacity-25"
-              style={{ background: "radial-gradient(circle, #7c3aed, transparent)" }} />
-            <div className="flex items-center justify-between px-4 pt-4 pb-2">
-              <div className="flex items-center gap-2">
-                <span className="flex h-5 w-5 items-center justify-center rounded-full"
-                  style={{ backgroundColor: PURPLE }}>
-                  <Info size={11} className="text-white" />
-                </span>
-                <p className="text-[11px] font-bold" style={{ color: PURPLE }}>Rappel ISO</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsoOpen(false)}
-                className="flex h-5 w-5 items-center justify-center rounded-lg transition hover:bg-violet-200"
-                style={{ color: PURPLE }}
-                title="Masquer"
-              >
-                <ChevronRight size={13} />
-              </button>
-            </div>
-            <div className="px-4 pb-4">
-              <IsoArticlesList />
-            </div>
-          </div>
-        ) : (
+          <p className="text-[14px] font-bold text-white">Nouvelle norme</p>
           <button
             type="button"
-            onClick={() => setIsoOpen(true)}
-            title="Afficher le rappel ISO"
-            className="mb-2 flex h-9 w-9 items-center justify-center rounded-xl shadow-lg transition hover:scale-105"
-            style={{ border: "1px solid #c4b5fd", backgroundColor: PURPLE, color: "#fff" }}
+            onClick={onCancel}
+            className="flex h-6 w-6 items-center justify-center rounded-full text-white/70 transition hover:bg-white/20 text-[18px] leading-none"
           >
-            <Info size={15} />
+            ×
           </button>
-        )}
+        </div>
+
+        <div className="space-y-3 px-6 py-4">
+          {[
+            { key: "code",             label: "Code",                placeholder: "ex : ISO 9001" },
+            { key: "version",          label: "Version",             placeholder: "ex : 2015" },
+            { key: "titre",            label: "Titre",               placeholder: "Systèmes de management de la qualité…" },
+            { key: "date_publication", label: "Date de publication", placeholder: "", type: "date" },
+          ].map(({ key, label, placeholder, type = "text" }) => (
+            <div key={key}>
+              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                {label}
+              </label>
+              <input
+                type={type}
+                value={form[key]}
+                onChange={(e) => set(key, e.target.value)}
+                placeholder={placeholder}
+                className={inputCls}
+                style={{ borderColor: BORDER }}
+              />
+            </div>
+          ))}
+        </div>
+
+        <div
+          className="flex items-center justify-end gap-2 px-6 py-4"
+          style={{ borderTop: `1px solid ${BORDER}` }}
+        >
+          <button
+            type="button"
+            onClick={onCancel}
+            className="rounded-xl border border-slate-200 bg-white px-5 py-2 text-[12px] font-semibold text-slate-600 hover:bg-slate-50 transition"
+          >
+            Annuler
+          </button>
+          <button
+            type="button"
+            disabled={!form.code || !form.titre || saving}
+            onClick={() => onSave(form)}
+            className="rounded-xl px-5 py-2 text-[12px] font-semibold text-white transition disabled:opacity-50"
+            style={{ backgroundColor: PURPLE }}
+          >
+            {saving ? "Création…" : "Créer"}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -395,7 +188,6 @@ export default function CanevasFichePage() {
   const [showAdd, setShowAdd] = useState(false);
   const [saving,  setSaving]  = useState(false);
   const [confirm, setConfirm] = useState(null);
-  const [isoOpen, setIsoOpen] = useState(true);
 
   const userName = `${user?.prenom ?? ""} ${user?.nom ?? ""}`.trim() || user?.email || "Utilisateur";
   const userRole = user?.roles?.[0] ?? "";
@@ -448,13 +240,11 @@ export default function CanevasFichePage() {
     <AppLayout pageTitle="Canevas fiche" userName={userName} userRole={userRole}>
       <div style={{ fontFamily: "'DM Sans', sans-serif" }}>
 
-        {/* ── Top bar: title left + button right ── */}
+        {/* Top bar */}
         <div className="mb-5 flex items-center justify-between">
-          <div>
-            <p className="text-[11.5px] text-slate-400">
-              Une seule norme peut être active à la fois. Les sections de la fiche sont liées à la norme active.
-            </p>
-          </div>
+          <p className="text-[11.5px] text-slate-400">
+            Une seule norme peut être active à la fois. Les sections de la fiche sont liées à la norme active.
+          </p>
           <button
             type="button"
             onClick={() => setShowAdd(true)}
@@ -467,53 +257,41 @@ export default function CanevasFichePage() {
           </button>
         </div>
 
-        {/* ── Two-column layout: list (left) + ISO panel (right) ── */}
-        <div className="flex items-start gap-5">
-
-          {/* List */}
-          <div className="flex-1 min-w-0">
-            {loading && (
-              <div className="flex items-center justify-center py-16 text-[13px] text-slate-400">
-                Chargement…
-              </div>
-            )}
-
-            {!loading && normes.length === 0 && (
-              <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 py-16">
-                <BookOpen size={28} className="text-slate-300" />
-                <p className="text-[13px] text-slate-400">Aucune norme enregistrée</p>
-                <button
-                  type="button"
-                  onClick={() => setShowAdd(true)}
-                  className="mt-1 rounded-lg px-4 py-1.5 text-[12px] font-semibold text-white"
-                  style={{ backgroundColor: PURPLE }}
-                >
-                  Ajouter la première norme
-                </button>
-              </div>
-            )}
-
-            <div className="space-y-3">
-              {normes.map((norme) => (
-                <NormeCard
-                  key={norme.id_norme}
-                  norme={norme}
-                  onOpen={() => navigate(`/cartographie/canevas-fiche/${norme.id_norme}`)}
-                  onToggle={() => handleToggle(norme)}
-                  onDelete={() => setConfirm({ type: "delete", norme })}
-                />
-              ))}
-            </div>
+        {/* List */}
+        {loading && (
+          <div className="flex items-center justify-center py-16 text-[13px] text-slate-400">
+            Chargement…
           </div>
+        )}
 
-          {/* ISO sidebar */}
-          <div className="sticky top-4">
-            <IsoSidePanel open={isoOpen} onToggle={() => setIsoOpen((o) => !o)} />
+        {!loading && normes.length === 0 && (
+          <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 py-16">
+            <BookOpen size={28} className="text-slate-300" />
+            <p className="text-[13px] text-slate-400">Aucune norme enregistrée</p>
+            <button
+              type="button"
+              onClick={() => setShowAdd(true)}
+              className="mt-1 rounded-lg px-4 py-1.5 text-[12px] font-semibold text-white"
+              style={{ backgroundColor: PURPLE }}
+            >
+              Ajouter la première norme
+            </button>
           </div>
+        )}
+
+        <div className="space-y-3">
+          {normes.map((norme) => (
+            <NormeCard
+              key={norme.id_norme}
+              norme={norme}
+              onOpen={() => navigate(`/cartographie/canevas-fiche/${norme.id_norme}`)}
+              onToggle={() => handleToggle(norme)}
+              onDelete={() => setConfirm({ type: "delete", norme })}
+            />
+          ))}
         </div>
       </div>
 
-      {/* Add norme popup */}
       {showAdd && (
         <AddNormeForm
           saving={saving}

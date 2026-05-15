@@ -13,7 +13,7 @@ import {
   Settings,
   Users,
 } from "lucide-react";
-import qonformeLogo from "../../assets/icons/qonforme-logo.svg";
+import qonformeLogo from "../../assets/logo_gray.svg";
 import { useAuth } from "../../hooks/useAuth";
 import SidebarCalendar from "./SidebarCalendar";
 import { SIDEBAR_WIDTH, TOPBAR_HEIGHT } from "./layout.constants";
