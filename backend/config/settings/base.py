@@ -169,6 +169,7 @@ DEFAULT_FROM_EMAIL = config(
     'DEFAULT_FROM_EMAIL',
     default='Qonform <no-reply@qonform.local>',
 )
+FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:5173').rstrip('/')
 
 # Accept files up to 25 MB in Django (client-side limit is 20 MB)
 DATA_UPLOAD_MAX_MEMORY_SIZE = 25 * 1024 * 1024

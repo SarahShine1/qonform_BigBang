@@ -5,15 +5,17 @@ import {
   Search,
   Settings2,
   ShieldCheck,
+  Trash2,
   UserPlus,
   UserX,
   Users,
 } from "lucide-react";
 import { organigramApi } from "../../api/organigram.api";
+import { usersApi } from "../../api/users.api";
 import AppLayout from "../../components/layout/AppLayout";
+import ConfirmationPopup from "../../components/template/ConfirmationPopup";
 import CreateUserModal from "../../components/users/CreateUserModal";
 import { useAuth } from "../../hooks/useAuth";
-import { usersApi } from "../../api/users.api";
 
 const defaultStats = {
   activeUsers: 0,
@@ -46,7 +48,7 @@ const statCards = [
       "bg-[#fff2e8] text-[#ea580c] dark:bg-orange-950 dark:text-orange-300",
   },
   {
-    label: "COMPTES DÉSACTIVÉS",
+    label: "COMPTES DESACTIVES",
     statKey: "disabledUsers",
     icon: UserX,
     iconClassName:
@@ -99,7 +101,7 @@ function getUnitName(unit) {
     unit?.libelle ??
     unit?.title ??
     unit?.label ??
-    "Unité sans nom"
+    "Unite sans nom"
   );
 }
 
@@ -140,23 +142,14 @@ function flattenOrgUnits(units = [], parentName = "") {
       parentName,
     };
 
-    return [
-      normalized,
-      ...flattenOrgUnits(getUnitChildren(unit), name),
-    ];
+    return [normalized, ...flattenOrgUnits(getUnitChildren(unit), name)];
   });
 }
 
 function isAssignableDepartment(unit) {
-  const type = String(unit.type || "").toUpperCase();
-
-  return [
-    "DIRECTION",
-    "DEPARTMENT",
-    "DEPARTEMENT",
-    "SERVICE",
-    "CELLULE",
-  ].includes(type);
+  return ["DIRECTION", "DEPARTMENT", "DEPARTEMENT", "SERVICE", "CELLULE"].includes(
+    String(unit.type || "").toUpperCase(),
+  );
 }
 
 function normalizeDepartmentOptions(treeOrUnits = []) {
@@ -165,7 +158,7 @@ function normalizeDepartmentOptions(treeOrUnits = []) {
     .filter(isAssignableDepartment)
     .map((unit) => ({
       id: unit.id,
-      name: unit.parentName ? `${unit.name} — ${unit.parentName}` : unit.name,
+      name: unit.parentName ? `${unit.name} - ${unit.parentName}` : unit.name,
       code: unit.code,
       type: unit.type,
     }))
@@ -199,10 +192,9 @@ async function loadOrganigramDepartments() {
       data = await organigramApi.getAll();
     }
 
-    const units = extractArrayFromApiResponse(data);
-    return normalizeDepartmentOptions(units);
+    return normalizeDepartmentOptions(extractArrayFromApiResponse(data));
   } catch (error) {
-    console.error("Impossible de charger les départements depuis l’organigramme:", error);
+    console.error("Impossible de charger les departements depuis l'organigramme:", error);
     return [];
   }
 }
@@ -219,23 +211,19 @@ function buildDepartmentLookup(departments = []) {
 }
 
 function normalizeUser(entry, departmentLookup = {}) {
-  const role = entry.roles?.[0] || "Sans rôle";
+  const role = entry.roles?.[0] || "Sans role";
   const departmentId = entry.departement ?? entry.id_departement ?? null;
-  const departmentName = departmentId
-    ? departmentLookup[String(departmentId)]
-    : "";
+  const departmentName = departmentId ? departmentLookup[String(departmentId)] : "";
 
   return {
     id: entry.id_user,
     nom: entry.full_name || `${entry.prenom || ""} ${entry.nom || ""}`.trim(),
     email: entry.email,
-    telephone: entry.telephone || "—",
+    telephone: entry.telephone || "-",
     role,
-    service:
-      departmentName ||
-      (departmentId ? `Département ${departmentId}` : "Non assigné"),
-    statut: entry.statut || (entry.est_actif ? "Actif" : "Désactivé"),
-    derniereConnexion: "—",
+    service: departmentName || (departmentId ? `Departement ${departmentId}` : "Non assigne"),
+    statut: entry.statut || (entry.est_actif ? "Actif" : "Desactive"),
+    derniereConnexion: "-",
   };
 }
 
@@ -253,13 +241,16 @@ export default function GestionUtilisateurs() {
   const [error, setError] = useState("");
   const [createError, setCreateError] = useState("");
   const [createNotice, setCreateNotice] = useState("");
+  const [deleteError, setDeleteError] = useState("");
+  const [deletingUserId, setDeletingUserId] = useState(null);
+  const [pendingDeletion, setPendingDeletion] = useState(null);
 
   const userName =
     `${user?.prenom || ""} ${user?.nom || ""}`.trim() ||
     user?.email ||
     "Ahmed BENALI";
 
-  const userRole = user?.roles?.[0] || "Chef Cellule Qualité";
+  const userRole = user?.roles?.[0] || "Chef Cellule Qualite";
 
   useEffect(() => {
     let active = true;
@@ -269,22 +260,18 @@ export default function GestionUtilisateurs() {
       setError("");
 
       try {
-        const [usersData, statsData, rolesData, departmentsData] =
-          await Promise.all([
-            usersApi.getUsers(),
-            usersApi.getStats(),
-            usersApi.getRoles(),
-            loadOrganigramDepartments(),
-          ]);
+        const [usersData, statsData, rolesData, departmentsData] = await Promise.all([
+          usersApi.getUsers(),
+          usersApi.getStats(),
+          usersApi.getRoles(),
+          loadOrganigramDepartments(),
+        ]);
 
         if (!active) return;
 
         const departmentLookup = buildDepartmentLookup(departmentsData);
-
         setDepartments(departmentsData);
-        setUsers(
-          usersData.map((entry) => normalizeUser(entry, departmentLookup)),
-        );
+        setUsers(usersData.map((entry) => normalizeUser(entry, departmentLookup)));
         setStats({ ...defaultStats, ...statsData });
         setRoles(rolesData);
       } catch (loadError) {
@@ -323,16 +310,12 @@ export default function GestionUtilisateurs() {
       const createdUser = await usersApi.createUser(payload);
       const departmentLookup = buildDepartmentLookup(departments);
 
-      setUsers((current) => [
-        normalizeUser(createdUser, departmentLookup),
-        ...current,
-      ]);
-
+      setUsers((current) => [normalizeUser(createdUser, departmentLookup), ...current]);
       setModalOpen(false);
       setCreateNotice(
         createdUser.email_sent
           ? ""
-          : "Utilisateur créé avec succès, sans envoi d’email.",
+          : "Utilisateur cree avec succes, sans envoi d'email.",
       );
 
       const freshStats = await usersApi.getStats();
@@ -343,10 +326,7 @@ export default function GestionUtilisateurs() {
       if (partialUser) {
         const departmentLookup = buildDepartmentLookup(departments);
 
-        setUsers((current) => [
-          normalizeUser(partialUser, departmentLookup),
-          ...current,
-        ]);
+        setUsers((current) => [normalizeUser(partialUser, departmentLookup), ...current]);
         setModalOpen(false);
         setCreateError("");
         setCreateNotice(apiErrorMessage(createRequestError));
@@ -364,6 +344,32 @@ export default function GestionUtilisateurs() {
       setCreateError(apiErrorMessage(createRequestError));
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleDeleteUser = async () => {
+    if (!pendingDeletion) return;
+
+    setDeletingUserId(pendingDeletion.id);
+    setDeleteError("");
+
+    try {
+      await usersApi.deleteUser(pendingDeletion.id);
+      setUsers((current) =>
+        current.map((entry) =>
+          entry.id === pendingDeletion.id
+            ? { ...entry, statut: "Desactive" }
+            : entry,
+        ),
+      );
+      setPendingDeletion(null);
+
+      const freshStats = await usersApi.getStats();
+      setStats({ ...defaultStats, ...freshStats });
+    } catch (deleteRequestError) {
+      setDeleteError(apiErrorMessage(deleteRequestError));
+    } finally {
+      setDeletingUserId(null);
     }
   };
 
@@ -425,7 +431,7 @@ export default function GestionUtilisateurs() {
                 type="button"
                 className="rounded-xl border border-slate-200 px-3.5 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
               >
-                Tous les rôles
+                Tous les roles
               </button>
 
               <button
@@ -450,7 +456,7 @@ export default function GestionUtilisateurs() {
                 className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-3.5 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
               >
                 <BadgeCheck className="h-4 w-4" />
-                Gérer les rôles
+                Gerer les roles
               </button>
 
               <button
@@ -459,7 +465,7 @@ export default function GestionUtilisateurs() {
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#58148E] px-4 py-2 text-sm font-medium text-white shadow-[0_8px_18px_rgba(88,20,142,0.25)] transition hover:bg-[#4A1178]"
               >
                 <UserPlus className="h-4 w-4" />
-                Créer utilisateur
+                Creer utilisateur
               </button>
             </div>
           </div>
@@ -476,6 +482,12 @@ export default function GestionUtilisateurs() {
             </div>
           ) : null}
 
+          {deleteError ? (
+            <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-600 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300">
+              {deleteError}
+            </div>
+          ) : null}
+
           <div className="mt-4 overflow-hidden rounded-[18px] border border-slate-200 dark:border-slate-800">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800">
@@ -483,11 +495,12 @@ export default function GestionUtilisateurs() {
                   <tr>
                     {[
                       "Utilisateur",
-                      "Rôle",
+                      "Role",
                       "Service",
-                      "Téléphone",
+                      "Telephone",
                       "Statut",
-                      "Dernière connexion",
+                      "Derniere connexion",
+                      "Actions",
                     ].map((label) => (
                       <th
                         key={label}
@@ -503,7 +516,7 @@ export default function GestionUtilisateurs() {
                   {loading ? (
                     <tr>
                       <td
-                        colSpan={6}
+                        colSpan={7}
                         className="px-4 py-8 text-center text-sm text-slate-500 dark:text-slate-400"
                       >
                         Chargement des utilisateurs...
@@ -559,6 +572,27 @@ export default function GestionUtilisateurs() {
                         <td className="px-4 py-3.5 text-sm text-slate-500 dark:text-slate-400">
                           {entry.derniereConnexion}
                         </td>
+
+                        <td className="px-4 py-3.5">
+                          <button
+                            type="button"
+                            onClick={() => setPendingDeletion(entry)}
+                            disabled={
+                              deletingUserId === entry.id ||
+                              entry.id === user?.id_user ||
+                              entry.statut === "Desactive"
+                            }
+                            className="inline-flex items-center gap-2 rounded-lg border border-rose-200 px-3 py-2 text-xs font-medium text-rose-600 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-rose-900 dark:text-rose-300 dark:hover:bg-rose-950/30"
+                            title={
+                              entry.id === user?.id_user
+                                ? "Vous ne pouvez pas supprimer votre propre compte."
+                                : "Supprimer l'utilisateur"
+                            }
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            {deletingUserId === entry.id ? "Suppression..." : "Supprimer"}
+                          </button>
+                        </td>
                       </tr>
                     ))
                   )}
@@ -568,7 +602,7 @@ export default function GestionUtilisateurs() {
 
             {!loading && filteredUsers.length === 0 ? (
               <div className="border-t border-slate-200 px-5 py-8 text-center text-sm text-slate-500 dark:border-slate-800 dark:text-slate-400">
-                Aucun utilisateur ne correspond à cette recherche.
+                Aucun utilisateur ne correspond a cette recherche.
               </div>
             ) : null}
           </div>
@@ -584,6 +618,20 @@ export default function GestionUtilisateurs() {
         submitting={submitting}
         error={createError}
       />
+
+      {pendingDeletion ? (
+        <ConfirmationPopup
+          title="Supprimer cet utilisateur ?"
+          message={`Le compte de ${pendingDeletion.nom} sera desactive et ne pourra plus se connecter.`}
+          confirmLabel="Supprimer"
+          onConfirm={handleDeleteUser}
+          onCancel={() => {
+            if (!deletingUserId) {
+              setPendingDeletion(null);
+            }
+          }}
+        />
+      ) : null}
     </AppLayout>
   );
 }

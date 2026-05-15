@@ -1021,3 +1021,87 @@ class MySettingsApiTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("profiles/", response.data["photo_profil"])
+class PasswordResetApiTests(APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user, cls.utilisateur = make_user(
+            username="reset_user",
+            email="reset@esi.dz",
+            password="oldpassword123",
+            nom="Reset",
+            prenom="User",
+            est_actif=True,
+        )
+
+    @patch("apps.accounts.views.send_password_reset_email")
+    def test_forgot_password_returns_success_for_existing_account(self, send_reset_email_mock):
+        send_reset_email_mock.return_value = {
+            "uid": "uid",
+            "token": "token",
+            "reset_url": "http://localhost:5173/reset-password?uid=uid&token=token",
+        }
+
+        response = self.client.post(
+            "/api/v1/auth/password/forgot/",
+            {"email": "reset@esi.dz"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("detail", response.data)
+        send_reset_email_mock.assert_called_once()
+
+    @patch("apps.accounts.views.send_password_reset_email")
+    def test_forgot_password_does_not_fail_for_unknown_email(self, send_reset_email_mock):
+        response = self.client.post(
+            "/api/v1/auth/password/forgot/",
+            {"email": "unknown@esi.dz"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("detail", response.data)
+        send_reset_email_mock.assert_not_called()
+
+    def test_reset_password_updates_credentials(self):
+        from django.contrib.auth.tokens import PasswordResetTokenGenerator
+        from django.utils.encoding import force_bytes
+        from django.utils.http import urlsafe_base64_encode
+
+        uid = urlsafe_base64_encode(force_bytes(self.user.pk))
+        token = PasswordResetTokenGenerator().make_token(self.user)
+
+        response = self.client.post(
+            "/api/v1/auth/password/reset/",
+            {
+                "uid": uid,
+                "token": token,
+                "password": "newpassword123",
+                "password_confirmation": "newpassword123",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password("newpassword123"))
+
+    def test_reset_password_rejects_invalid_token(self):
+        from django.utils.encoding import force_bytes
+        from django.utils.http import urlsafe_base64_encode
+
+        uid = urlsafe_base64_encode(force_bytes(self.user.pk))
+
+        response = self.client.post(
+            "/api/v1/auth/password/reset/",
+            {
+                "uid": uid,
+                "token": "invalid-token",
+                "password": "newpassword123",
+                "password_confirmation": "newpassword123",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("token", response.data)
