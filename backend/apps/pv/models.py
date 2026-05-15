@@ -25,8 +25,8 @@ class PVParticipant(models.Model):
 
 class PV(models.Model):
     PV_TYPES = [
-        ('SUIVI', 'Follow-up'),
-        ('REVUE_DG', 'Meeting'),    # ← underscore, pas espace
+        ('SUIVI', 'Reunion de suivi'),
+        ('REVUE_DG', 'Revue avec DG'),    # ← underscore, pas espace
     ]
 
     id = models.AutoField(primary_key=True)
