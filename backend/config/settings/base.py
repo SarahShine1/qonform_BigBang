@@ -47,8 +47,8 @@ LOCAL_APPS = [
     'apps.pilotage',
     'apps.diagnostic',
     'apps.maturity',
-
     'apps.taches',
+    'apps.notifications',
     'apps.pv',
 
 
