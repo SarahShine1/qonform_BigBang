@@ -159,8 +159,16 @@ export default function Topbar({ pageTitle, userName, userRole, leftOffset = SID
           <p className="text-[10px] leading-[1.2] text-slate-400 dark:text-slate-500">{userRole}</p>
         </div>
 
-        <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-[#58148E]">
-          <span className="text-[12px] font-semibold text-white">{initials}</span>
+        <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#58148E]">
+          {user?.photo_profil ? (
+            <img
+              src={user.photo_profil}
+              alt={userName || "Profil"}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <span className="text-[12px] font-semibold text-white">{initials}</span>
+          )}
         </div>
       </div>
     </header>

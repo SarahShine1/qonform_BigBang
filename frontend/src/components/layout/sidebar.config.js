@@ -98,7 +98,7 @@ const auditeurItems = [
 ];
 
 const dgItems = [
-  { label: "Tableau de bord", icon: LayoutDashboard, to: "/dashboard" },
+  { label: "Tableau de bord", icon: LayoutDashboard, to: "/dashboard-DG" },
   { label: "Organigramme", icon: GitBranch, to: "/organigramme" },
   {
     label: "Cartographie",

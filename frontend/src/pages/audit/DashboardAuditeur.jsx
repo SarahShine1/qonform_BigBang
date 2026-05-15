@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  AlertTriangle,
   BarChart3,
+  CheckCircle2,
+  ClipboardCheck,
   Gauge,
   MoreVertical,
   PieChart,
+  RotateCcw,
 } from "lucide-react";
 import AppLayout from "../../components/layout/AppLayout";
 import { auditApi } from "../../api/audit.api";
@@ -46,15 +48,28 @@ export default function DashboardAuditeur() {
 
   const kpis = data?.kpis || {};
   const conformity = data?.tauxMoyenConformite || 0;
+  const ficheKpis = buildFicheKpis(data?.fichesParStatut || []);
 
   return (
     <AppLayout
       pageTitle="Dashboard Auditeur"
       userName={userName}
       userRole="Auditeur"
-      contentClassName="bg-gray-50 px-4 py-3 pb-5"
+      contentClassName="bg-gray-50 px-4 py-4 pb-5"
     >
-      <section className="grid gap-3 lg:grid-cols-3">
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {ficheKpis.map((item) => (
+          <KpiCard key={item.label} {...item} />
+        ))}
+      </section>
+
+      <section className="mt-3">
+        <ChartCard title="État de mes tâches" icon={BarChart3} wide>
+          <CompactTaskStatus data={normalizeTaskLabels(data?.tachesParStatut || [])} alerts={data?.alertes || []} />
+        </ChartCard>
+      </section>
+
+      <section className="mt-5 grid gap-3 lg:grid-cols-3">
         <ChartCard title="Progression des processus audités" icon={PieChart} compact>
           <DonutChart
             data={[
@@ -66,35 +81,41 @@ export default function DashboardAuditeur() {
           />
         </ChartCard>
 
-        <ChartCard title="Répartition des fiches processus" icon={BarChart3} compact>
-          <HorizontalBars data={data?.fichesParStatut || []} unit="fiche" />
+        <ChartCard title="Résultats des audits réalisés" icon={BarChart3} compact>
+          <VerticalBars data={normalizeResultLabels(data?.resultatsAudits || [])} unit="audit" compact />
         </ChartCard>
 
         <ChartCard title="Taux moyen de conformité" icon={Gauge} compact>
           <GaugeChart value={conformity} />
         </ChartCard>
       </section>
-
-      <section className="mt-3 grid gap-3 lg:grid-cols-3">
-        <ChartCard title="Résultats des audits réalisés" icon={BarChart3} compact>
-          <VerticalBars data={data?.resultatsAudits || []} unit="audit" compact />
-        </ChartCard>
-        <AlertsPanel alerts={data?.alertes || []} />
-        <ChartCard title="État de mes tâches" icon={BarChart3} compact>
-          <VerticalBars data={data?.tachesParStatut || []} unit="tâche" compact />
-        </ChartCard>
-      </section>
     </AppLayout>
   );
 }
 
-function ChartCard({ title, icon: Icon, children, tall = false, compact = false, small = false }) {
-  const cardHeight = tall ? "h-[432px]" : compact ? "h-[258px]" : small ? "h-[210px]" : "h-[254px]";
-  const bodyHeight = tall ? "h-[382px]" : compact ? "h-[208px]" : small ? "h-[160px]" : "h-[204px]";
+function KpiCard({ label, value, icon: Icon, iconClassName, valueClassName }) {
+  return (
+    <section className="h-[128px] rounded-lg border border-gray-200 bg-white px-5 py-4 shadow-sm transition-shadow hover:shadow-md">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-slate-500">{label}</p>
+          <p className={`mt-7 text-3xl font-extrabold leading-none ${valueClassName}`}>{value}</p>
+        </div>
+        <span className={`flex h-11 w-11 items-center justify-center rounded-full ${iconClassName}`}>
+          <Icon className="h-5 w-5" />
+        </span>
+      </div>
+    </section>
+  );
+}
+
+function ChartCard({ title, icon: Icon, children, compact = false, wide = false }) {
+  const cardHeight = wide ? "h-[206px]" : compact ? "h-[218px]" : "h-[218px]";
+  const bodyHeight = wide ? "h-[148px]" : compact ? "h-[164px]" : "h-[164px]";
 
   return (
     <section className={`${cardHeight} rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm`}>
-      <div className="mb-2 flex items-center justify-between gap-2">
+      <div className="mb-1 flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
           <Icon className="h-4 w-4 shrink-0 text-purple-700" />
           <h2 className="truncate text-sm font-bold text-gray-950">{title}</h2>
@@ -117,7 +138,7 @@ function DonutChart({ data, center, caption }) {
   return (
     <div className="relative flex h-full items-center justify-center gap-3">
       <div className="shrink-0">
-        <svg viewBox="0 0 120 120" className="h-28 w-28 xl:h-32 xl:w-32">
+        <svg viewBox="0 0 120 120" className="h-[92px] w-[92px] xl:h-24 xl:w-24">
           <circle cx="60" cy="60" r="42" fill="none" stroke="#e5e7eb" strokeWidth="16" />
           {data.map((item, index) => {
             const dash = (Number(item.value || 0) / total) * 263.89;
@@ -159,47 +180,6 @@ function DonutChart({ data, center, caption }) {
   );
 }
 
-function HorizontalBars({ data, unit }) {
-  const [hovered, setHovered] = useState(null);
-  const max = Math.max(...data.map((item) => item.value || 0), 0);
-  if (!max) return <EmptyChart />;
-  const active = hovered === null ? null : data[hovered];
-
-  return (
-    <div className="relative flex h-full flex-col justify-center space-y-2 pb-2">
-      {data.map((item, index) => (
-        <div
-          key={item.label}
-          className="cursor-pointer"
-          onMouseEnter={() => setHovered(index)}
-          onMouseLeave={() => setHovered(null)}
-        >
-          <div className="mb-0.5 flex justify-between text-[11px]">
-            <span className="font-semibold text-slate-700">{item.label}</span>
-            <span className="font-bold text-slate-500">{item.value}</span>
-          </div>
-          <div className="h-2 rounded-full bg-gray-100">
-            <div
-              className="h-full rounded-full transition-all duration-200"
-              style={{
-                width: `${((item.value || 0) / max) * 100}%`,
-                background: COLORS[index % COLORS.length],
-                opacity: hovered === null || hovered === index ? 1 : 0.38,
-                transform: hovered === index ? "scaleY(1.18)" : "scaleY(1)",
-              }}
-            />
-          </div>
-        </div>
-      ))}
-      {active && (
-        <ChartTooltip>
-          <strong>{active.label}</strong> : {active.value} {plural(unit, active.value)}
-        </ChartTooltip>
-      )}
-    </div>
-  );
-}
-
 function VerticalBars({ data, unit, compact = false }) {
   const [hovered, setHovered] = useState(null);
   const max = Math.max(...data.map((item) => item.value || 0), 0);
@@ -207,7 +187,7 @@ function VerticalBars({ data, unit, compact = false }) {
   const active = hovered === null ? null : data[hovered];
 
   return (
-    <div className="relative flex h-full items-end gap-3 border-b border-gray-100 pt-2">
+    <div className="relative flex h-full items-end gap-3 border-b border-gray-100 pt-1">
       {data.map((item, index) => (
         <div
           key={item.label}
@@ -219,7 +199,7 @@ function VerticalBars({ data, unit, compact = false }) {
           <div
             className="w-full max-w-[42px] rounded-t-md transition-all duration-200"
             style={{
-              height: `${Math.max(((item.value || 0) / max) * (compact ? 82 : 118), 8)}px`,
+              height: `${Math.max(((item.value || 0) / max) * (compact ? 54 : 82), 7)}px`,
               background: COLORS[index % COLORS.length],
               opacity: hovered === null || hovered === index ? 1 : 0.38,
               transform: hovered === index ? "scaleX(1.08)" : "scaleX(1)",
@@ -231,6 +211,97 @@ function VerticalBars({ data, unit, compact = false }) {
       {active && (
         <ChartTooltip>
           <strong>{active.label}</strong> : {active.value} {plural(unit, active.value)}
+        </ChartTooltip>
+      )}
+    </div>
+  );
+}
+
+function CompactTaskStatus({ data, alerts = [] }) {
+  const [hovered, setHovered] = useState(null);
+  const max = Math.max(...data.map((item) => item.value || 0), 0);
+  if (!max) return <EmptyChart />;
+  const active = hovered === null ? null : data[hovered];
+  const urgentAlerts = alerts
+    .filter((alert) => {
+      const message = String(alert.message || "").toLowerCase();
+      return !message.includes("nc majeures ou critiques") && !message.includes("rapport référencé");
+    })
+    .slice(0, 3);
+
+  return (
+    <div className="relative grid h-full items-center gap-4 overflow-hidden md:grid-cols-[minmax(0,1.9fr)_minmax(220px,0.65fr)]">
+      <div className="flex h-full items-center justify-center px-4 py-1">
+        <div className="flex w-full max-w-xl items-center justify-center gap-6">
+          <div className="flex h-[74px] min-w-[220px] items-end justify-center gap-7 border-b border-gray-100 px-3">
+            {data.map((item, index) => {
+              const height = Math.max(((item.value || 0) / max) * 56, 7);
+              return (
+                <button
+                  key={item.label}
+                  type="button"
+                  aria-label={`${item.label}: ${item.value}`}
+                  className="flex h-full w-7 cursor-pointer items-end justify-center transition-transform duration-200 hover:scale-x-110"
+                  onMouseEnter={() => setHovered(index)}
+                  onMouseLeave={() => setHovered(null)}
+                >
+                  <span
+                    className="block w-6 rounded-t-md transition-all duration-200"
+                    style={{
+                      height: `${height}px`,
+                      background: COLORS[index % COLORS.length],
+                      opacity: hovered === null || hovered === index ? 1 : 0.42,
+                    }}
+                  />
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="grid min-w-[150px] gap-1">
+            {data.map((item, index) => (
+              <div
+                key={item.label}
+                className="cursor-pointer rounded-md px-2 py-0.5 transition-colors hover:bg-gray-50"
+                onMouseEnter={() => setHovered(index)}
+                onMouseLeave={() => setHovered(null)}
+              >
+                <span className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600">
+                  <span className="h-2.5 w-2.5 rounded-full" style={{ background: COLORS[index % COLORS.length] }} />
+                  {item.label}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="h-full overflow-hidden border-l border-slate-200 pl-4 pr-1">
+        <div className="mb-1 flex items-center gap-2">
+          <span className="h-2 w-2 rounded-full bg-red-500" />
+          <p className="text-[11px] font-bold text-slate-800">Alertes urgentes</p>
+        </div>
+        <div className="space-y-1">
+          {urgentAlerts.length === 0 ? (
+            <p className="rounded-md border border-dashed border-slate-200 bg-white px-2 py-2 text-center text-[11px] text-slate-500">
+              Aucune alerte urgente
+            </p>
+          ) : (
+            urgentAlerts.map((alert) => (
+              <div
+                key={alert.message}
+                className="truncate rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold leading-4 text-slate-600"
+                title={alert.message}
+              >
+                {alert.message}
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+      {active && (
+        <ChartTooltip>
+          <strong>{active.label}</strong> : {active.value} {plural("tâche", active.value)}
         </ChartTooltip>
       )}
     </div>
@@ -250,7 +321,7 @@ function GaugeChart({ value }) {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      <svg viewBox="0 0 120 120" className="h-28 w-28 xl:h-32 xl:w-32">
+      <svg viewBox="0 0 120 120" className="h-[92px] w-[92px] xl:h-24 xl:w-24">
         <circle cx="60" cy="60" r="42" fill="none" stroke="#e5e7eb" strokeWidth="14" />
         <circle
           cx="60"
@@ -278,33 +349,6 @@ function GaugeChart({ value }) {
   );
 }
 
-function AlertsPanel({ alerts }) {
-  const visibleAlerts = alerts.slice(0, 3);
-  return (
-    <section className="h-[258px] rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <AlertTriangle className="h-4 w-4 text-red-500" />
-          <h2 className="text-sm font-bold text-gray-950">Alertes importantes</h2>
-        </div>
-        <MoreVertical className="h-4 w-4 text-slate-400" />
-      </div>
-      <div className="mt-2 space-y-2">
-        {visibleAlerts.length === 0 ? <EmptyChart /> : visibleAlerts.map((alert) => <AlertItem key={alert.message} alert={alert} />)}
-      </div>
-    </section>
-  );
-}
-
-function AlertItem({ alert }) {
-  const styles = {
-    danger: "border-red-100 bg-red-50 text-red-700",
-    warning: "border-amber-100 bg-amber-50 text-amber-700",
-    info: "border-blue-100 bg-blue-50 text-blue-700",
-  };
-  return <div className={`rounded-md border px-3 py-2 text-xs font-semibold leading-4 ${styles[alert.type] || styles.info}`}>{alert.message}</div>;
-}
-
 function Legend({ data }) {
   return (
     <div className="flex max-w-[130px] flex-col gap-2 xl:max-w-[150px]">
@@ -324,6 +368,76 @@ function ChartTooltip({ children }) {
       {children}
     </div>
   );
+}
+
+function buildFicheKpis(items) {
+  const values = new Map((items || []).map((item) => [normalizeLabel(item.label), item.value || 0]));
+  return [
+    {
+      label: "Soumises",
+      value: values.get("soumises") || 0,
+      icon: ClipboardCheck,
+      iconClassName: "bg-blue-50 text-blue-600",
+      valueClassName: "text-blue-600",
+    },
+    {
+      label: "En cours d'audit",
+      value: values.get("en cours daudit") || 0,
+      icon: PieChart,
+      iconClassName: "bg-amber-50 text-amber-600",
+      valueClassName: "text-amber-600",
+    },
+    {
+      label: "À réauditer",
+      value: values.get("a reauditer") || 0,
+      icon: RotateCcw,
+      iconClassName: "bg-purple-50 text-purple-700",
+      valueClassName: "text-purple-700",
+    },
+    {
+      label: "Auditées / publiées",
+      value: values.get("auditees publiees") || 0,
+      icon: CheckCircle2,
+      iconClassName: "bg-emerald-50 text-emerald-600",
+      valueClassName: "text-emerald-600",
+    },
+  ];
+}
+
+function normalizeTaskLabels(items) {
+  return (items || []).map((item) => ({
+    ...item,
+    label: cleanLabel(item.label),
+  }));
+}
+
+function normalizeResultLabels(items) {
+  return (items || []).map((item) => ({
+    ...item,
+    label: cleanLabel(item.label),
+  }));
+}
+
+function cleanLabel(value) {
+  const normalized = normalizeLabel(value);
+  const labels = {
+    "a faire": "À faire",
+    terminees: "Terminées",
+    "auditees publiees": "Auditées / publiées",
+    "a reauditer": "À réauditer",
+  };
+  return labels[normalized] || value;
+}
+
+function normalizeLabel(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[’']/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
 }
 
 function plural(unit, value) {

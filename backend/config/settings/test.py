@@ -32,6 +32,7 @@ TEST_RUNNER = 'config.test_runner.UnmanagedModelsTestRunner'
 # List of model labels whose tables should be created in the test DB
 # even though managed=False in production.
 UNMANAGED_MODELS_TO_CREATE = [
+    'accounts.Departement',
     'accounts.Utilisateur',
     'accounts.Role',
     'accounts.UserRole',

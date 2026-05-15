@@ -1,6 +1,7 @@
 from collections import defaultdict
 from datetime import date
 from html import escape
+import unicodedata
 
 from django.db import connection, transaction
 from django.http import StreamingHttpResponse
@@ -70,6 +71,20 @@ CONFORMITY_WEIGHTS = {
     "checklist": 0.30,
     "bpmn": 0.15,
     "proofs": 0.15,
+}
+
+SECTION_WEIGHTS = {
+    "contexte de lorganisation": 15,
+    "contexte de lorganisme": 15,
+    "leadership": 10,
+    "planification": 15,
+    "support": 10,
+    "realisation des activites operationnelles": 25,
+    "realisation des activites": 25,
+    "evaluation des performances": 10,
+    "amelioration": 10,
+    "ameliorations": 10,
+    "documents et preuves": 5,
 }
 
 
@@ -818,10 +833,13 @@ def create_action_corrective(request, id_nc):
 
 def load_fiche_audit_detail(id_version):
     with connection.cursor() as cursor:
+        has_version_norme = table_has_column(cursor, "version_fiche", "id_norme")
+        norme_select = "vf.id_norme" if has_version_norme else "NULL::integer AS id_norme"
         cursor.execute(
-            """
+            f"""
             SELECT
                 vf.id_version,
+                {norme_select},
                 vf.numero_version,
                 vf.statut,
                 vf."commit" AS audit_commit,
@@ -900,22 +918,48 @@ def load_fiche_audit_detail(id_version):
         )
         champ_rows = dictfetchall(cursor)
 
-        cursor.execute(
-            """
-            SELECT id_section_template, nom, ordre
-            FROM section_template
-            WHERE est_actif = TRUE
-            ORDER BY ordre, id_section_template
-            """
-        )
-        template_sections = dictfetchall(cursor)
+        has_section_norme = table_has_column(cursor, "section_template", "id_norme")
+        if has_section_norme and fiche.get("id_norme"):
+            cursor.execute(
+                """
+                SELECT id_section_template, nom, ordre
+                FROM section_template
+                WHERE est_actif = TRUE
+                  AND id_norme = %s
+                ORDER BY ordre, id_section_template
+                """,
+                [fiche["id_norme"]],
+            )
+            template_sections = dictfetchall(cursor)
+            if not template_sections:
+                cursor.execute(
+                    """
+                    SELECT id_section_template, nom, ordre
+                    FROM section_template
+                    WHERE est_actif = TRUE
+                    ORDER BY ordre, id_section_template
+                    """
+                )
+                template_sections = dictfetchall(cursor)
+        else:
+            cursor.execute(
+                """
+                SELECT id_section_template, nom, ordre
+                FROM section_template
+                WHERE est_actif = TRUE
+                ORDER BY ordre, id_section_template
+                """
+            )
+            template_sections = dictfetchall(cursor)
 
         criteres = []
         if table_exists(cursor, "critere_evaluation"):
             ensure_default_audit_criteria(cursor)
+            has_critere_section = table_has_column(cursor, "critere_evaluation", "id_section_template")
+            section_select = "id_section_template" if has_critere_section else "NULL::integer AS id_section_template"
             cursor.execute(
-                """
-                SELECT id_critere, nom, est_actif
+                f"""
+                SELECT id_critere, nom, est_actif, {section_select}
                 FROM critere_evaluation
                 WHERE est_actif = TRUE
                 ORDER BY id_critere
@@ -930,6 +974,7 @@ def load_fiche_audit_detail(id_version):
                     "id_critere": item["id_critere"],
                     "id_exigence": item["id_critere"],
                     "description": item["nom"],
+                    "id_section_template": item.get("id_section_template"),
                     "est_obligatoire": True,
                     "ponderation": 1,
                     "code_article": f"CR-{item['id_critere']}",
@@ -1141,7 +1186,7 @@ def load_fiche_audit_detail(id_version):
         )
 
     documents_grouped = group_audit_documents(documents)
-    metrics = calculate_audit_metrics(sections, evaluations, documents_grouped)
+    metrics = calculate_audit_metrics(sections, evaluations, documents_grouped, section_requirements)
     taux_conformite = metrics["taux_global"]
     report_file = fiche.get("rapport_pdf") or default_report_filename(fiche["id_version"], fiche["code_process"])
 
@@ -1324,6 +1369,7 @@ def distribute_requirements_by_section(exigences, sections):
     if not sections:
         return []
 
+    buckets_by_id = {}
     buckets = [
         {
             "id_section_template": section["id_section_template"],
@@ -1333,9 +1379,15 @@ def distribute_requirements_by_section(exigences, sections):
         }
         for section in sections
     ]
+    for bucket in buckets:
+        if bucket["id_section_template"] is not None:
+            buckets_by_id[str(bucket["id_section_template"])] = bucket
 
     for index, exigence in enumerate(exigences):
-        bucket = buckets[index % len(buckets)]
+        section_id = exigence.get("id_section_template")
+        bucket = buckets_by_id.get(str(section_id)) if section_id is not None else None
+        if bucket is None:
+            bucket = buckets[index % len(buckets)]
         bucket["requirements"].append(exigence)
 
     return buckets
@@ -1343,17 +1395,17 @@ def distribute_requirements_by_section(exigences, sections):
 
 def apply_section_completion_rates(sections):
     for section in sections:
-        champs = section.get("champs") or []
-        if not champs:
-            section["completion_rate"] = None
+        required_fields = [champ for champ in section.get("champs") or [] if champ.get("est_obligatoire")]
+        if not required_fields:
+            section["completion_rate"] = 100
             section["completion_done"] = 0
             section["completion_total"] = 0
             continue
 
-        completed = sum(1 for champ in champs if is_value_filled(champ.get("valeur")))
-        section["completion_rate"] = round((completed / len(champs)) * 100)
+        completed = sum(1 for champ in required_fields if is_value_filled(champ.get("valeur")))
+        section["completion_rate"] = round((completed / len(required_fields)) * 100)
         section["completion_done"] = completed
-        section["completion_total"] = len(champs)
+        section["completion_total"] = len(required_fields)
 
 
 def is_value_filled(value):
@@ -1386,31 +1438,19 @@ def group_audit_documents(documents):
     return grouped
 
 
-def calculate_audit_metrics(sections, evaluations, documents_grouped):
-    completion_values = [
-        section.get("completion_rate")
-        for section in sections
-        if section.get("completion_rate") is not None
-    ]
-    completion = average_numbers(completion_values)
-    checklist = score_db_results(item.get("resultat") for item in evaluations)
+def calculate_audit_metrics(sections, evaluations, documents_grouped, section_requirements=None):
+    section_scores = calculate_section_scores(sections, evaluations, section_requirements)
+    completion = average_numbers([item["taux_completude"] for item in section_scores])
+    checklist = average_numbers([item["taux_criteres"] for item in section_scores])
     bpmn = score_db_results(document.get("evaluation") for document in documents_grouped.get("bpmn", []))
     proofs = score_db_results(document.get("evaluation") for document in documents_grouped.get("preuves", []))
 
-    values = {
-        "completion": completion,
-        "checklist": checklist,
-        "bpmn": bpmn,
-        "proofs": proofs,
-    }
-    active_weight = sum(weight for key, weight in CONFORMITY_WEIGHTS.items() if values.get(key) is not None)
-    if active_weight == 0:
-        global_rate = 0
+    weighted_sections = [item for item in section_scores if item["poids"] > 0]
+    weight_total = sum(item["poids"] for item in weighted_sections)
+    if weight_total:
+        global_rate = round(sum(item["score"] * item["poids"] for item in weighted_sections) / weight_total)
     else:
-        global_rate = round(
-            sum((values[key] or 0) * CONFORMITY_WEIGHTS[key] for key in values if values.get(key) is not None)
-            / active_weight
-        )
+        global_rate = round(average_numbers([item["score"] for item in section_scores]) or 0)
 
     return {
         "taux_completude_moyen": round(completion or 0),
@@ -1418,8 +1458,76 @@ def calculate_audit_metrics(sections, evaluations, documents_grouped):
         "score_bpmn": round(bpmn or 0),
         "score_preuves": round(proofs or 0),
         "taux_global": global_rate,
-        "ponderation": CONFORMITY_WEIGHTS,
+        "ponderation": SECTION_WEIGHTS,
+        "sections": section_scores,
     }
+
+
+def calculate_section_scores(sections, evaluations, section_requirements=None):
+    requirement_to_section = {}
+    for section in section_requirements or []:
+        section_id = section.get("id_section_template")
+        for requirement in section.get("requirements", []):
+            requirement_id = requirement.get("id_critere") or requirement.get("id_exigence")
+            if requirement_id is not None:
+                requirement_to_section[str(requirement_id)] = section_id
+
+    evaluations_by_section = defaultdict(list)
+    for evaluation in evaluations:
+        requirement_id = evaluation.get("id_critere") or evaluation.get("id_exigence")
+        section_id = evaluation.get("id_section_template") or requirement_to_section.get(str(requirement_id))
+        if section_id is not None:
+            evaluations_by_section[str(section_id)].append(evaluation)
+
+    scores = []
+    for section in sections:
+        section_id = section.get("id_section_template")
+        section_evaluations = evaluations_by_section.get(str(section_id), [])
+        taux_completude = section.get("completion_rate")
+        if taux_completude is None:
+            taux_completude = 100
+        taux_criteres = calculate_section_criteria_rate(section_evaluations)
+        score = round((0.6 * taux_completude) + (0.4 * taux_criteres))
+        poids = get_section_weight(section.get("nom"))
+        section["criteria_rate"] = taux_criteres
+        section["score_section"] = score
+        section["weight"] = poids
+        scores.append(
+            {
+                "id_section_template": section_id,
+                "nom": section.get("nom"),
+                "taux_completude": round(taux_completude),
+                "taux_criteres": round(taux_criteres),
+                "score": score,
+                "poids": poids,
+            }
+        )
+    return scores
+
+
+def calculate_section_criteria_rate(section_evaluations):
+    if not section_evaluations:
+        return 0
+
+    applicable_scores = [
+        EVALUATION_SCORE[evaluation["resultat"]]
+        for evaluation in section_evaluations
+        if evaluation.get("resultat") in EVALUATION_SCORE
+    ]
+    if not applicable_scores:
+        return 100
+    return sum(applicable_scores) / len(applicable_scores)
+
+
+def get_section_weight(section_name):
+    return SECTION_WEIGHTS.get(normalize_section_name(section_name), 0)
+
+
+def normalize_section_name(value):
+    text = unicodedata.normalize("NFKD", str(value or ""))
+    text = "".join(char for char in text if not unicodedata.combining(char))
+    text = text.lower().replace("’", "").replace("'", "")
+    return " ".join("".join(char if char.isalnum() else " " for char in text).split())
 
 
 def average_numbers(values):

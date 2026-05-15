@@ -11,6 +11,20 @@ import { auditApi } from "../../api/audit.api";
 import { complianceStatuses } from "../../data/auditExecution.mock";
 import { useAuth } from "../../hooks/useAuth";
 
+const SECTION_WEIGHTS = {
+  "contexte de lorganisation": 15,
+  "contexte de lorganisme": 15,
+  leadership: 10,
+  planification: 15,
+  support: 10,
+  "realisation des activites operationnelles": 25,
+  "realisation des activites": 25,
+  "evaluation des performances": 10,
+  amelioration: 10,
+  ameliorations: 10,
+  "documents et preuves": 5,
+};
+
 export default function AuditExecution() {
   const { auditId } = useParams();
   const navigate = useNavigate();
@@ -444,16 +458,19 @@ function calculateAuditMetrics(data, evaluations) {
   const bpmnSections = sections.filter((section) => section.id === "bpmn");
   const proofSections = sections.filter((section) => section.id === "preuves");
 
-  const completionScore = average(
-    ficheSections
-      .map((section) => section.completionRate)
-      .filter((rate) => typeof rate === "number")
-  );
-  const checklistScore = scoreRequirements(
-    ficheSections.flatMap((section) => section.requirements),
-    evaluations,
-    scoreMap
-  );
+  const sectionScores = ficheSections.map((section) => {
+    const completionRate = typeof section.completionRate === "number" ? section.completionRate : 100;
+    const criteriaRate = scoreSectionRequirements(section.requirements, evaluations, scoreMap);
+    const score = Math.round(completionRate * 0.6 + criteriaRate * 0.4);
+    return {
+      score,
+      completionRate,
+      criteriaRate,
+      weight: getSectionWeight(section.title),
+    };
+  });
+  const completionScore = average(sectionScores.map((section) => section.completionRate));
+  const checklistScore = average(sectionScores.map((section) => section.criteriaRate));
   const bpmnScore = scoreRequirements(
     bpmnSections.flatMap((section) => section.requirements),
     evaluations,
@@ -465,18 +482,12 @@ function calculateAuditMetrics(data, evaluations) {
     scoreMap
   );
 
-  const weighted = [
-    { value: completionScore, weight: 0.4 },
-    { value: checklistScore, weight: 0.3 },
-    { value: bpmnScore, weight: 0.15 },
-    { value: proofScore, weight: 0.15 },
-  ].filter((item) => item.value !== null);
-
+  const weighted = sectionScores.filter((item) => item.weight > 0);
   const weightTotal = weighted.reduce((total, item) => total + item.weight, 0);
   const tauxGlobal =
     weightTotal === 0
-      ? data.complianceRate || 0
-      : Math.round(weighted.reduce((total, item) => total + item.value * item.weight, 0) / weightTotal);
+      ? Math.round(average(sectionScores.map((item) => item.score)) ?? data.complianceRate ?? 0)
+      : Math.round(weighted.reduce((total, item) => total + item.score * item.weight, 0) / weightTotal);
 
   return {
     tauxCompletudeMoyen: Math.round(completionScore ?? data.metrics?.taux_completude_moyen ?? 0),
@@ -485,6 +496,23 @@ function calculateAuditMetrics(data, evaluations) {
     scorePreuves: Math.round(proofScore ?? data.metrics?.score_preuves ?? 0),
     tauxGlobal,
   };
+}
+
+function scoreSectionRequirements(requirements, evaluations, scoreMap) {
+  const statuses = requirements
+    .map((requirement) => evaluations[requirement.id]?.status)
+    .filter(Boolean);
+
+  if (!statuses.length) return 0;
+
+  const scores = statuses
+    .filter((statusValue) => statusValue !== "non_applicable")
+    .map((statusValue) => scoreMap.get(statusValue))
+    .filter((score) => typeof score === "number")
+    .map((score) => score * 100);
+
+  if (!scores.length) return 100;
+  return average(scores) ?? 0;
 }
 
 function scoreRequirements(requirements, evaluations, scoreMap) {
@@ -496,6 +524,21 @@ function scoreRequirements(requirements, evaluations, scoreMap) {
     .map((score) => score * 100);
 
   return average(scores);
+}
+
+function getSectionWeight(sectionName) {
+  return SECTION_WEIGHTS[normalizeSectionName(sectionName)] || 0;
+}
+
+function normalizeSectionName(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[’']/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
 }
 
 function average(values) {
