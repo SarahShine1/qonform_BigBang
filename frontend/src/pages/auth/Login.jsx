@@ -1,17 +1,20 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   ArrowRight,
+  BadgeCheck,
   Eye,
+  EyeOff,
+  FolderKanban,
+  Loader2,
   Lock,
   Mail,
-  ShieldCheck,
   Network,
   ScrollText,
-  FolderKanban,
-  BadgeCheck,
+  ShieldCheck,
+  X,
 } from "lucide-react";
-import { login as loginRequest } from "../../api/auth";
+import { forgotPassword, login as loginRequest } from "../../api/auth";
 import { useAuth } from "../../hooks/useAuth";
 import qonformeLogo from "../../assets/icons/qonforme-logo.svg";
 import googleLogo from "../../assets/icons/google-logo.svg";
@@ -101,15 +104,21 @@ function SlidePreview({ title }) {
         <div className="space-y-2">
           <div className="flex items-center justify-between rounded-[10px] bg-[#FBF8FF] px-3 py-3">
             <span className="h-2.5 w-20 rounded-full bg-[#E2D2FF]" />
-            <span className="rounded-full bg-[#FDE68A] px-2 py-1 text-[10px] text-[#7C5200]">Planifie</span>
+            <span className="rounded-full bg-[#FDE68A] px-2 py-1 text-[10px] text-[#7C5200]">
+              Planifie
+            </span>
           </div>
           <div className="flex items-center justify-between rounded-[10px] bg-[#FBF8FF] px-3 py-3">
             <span className="h-2.5 w-24 rounded-full bg-[#D7BCFF]" />
-            <span className="rounded-full bg-[#FCD34D] px-2 py-1 text-[10px] text-[#7C5200]">En cours</span>
+            <span className="rounded-full bg-[#FCD34D] px-2 py-1 text-[10px] text-[#7C5200]">
+              En cours
+            </span>
           </div>
           <div className="flex items-center justify-between rounded-[10px] bg-[#FBF8FF] px-3 py-3">
             <span className="h-2.5 w-16 rounded-full bg-[#E2D2FF]" />
-            <span className="rounded-full bg-[#BBF7D0] px-2 py-1 text-[10px] text-[#166534]">Termine</span>
+            <span className="rounded-full bg-[#BBF7D0] px-2 py-1 text-[10px] text-[#166534]">
+              Termine
+            </span>
           </div>
         </div>
       </div>
@@ -164,12 +173,22 @@ function ShowcaseSlide({ title, text, icon: Icon }) {
 
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { login } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState(location.state?.message || "");
+  const [forgotOpen, setForgotOpen] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotError, setForgotError] = useState("");
+  const [forgotSuccess, setForgotSuccess] = useState("");
+  const [debugResetUrl, setDebugResetUrl] = useState("");
 
   useEffect(() => {
     const previousHtmlOverflow = document.documentElement.style.overflow;
@@ -184,20 +203,52 @@ export default function Login() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!location.state?.message) return;
+    window.history.replaceState({}, document.title);
+  }, [location.state]);
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     setLoading(true);
     setError("");
+    setSuccessMessage("");
 
     try {
       const data = await loginRequest(email, password);
-      login(data);
+      login(data, { rememberMe });
       navigate("/accueil", { replace: true });
     } catch (requestError) {
       const detail = requestError?.response?.data?.detail;
       setError(typeof detail === "string" ? detail : "Identifiants invalides.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async (event) => {
+    event.preventDefault();
+    setForgotLoading(true);
+    setForgotError("");
+    setForgotSuccess("");
+    setDebugResetUrl("");
+
+    try {
+      const data = await forgotPassword(forgotEmail.trim());
+      setForgotSuccess(
+        data?.detail ||
+          "Si un compte existe avec cet email, un lien de reinitialisation a ete envoye.",
+      );
+      setDebugResetUrl(data?.debug_reset_url || "");
+    } catch (requestError) {
+      const detail = requestError?.response?.data?.detail;
+      setForgotError(
+        typeof detail === "string"
+          ? detail
+          : "Impossible d'envoyer la demande de reinitialisation.",
+      );
+    } finally {
+      setForgotLoading(false);
     }
   };
 
@@ -255,12 +306,9 @@ export default function Login() {
 
         <section className="login-right flex h-screen items-center justify-center overflow-hidden bg-[#FAFAFC] px-5 py-3 sm:px-8">
           <div className="w-full max-w-[410px] rounded-[20px] border border-[#EEE8F7] bg-white px-7 py-10 shadow-[0_18px_38px_rgba(88,20,142,0.08)] sm:px-8 sm:py-10">
-            
-            
             <h2 className="m-3 text-center text-[clamp(22px,1.55vw,28px)] font-semibold tracking-[-0.03em] text-slate-900">
               Bienvenue sur Qonform
             </h2>
-
 
             <div className="mt-4 flex items-center justify-center gap-3">
               <img src={qonformeLogo} alt="Qonforme" className="h-8 w-8" />
@@ -300,24 +348,54 @@ export default function Login() {
                 <div className="relative">
                   <Lock className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
                   <input
-                    type="password"
+                    type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
                     className="h-[46px] w-full rounded-md border border-[#E7E1F2] bg-white pl-12 pr-12 text-[13px] text-slate-900 outline-none transition focus:border-[#58148E] focus:ring-2 focus:ring-[#E9DDFE]"
                     placeholder="Mot de passe"
                     required
                   />
-                  <Eye className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((current) => !current)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-slate-700"
+                    aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                  >
+                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  </button>
                 </div>
               </label>
 
-              <div className="   flex items-center justify-between gap-3 text-[12px] leading-none">
-                <label className="mt-4 mb-4 flex items-center gap-2 whitespace-nowrap text-slate-600">
-                  <input type="checkbox" className="h-4 w-4 rounded-[3px] border-[#D7CCEF]" />
+              <div className="flex items-center justify-between gap-3 text-[12px] leading-none">
+                <label className="mb-4 mt-4 flex items-center gap-2 whitespace-nowrap text-slate-600">
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(event) => setRememberMe(event.target.checked)}
+                    className="h-4 w-4 rounded-[3px] border-[#D7CCEF]"
+                  />
                   Se souvenir de moi
                 </label>
-                <span className=" mt-4 mb-4 whitespace-nowrap text-[#58148E]">Mot de passe oublie ?</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setForgotEmail(email);
+                    setForgotError("");
+                    setForgotSuccess("");
+                    setDebugResetUrl("");
+                    setForgotOpen(true);
+                  }}
+                  className="mb-4 mt-4 whitespace-nowrap text-[#58148E] transition hover:text-[#4B1178]"
+                >
+                  Mot de passe oublie ?
+                </button>
               </div>
+
+              {successMessage ? (
+                <p className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                  {successMessage}
+                </p>
+              ) : null}
 
               {error ? (
                 <p className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-600">
@@ -337,6 +415,96 @@ export default function Login() {
           </div>
         </section>
       </div>
+
+      {forgotOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4 backdrop-blur-[2px]"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !forgotLoading) {
+              setForgotOpen(false);
+            }
+          }}
+        >
+          <form
+            onSubmit={handleForgotPassword}
+            className="w-full max-w-md rounded-[20px] border border-[#EEE8F7] bg-white p-6 shadow-[0_18px_38px_rgba(88,20,142,0.14)]"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900">
+                  Mot de passe oublie
+                </h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  Entrez votre email pour recevoir un lien de reinitialisation.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setForgotOpen(false)}
+                disabled={forgotLoading}
+                className="rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                aria-label="Fermer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <label className="mt-5 block">
+              <div className="relative">
+                <Mail className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="email"
+                  value={forgotEmail}
+                  onChange={(event) => setForgotEmail(event.target.value)}
+                  className="h-[46px] w-full rounded-md border border-[#E7E1F2] bg-white pl-12 pr-4 text-[13px] text-slate-900 outline-none transition focus:border-[#58148E] focus:ring-2 focus:ring-[#E9DDFE]"
+                  placeholder="Adresse e-mail"
+                  required
+                />
+              </div>
+            </label>
+
+            {forgotError ? (
+              <p className="mt-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-600">
+                {forgotError}
+              </p>
+            ) : null}
+
+            {forgotSuccess ? (
+              <div className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                <p>{forgotSuccess}</p>
+                {debugResetUrl ? (
+                  <a
+                    href={debugResetUrl}
+                    className="mt-2 inline-flex text-sm font-medium text-[#58148E] underline"
+                  >
+                    Ouvrir le lien de reinitialisation
+                  </a>
+                ) : null}
+              </div>
+            ) : null}
+
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setForgotOpen(false)}
+                disabled={forgotLoading}
+                className="rounded-md px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100"
+              >
+                Annuler
+              </button>
+              <button
+                type="submit"
+                disabled={forgotLoading}
+                className="inline-flex h-[44px] items-center justify-center gap-2 rounded-md bg-[#58148E] px-4 text-sm font-medium text-white transition hover:bg-[#4B14A8] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {forgotLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                Envoyer le lien
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
     </div>
   );
 }
