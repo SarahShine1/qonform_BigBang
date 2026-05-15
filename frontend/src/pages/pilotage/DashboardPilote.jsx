@@ -10,9 +10,11 @@ import { pilotageApi } from "../../api/pilotage.api";
 import { useAuth } from "../../hooks/useAuth";
 import {
   KpiCard,
-  ProcessusTable,
-  AuditZone,
+  StatutDonut,
+  NcBarChart,
+  TachesCard,
   Timeline,
+  ConformityBars,
 } from "../../components/pilotage/pilote";
 
 export default function DashboardPilote() {
@@ -39,7 +41,7 @@ export default function DashboardPilote() {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50 text-sm text-slate-500">
-        Chargement du dashboard...
+        Chargement du dashboard…
       </div>
     );
   }
@@ -51,10 +53,12 @@ export default function DashboardPilote() {
     );
   }
 
-  const kpis      = data?.kpis      || {};
-  const audit     = data?.audit     || {};
-  const timeline  = data?.timeline  || [];
-  const processus = data?.processus || [];
+  const kpis                  = data?.kpis                  || {};
+  const statutDistribution    = data?.statutDistribution     || [];
+  const ncParProcessus        = data?.ncParProcessus         || [];
+  const conformiteParProcessus = data?.conformiteParProcessus || [];
+  const tachesAVenir          = data?.tachesAVenir           || [];
+  const timeline              = data?.timeline               || [];
 
   return (
     <AppLayout
@@ -81,7 +85,7 @@ export default function DashboardPilote() {
         />
         <KpiCard
           icon={Clock}
-          label="En attente de validation"
+          label="En attente"
           value={kpis.enAttente ?? 0}
           color="text-amber-600"
           bg="bg-amber-50"
@@ -95,13 +99,25 @@ export default function DashboardPilote() {
         />
       </section>
 
-      {/* Zone 2 — Processus table */}
-      <ProcessusTable processus={processus} />
-
-      {/* Zone 3 + Zone 5 — Audit + Timeline */}
+      {/* Zone 2 — Donut + Tâches */}
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
-        <AuditZone audit={audit} />
+        <div className="lg:col-span-2">
+          <StatutDonut data={statutDistribution} />
+        </div>
+        <TachesCard taches={tachesAVenir} />
+      </div>
+
+      {/* Zone 3 — NC bar chart + Timeline */}
+      <div className="mt-4 grid gap-4 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <NcBarChart data={ncParProcessus} />
+        </div>
         <Timeline events={timeline} />
+      </div>
+
+      {/* Zone 4 — Conformity per processus */}
+      <div className="mt-4">
+        <ConformityBars data={conformiteParProcessus} />
       </div>
     </AppLayout>
   );
