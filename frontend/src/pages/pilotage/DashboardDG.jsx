@@ -174,12 +174,10 @@ export default function DashboardDG() {
 
   return (
     <AppLayout pageTitle="Dashboard Direction Générale" userName={userName} userRole={userRole} contentClassName="bg-[#f8fafc] overflow-hidden">
-      <div className="h-full  px-5 ">
+      <div className="h-full overflow-hidden px-5 ">
         <div className="mb-3">
           <h1 className="text-[22px] font-bold text-slate-900">Tableau de bord Direction Générale</h1>
           <p className="text-[13px] text-slate-500">Vue exécutive de suivi du projet qualité.</p>
-            
-
         </div>
 
         <div className="grid grid-cols-4 gap-3">
