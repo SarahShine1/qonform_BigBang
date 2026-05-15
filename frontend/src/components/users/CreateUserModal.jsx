@@ -122,6 +122,7 @@ export default function CreateUserModal({
       role: form.role,
       departement: form.departement ? Number(form.departement) : null,
       est_actif: form.est_actif,
+      send_invitation: sendInvitation,
     });
   };
 
@@ -249,7 +250,7 @@ export default function CreateUserModal({
 
               {departments.length === 0 ? (
                 <p className="text-xs text-amber-600 dark:text-amber-400">
-                  Aucun département trouvé dans l’organigramme.
+                  Aucun département trouvé dans l&apos;organigramme.
                 </p>
               ) : null}
             </label>
@@ -300,24 +301,31 @@ export default function CreateUserModal({
             </span>
           </label>
 
-          <button
-            type="button"
-            onClick={() => setSendInvitation((current) => !current)}
-            className="flex w-full items-center gap-3 rounded-xl border border-[#e9ddff] bg-[#f6f0ff] px-4 py-3 text-left transition hover:border-[#d8c4ff] dark:border-violet-900 dark:bg-violet-950/60"
-          >
+          <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-[#e9ddff] bg-[#f6f0ff] px-4 py-3 transition hover:border-[#d8c4ff] dark:border-violet-900 dark:bg-violet-950/60">
+            <input
+              type="checkbox"
+              className="sr-only"
+              checked={sendInvitation}
+              onChange={(event) => setSendInvitation(event.target.checked)}
+            />
             <span
-              className={`flex h-6 w-6 items-center justify-center rounded-md ${
+              className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${
                 sendInvitation
                   ? "bg-[#58148E] text-white"
                   : "border border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-900"
               }`}
             >
-              {sendInvitation && <Check className="h-4 w-4" />}
+              {sendInvitation ? <Check className="h-4 w-4" /> : null}
             </span>
-            <span className="text-sm font-medium text-[#58148E] dark:text-violet-300">
-              Envoyer l&apos;invitation par email à l&apos;utilisateur immédiatement.
+            <span className="space-y-1">
+              <span className="block text-sm font-medium text-[#58148E] dark:text-violet-300">
+                Envoyer les identifiants par email
+              </span>
+              <span className="block text-xs text-slate-500 dark:text-slate-400">
+                Le mot de passe temporaire sera envoyé à l&apos;adresse renseignée.
+              </span>
             </span>
-          </button>
+          </label>
 
           {error ? (
             <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-600 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300">

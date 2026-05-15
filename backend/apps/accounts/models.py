@@ -76,6 +76,33 @@ class Utilisateur(models.Model):
         return f"{self.prenom} {self.nom} <{self.email}>"
 
 
+class UtilisateurSettings(models.Model):
+    """
+    Dedicated settings storage attached to the application-level profile.
+
+    We keep this in a separate managed table to avoid risky schema changes on
+    the existing unmanaged "utilisateur" table.
+    """
+
+    utilisateur = models.OneToOneField(
+        Utilisateur,
+        on_delete=models.CASCADE,
+        related_name="settings",
+        db_column="id_user",
+        to_field="id_user",
+        primary_key=True,
+        db_constraint=False,
+    )
+    photo_profil = models.ImageField(upload_to="profiles/", null=True, blank=True)
+    preferences = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        db_table = "utilisateur_settings"
+
+    def __str__(self):
+        return f"Settings for {self.utilisateur_id}"
+
+
 class Role(models.Model):
     """
     Maps to the existing 'role' table on Supabase.

@@ -24,7 +24,10 @@ import ChefTachesPage from "./pages/tache/ChefTachesPage";
 import DossierProcessusPage from "./pages/processus/DossierProcessusPage";
 import PreAuditPage from "./pages/audit/PreAuditPage";
 import DashboardPilote from "./pages/pilotage/DashboardPilote";
+import DashboardCAQ from "./pages/caq/DashboardCAQ";
 import PVPage from "./pages/pv/PVPage";
+import DashboardDG from "./pages/pilotage/DashboardDG";
+import ParametresPage from "./pages/settings/ParametresPage";
 
 
 export default function App() {
@@ -39,16 +42,23 @@ export default function App() {
             <Route path="/accueil" element={<AccueilPage />} />
 
             <Route
-              path="/dashboard"
               element={
-                <ModulePlaceholderPage
-                  pageTitle="Tableau de bord"
-                  title="Tableau de bord"
-                  description="Cette section servira de vue de pilotage et pourra etre reliee a des donnees reelles plus tard."
+                <RoleProtectedRoute
+                  roles={["DG", "Direction generale", "Direction générale"]}
                 />
               }
-            />
+            >
+              <Route path="/dashboard-DG" element={<DashboardDG />} />
+            </Route>
 
+            <Route
+              element={
+                <RoleProtectedRoute roles={["CAQ", "ADMIN", "Admin"]} />
+              }
+            >
+            <Route path="/dashboard" element={<DashboardCAQ />} />
+            </Route>
+            
             <Route path="/organigramme" element={<Organigramme />} />
             <Route
               path="/gestion-utilisateurs"
@@ -136,16 +146,7 @@ export default function App() {
 
             <Route path="/niveau-maturite" element={<MaturityPage />} />
 
-            <Route
-              path="/parametres"
-              element={
-                <ModulePlaceholderPage
-                  pageTitle="Parametres"
-                  title="Parametres"
-                  description="Les parametres de la plateforme pourront etre completes ici sans changer la navigation actuelle."
-                />
-              }
-            />
+            <Route path="/parametres" element={<ParametresPage />} />
           </Route>
 
           <Route

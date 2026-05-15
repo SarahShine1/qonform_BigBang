@@ -33,6 +33,7 @@ urlpatterns = [
     path('api/v1/documents/',  include('apps.documents.urls')),
     path('api/v1/pilotage/',   include('apps.pilotage.urls')),
     path('api/v1/diagnostic/', include('apps.diagnostic.urls')),
+    path('api/v1/maturity/',   include('apps.maturity.urls')),
 
 
     path('api/v1/taches/',     include('apps.taches.urls')),
