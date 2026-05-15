@@ -21,7 +21,7 @@ def api_root(request):
 urlpatterns = [
     path('', api_root),
     path('admin/', admin.site.urls),
-
+    path("api/v1/notifications/", include("apps.notifications.urls")),
 
     path('api/v1/auth/',       include('apps.accounts.urls')),
     path('api/v1/messaging/',  include('apps.messaging.urls')),
