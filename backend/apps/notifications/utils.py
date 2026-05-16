@@ -25,5 +25,51 @@ def notifier_participants_pv(pv):
                 f"Vous êtes inscrit comme participant au procès-verbal "
                 f"« {type_label} » du {date_formatee} ."
             ),
-            lien="/suivi",  
+            lien="/suivi",
         )
+
+
+def notifier_audit_fiche(fiche, type_notification, titre, message):
+    destinataire_id = fiche.get("id_redacteur")
+    code_fiche = fiche.get("code_fiche") or fiche.get("code_process") or f"#{fiche.get('id_version')}"
+    id_processus = fiche.get("id_processus")
+
+    if not destinataire_id:
+        return None
+
+    lien = f"/gestion-processus/dossier/{id_processus}" if id_processus else "/dashboard-pilote"
+
+    return Notification.objects.create(
+        destinataire_id=destinataire_id,
+        type_notification=type_notification,
+        titre=titre,
+        message=message.format(code_fiche=code_fiche),
+        lien=lien,
+    )
+
+
+def notifier_fiche_en_cours_audit(fiche):
+    return notifier_audit_fiche(
+        fiche,
+        "AUDIT_FICHE_EN_COURS",
+        "Fiche en cours d'audit",
+        "La fiche {code_fiche} est en cours d'audit.",
+    )
+
+
+def notifier_fiche_correction_demandee(fiche):
+    return notifier_audit_fiche(
+        fiche,
+        "AUDIT_CORRECTION_DEMANDEE",
+        "Correction demandée",
+        "La fiche {code_fiche} vous a été renvoyée pour correction.",
+    )
+
+
+def notifier_fiche_publiee(fiche):
+    return notifier_audit_fiche(
+        fiche,
+        "AUDIT_FICHE_PUBLIEE",
+        "Fiche publiée",
+        "La fiche {code_fiche} a été auditée et publiée.",
+    )

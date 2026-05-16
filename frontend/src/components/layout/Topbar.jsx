@@ -76,6 +76,11 @@ export default function Topbar({ pageTitle, userName, userRole, leftOffset = SID
   const isTaskNotification = (notification) =>
     String(notification.type_notification || "").startsWith("TACHE_");
 
+  const isAuditNotification = (notification) =>
+    String(notification.type_notification || "").startsWith("AUDIT_");
+
+  const getAuditIcon = () => ClipboardCheck;
+
   const getAvatarColor = (typeNotification) => {
     switch (typeNotification) {
       case "TACHE_MODIFIEE":
@@ -104,6 +109,39 @@ export default function Topbar({ pageTitle, userName, userRole, leftOffset = SID
       default:
         return ClipboardCheck;
     }
+  };
+
+  const getNotificationRowClass = (notification) => {
+    if (notification.lu) {
+      if (isTaskNotification(notification)) {
+        return "bg-white hover:bg-red-50 dark:bg-slate-900 dark:hover:bg-slate-800";
+      }
+      if (isAuditNotification(notification)) {
+        return "bg-white hover:bg-yellow-50 dark:bg-slate-900 dark:hover:bg-slate-800";
+      }
+      return "bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800";
+    }
+
+    if (isTaskNotification(notification)) {
+      return "bg-red-50/70 hover:bg-red-50 dark:bg-slate-800 dark:hover:bg-slate-700";
+    }
+    if (isAuditNotification(notification)) {
+      return "bg-yellow-50/70 hover:bg-yellow-50 dark:bg-slate-800 dark:hover:bg-slate-700";
+    }
+    return "bg-violet-50/70 hover:bg-violet-100/70 dark:bg-slate-800 dark:hover:bg-slate-700";
+  };
+
+  const getNotificationTitleClass = (notification) => {
+    if (isTaskNotification(notification)) return "text-red-700";
+    if (isPvNotification(notification)) return "text-blue-700 dark:text-blue-400";
+    if (isAuditNotification(notification)) return "text-yellow-700 dark:text-yellow-400";
+    return notification.lu ? "text-slate-700 dark:text-slate-300" : "text-slate-900 dark:text-white";
+  };
+
+  const getUnreadDotClass = (notification) => {
+    if (isTaskNotification(notification)) return "bg-red-500";
+    if (isAuditNotification(notification)) return "bg-yellow-600";
+    return "bg-violet-600 dark:bg-violet-400";
   };
 
   const formatTime = (dateString) => {
@@ -324,15 +362,7 @@ export default function Topbar({ pageTitle, userName, userRole, leftOffset = SID
                 key={notification.id_notification}
                 type="button"
                 onClick={() => handleRead(notification)}
-                className={`relative flex w-full items-start gap-3 px-3 py-2.5 text-left transition ${
-                  notification.lu
-                    ? isTaskNotification(notification)
-                      ? "bg-white hover:bg-red-50 dark:bg-slate-900 dark:hover:bg-slate-800"
-                      : "bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800"
-                    : isTaskNotification(notification)
-                      ? "bg-red-50/70 hover:bg-red-50 dark:bg-slate-800 dark:hover:bg-slate-700"
-                      : "bg-violet-50/70 hover:bg-violet-100/70 dark:bg-slate-800 dark:hover:bg-slate-700"
-                }`}
+                className={`relative flex w-full items-start gap-3 px-3 py-2.5 text-left transition ${getNotificationRowClass(notification)}`}
               >
                 {/* Avatar / task icon */}
                 {isTaskNotification(notification) ? (
@@ -349,6 +379,13 @@ export default function Topbar({ pageTitle, userName, userRole, leftOffset = SID
                       return <Icon className="h-5 w-5" />;
                     })()}
                   </div>
+                ) : isAuditNotification(notification) ? (
+                  <div className="mt-0.5 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-yellow-50 text-yellow-700">
+                    {(() => {
+                      const Icon = getAuditIcon(notification.type_notification);
+                      return <Icon className="h-5 w-5" />;
+                    })()}
+                  </div>
                 ) : (
                   <div className={`mt-0.5 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-[12px] font-semibold text-white ${
                     getAvatarColor(notification.type_notification)
@@ -359,15 +396,7 @@ export default function Topbar({ pageTitle, userName, userRole, leftOffset = SID
 
                 {/* Contenu */}
                 <div className="min-w-0 flex-1">
-                  <p className={`line-clamp-1 text-[13px] font-bold ${
-                    isTaskNotification(notification)
-                      ? "text-red-700"
-                      : isPvNotification(notification)
-                        ? "text-blue-700 dark:text-blue-400"
-                        : notification.lu
-                          ? "text-slate-700 dark:text-slate-300"
-                          : "text-slate-900 dark:text-white"
-                  }`}>
+                  <p className={`line-clamp-1 text-[13px] font-bold ${getNotificationTitleClass(notification)}`}>
                     {notification.titre}
                   </p>
                   <p className="mt-0.5 line-clamp-2 text-[12px] text-slate-600 dark:text-slate-400">
@@ -381,11 +410,7 @@ export default function Topbar({ pageTitle, userName, userRole, leftOffset = SID
                     {formatTime(notification.created_at)}
                   </p>
                   {!notification.lu && (
-                    <div className={`h-2 w-2 rounded-full ${
-                      isTaskNotification(notification)
-                        ? "bg-red-500"
-                        : "bg-violet-600 dark:bg-violet-400"
-                    }`} />
+                    <div className={`h-2 w-2 rounded-full ${getUnreadDotClass(notification)}`} />
                   )}
                 </div>
               </button>

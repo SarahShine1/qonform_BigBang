@@ -10,7 +10,10 @@ class Notification(models.Model):
         ("TACHE_TERMINEE", "Tâche terminée"),
         ("TACHE_ANNULEE", "Tâche annulée"),
         ("TACHE_RETARD", "Tâche en retard"),
-        ("PV_CREE",         "PV créé"), 
+        ("PV_CREE",         "PV créé"),
+        ("AUDIT_FICHE_EN_COURS", "Fiche en cours d'audit"),
+        ("AUDIT_CORRECTION_DEMANDEE", "Correction demandée"),
+        ("AUDIT_FICHE_PUBLIEE", "Fiche publiée"),
     ]
 
     id_notification = models.AutoField(primary_key=True)

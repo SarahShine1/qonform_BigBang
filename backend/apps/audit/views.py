@@ -9,6 +9,11 @@ from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from apps.notifications.utils import (
+    notifier_fiche_correction_demandee,
+    notifier_fiche_en_cours_audit,
+    notifier_fiche_publiee,
+)
 
 
 RESULT_TO_DB = {
@@ -114,6 +119,24 @@ def get_auditeur_id(request):
         )
         row = cursor.fetchone()
     return row[0] if row else None
+
+
+def get_audit_notification_context(cursor, id_version):
+    cursor.execute(
+        """
+        SELECT
+            vf.id_version,
+            vf.statut,
+            vf.id_redacteur,
+            p.id_processus,
+            p.code_process AS code_fiche
+        FROM version_fiche vf
+        JOIN processus p ON p.id_processus = vf.id_processus
+        WHERE vf.id_version = %s
+        """,
+        [id_version],
+    )
+    return dictfetchone(cursor)
 
 
 def get_status_bucket(version_status):
@@ -672,9 +695,13 @@ def start_audit_execution(request, id_version):
 
     payload = request.data or {}
     with transaction.atomic(), connection.cursor() as cursor:
+        fiche_context = get_audit_notification_context(cursor, id_version)
+        previous_status = fiche_context.get("statut") if fiche_context else None
         update_version_status(cursor, id_version, "En_revision")
         update_version_commit(cursor, id_version, payload.get("currentIndex", 0))
         upsert_audit_terrain(cursor, id_version, auditeur_id, "En_cours", "")
+        if fiche_context and previous_status != "En_revision":
+            notifier_fiche_en_cours_audit(fiche_context)
 
     return Response({"ok": True, "id_version": id_version, "status": "En_revision"})
 
@@ -723,6 +750,8 @@ def complete_audit_execution(request, id_version):
         )
 
     with transaction.atomic(), connection.cursor() as cursor:
+        fiche_context = get_audit_notification_context(cursor, id_version)
+        previous_status = fiche_context.get("statut") if fiche_context else None
         replace_evaluations(cursor, id_version, auditeur_id, evaluations)
         replace_non_conformities(
             cursor,
@@ -743,6 +772,8 @@ def complete_audit_execution(request, id_version):
             )
             result_status = "Brouillon"
             report_name = None
+            if fiche_context and previous_status != "Brouillon":
+                notifier_fiche_correction_demandee(fiche_context)
         else:
             update_version_status(cursor, id_version, "Publiee", revue=False)
             report_name = ensure_report_reference(cursor, id_version, auditeur_id)
@@ -755,6 +786,8 @@ def complete_audit_execution(request, id_version):
                 report_name,
             )
             result_status = "Publiee"
+            if fiche_context and previous_status != "Publiee":
+                notifier_fiche_publiee(fiche_context)
 
     return Response(
         {
