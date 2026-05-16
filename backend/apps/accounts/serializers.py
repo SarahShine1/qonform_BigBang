@@ -1,16 +1,19 @@
 from copy import deepcopy
 
 from django.contrib.auth.password_validation import validate_password
+from django.contrib.auth.tokens import PasswordResetTokenGenerator
 from django.core.validators import FileExtensionValidator
-from rest_framework import serializers
 from django.db import transaction
+from django.utils.encoding import force_str
+from django.utils.http import urlsafe_base64_decode
+from rest_framework import serializers
 from rest_framework_simplejwt.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 from .models import Departement, Role, User, Utilisateur, UtilisateurSettings
 from .utils import (
-    get_auth_user_for_utilisateur,
     get_active_role_labels_for_user,
+    get_auth_user_for_utilisateur,
     get_profile_photo_url,
     normalize_role_names,
     split_full_name,
@@ -58,11 +61,6 @@ def build_user_preferences(preferences=None):
 
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
-    """
-    Custom simplejwt serializer for email login.
-    It adds active roles and department to the JWT without exposing passwords.
-    """
-
     @classmethod
     def get_token(cls, user):
         token = super().get_token(user)
@@ -172,10 +170,7 @@ class ManagedUserSerializer(serializers.Serializer):
         if not obj.id_departement:
             return None
 
-        departement = Departement.objects.filter(
-            id_departement=obj.id_departement
-        ).first()
-
+        departement = Departement.objects.filter(id_departement=obj.id_departement).first()
         return departement.nom if departement else None
 
 
@@ -184,45 +179,20 @@ class ManagedUserWriteSerializer(serializers.Serializer):
     prenom = serializers.CharField(required=False, allow_blank=True, max_length=100)
     full_name = serializers.CharField(required=False, allow_blank=True, max_length=220)
     email = serializers.EmailField(required=False)
-
-    password = serializers.CharField(
-        required=False,
-        allow_blank=False,
-        min_length=8,
-        write_only=True,
-    )
-
+    password = serializers.CharField(required=False, allow_blank=False, min_length=8, write_only=True)
     est_actif = serializers.BooleanField(required=False)
     departement = serializers.IntegerField(required=False, allow_null=True)
-    send_invitation = serializers.BooleanField(
-        required=False,
-        default=False,
-        write_only=True,
-    )
-
-    roles = serializers.ListField(
-        child=serializers.CharField(),
-        required=False,
-        allow_empty=True,
-    )
-
+    send_invitation = serializers.BooleanField(required=False, default=False, write_only=True)
+    roles = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
     role = serializers.CharField(required=False, allow_blank=True)
 
     def validate_departement(self, value):
-        """
-        Prevent database IntegrityError.
-
-        If the frontend sends departement=5 but departement 5 does not exist
-        in table departement, we reject the request cleanly with 400 instead
-        of crashing with IntegrityError.
-        """
-
         if value in (None, ""):
             return None
 
         if not Departement.objects.filter(id_departement=value).exists():
             raise serializers.ValidationError(
-                "Département invalide. Sélectionnez un département existant ou Non assigné."
+                "Departement invalide. Selectionnez un departement existant ou Non assigne."
             )
 
         return value
@@ -254,18 +224,14 @@ class ManagedUserWriteSerializer(serializers.Serializer):
 
         if is_create and not attrs.get("email"):
             raise serializers.ValidationError({"email": "Email obligatoire."})
-
         if is_create and not attrs.get("password"):
             raise serializers.ValidationError({"password": "Mot de passe obligatoire."})
-
         if is_create and not attrs.get("nom"):
             raise serializers.ValidationError({"nom": "Nom obligatoire."})
-
         if is_create and not attrs.get("prenom"):
             raise serializers.ValidationError({"prenom": "Prenom obligatoire."})
 
         email = attrs.get("email")
-
         if email:
             user_qs = User.objects.filter(email=email)
             utilisateur_qs = Utilisateur.objects.filter(email=email)
@@ -311,7 +277,6 @@ class ManagedUserWriteSerializer(serializers.Serializer):
 
         self.send_invitation_requested = send_invitation
         self.temporary_password = temporary_password
-
         return utilisateur
 
     def update(self, instance, validated_data):
@@ -324,16 +289,12 @@ class ManagedUserWriteSerializer(serializers.Serializer):
 
         if "nom" in validated_data:
             instance.nom = validated_data["nom"]
-
         if "prenom" in validated_data:
             instance.prenom = validated_data["prenom"]
-
         if "email" in validated_data:
             instance.email = validated_data["email"]
-
         if "est_actif" in validated_data:
             instance.est_actif = validated_data["est_actif"]
-
         if "departement" in validated_data:
             instance.id_departement = validated_data["departement"]
 
@@ -343,13 +304,10 @@ class ManagedUserWriteSerializer(serializers.Serializer):
             if "email" in validated_data:
                 auth_user.email = validated_data["email"]
                 auth_user.username = validated_data["email"]
-
             if "est_actif" in validated_data:
                 auth_user.is_active = validated_data["est_actif"]
-
             if password:
                 auth_user.set_password(password)
-
             auth_user.save()
 
         if roles is not None:
@@ -366,14 +324,8 @@ class NotificationPreferencesSerializer(serializers.Serializer):
 
 
 class UserPreferencesSerializer(serializers.Serializer):
-    theme = serializers.ChoiceField(
-        choices=["light", "dark"],
-        required=False,
-    )
-    density = serializers.ChoiceField(
-        choices=["compact", "normal"],
-        required=False,
-    )
+    theme = serializers.ChoiceField(choices=["light", "dark"], required=False)
+    density = serializers.ChoiceField(choices=["compact", "normal"], required=False)
     notifications = NotificationPreferencesSerializer(required=False)
 
     def validate(self, attrs):
@@ -388,10 +340,8 @@ class UserPreferencesSerializer(serializers.Serializer):
 
         if "theme" in attrs:
             merged["theme"] = attrs["theme"]
-
         if "density" in attrs:
             merged["density"] = attrs["density"]
-
         if "notifications" in attrs:
             merged["notifications"].update(attrs["notifications"])
 
@@ -504,10 +454,7 @@ class UserSettingsSerializer(serializers.Serializer):
         if not obj.id_departement:
             return None
 
-        departement = Departement.objects.filter(
-            id_departement=obj.id_departement
-        ).first()
-
+        departement = Departement.objects.filter(id_departement=obj.id_departement).first()
         if not departement:
             return {"id": obj.id_departement, "nom": f"Departement {obj.id_departement}"}
 
@@ -525,3 +472,56 @@ class UserSettingsSerializer(serializers.Serializer):
         settings_obj = self._get_settings(obj)
         raw_preferences = getattr(settings_obj, "preferences", {}) if settings_obj else {}
         return build_user_preferences(raw_preferences)
+
+
+class ForgotPasswordSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+
+class ResetPasswordSerializer(serializers.Serializer):
+    uid = serializers.CharField()
+    token = serializers.CharField()
+    password = serializers.CharField(min_length=8, write_only=True)
+    password_confirmation = serializers.CharField(min_length=8, write_only=True)
+
+    default_error_messages = {
+        "invalid_link": "Le lien de reinitialisation est invalide ou a expire.",
+        "inactive_account": "Ce compte est désactivé. Contactez l'administrateur.",
+    }
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+
+        if attrs["password"] != attrs["password_confirmation"]:
+            raise serializers.ValidationError(
+                {"password_confirmation": "Les mots de passe ne correspondent pas."}
+            )
+
+        try:
+            user_id = force_str(urlsafe_base64_decode(attrs["uid"]))
+            auth_user = User.objects.get(pk=user_id)
+        except Exception as exc:
+            raise serializers.ValidationError(
+                {"token": self.error_messages["invalid_link"]}
+            ) from exc
+
+        if not PasswordResetTokenGenerator().check_token(auth_user, attrs["token"]):
+            raise serializers.ValidationError(
+                {"token": self.error_messages["invalid_link"]}
+            )
+
+        utilisateur = Utilisateur.objects.filter(auth=auth_user).first()
+        if not auth_user.is_active or (utilisateur and not utilisateur.est_actif):
+            raise serializers.ValidationError(
+                {"email": self.error_messages["inactive_account"]}
+            )
+
+        attrs["auth_user"] = auth_user
+        attrs["utilisateur"] = utilisateur
+        return attrs
+
+    def save(self, **kwargs):
+        auth_user = self.validated_data["auth_user"]
+        auth_user.set_password(self.validated_data["password"])
+        auth_user.save(update_fields=["password"])
+        return auth_user

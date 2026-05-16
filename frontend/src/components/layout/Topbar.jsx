@@ -1,18 +1,128 @@
-import { Bell, Menu, MessageSquare, Moon, Sun } from "lucide-react";
+import { Bell, Menu, MessageSquare, Moon, Sun, ClipboardCheck, CheckCircle, XCircle, Edit3, FileText } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { messagingApi } from "../../api/messages.api";
 import { useAuth } from "../../hooks/useAuth";
 import { useTheme } from "../../hooks/useTheme";
 import { SIDEBAR_WIDTH, TOPBAR_HEIGHT } from "./layout.constants";
 import MessagingPanel from "./MessagingPanel";
-
+import { getNotifications, markNotificationAsRead } from "../../services/notificationService";
 export default function Topbar({ pageTitle, userName, userRole, leftOffset = SIDEBAR_WIDTH, onMenuClick }) {
   const { isDark, toggleTheme } = useTheme();
   const { user } = useAuth();
+  const [notifications, setNotifications] = useState([]);
+  const [openNotif, setOpenNotif] = useState(false);
+  const [notifFilter, setNotifFilter] = useState("all");
+
+  useEffect(() => {
+    async function loadNotifications() {
+      try {
+        const data = await getNotifications();
+        setNotifications(data);
+      } catch (error) {
+        console.error(error);
+      }
+    }
+
+    if (user) {
+      loadNotifications();
+    }
+  }, [user]);
+
+  const isPvNotification = (notification) =>
+  notification.type_notification === "PV_CREE";
+
+  const notificationUnreadCount = notifications.filter((n) => !n.lu).length;
+  
+  async function handleRead(notification) {
+    if (!notification.lu) {
+      await markNotificationAsRead(notification.id_notification);
+      setNotifications((prev) =>
+        prev.map((n) =>
+          n.id_notification === notification.id_notification ? { ...n, lu: true } : n
+        )
+      );
+    }
+
+    if (notification.lien) {
+      window.location.href = notification.lien;
+    }
+  }
+
+  async function markAllAsRead() {
+    const unreadNotifications = notifications.filter((n) => !n.lu);
+    for (const notif of unreadNotifications) {
+      await markNotificationAsRead(notif.id_notification);
+    }
+    setNotifications((prev) => prev.map((n) => ({ ...n, lu: true })));
+  }
+
+  const filteredNotifications = notifFilter === "unread" 
+    ? notifications.filter((n) => !n.lu)
+    : notifications;
+
+  const getInitials = (title) => {
+    return title?.split(" ")[0]?.[0]?.toUpperCase() || "N";
+  };
+  
+  const getPvIcon = (typeNotification) => {
+  switch (typeNotification) {
+    case "PV_CREE":
+      return FileText;
+    default:
+      return FileText;
+  }
+};
+
+  const isTaskNotification = (notification) =>
+    String(notification.type_notification || "").startsWith("TACHE_");
+
+  const getAvatarColor = (typeNotification) => {
+    switch (typeNotification) {
+      case "TACHE_MODIFIEE":
+        return "bg-orange-600";
+      case "TACHE_TERMINEE":
+        return "bg-emerald-600";
+      case "TACHE_ANNULEE":
+        return "bg-red-600";
+      case "TACHE_DEMARREE":
+        return "bg-blue-600";
+        
+      default:
+        return "bg-violet-600";
+      
+    }
+  };
+
+  const getTaskIcon = (typeNotification) => {
+    switch (typeNotification) {
+      case "TACHE_TERMINEE":
+        return CheckCircle;
+      case "TACHE_ANNULEE":
+        return XCircle;
+      case "TACHE_MODIFIEE":
+        return Edit3;
+      default:
+        return ClipboardCheck;
+    }
+  };
+
+  const formatTime = (dateString) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return "À l'instant";
+    if (diffMins < 60) return `${diffMins}m`;
+    if (diffHours < 24) return `${diffHours}h`;
+    if (diffDays < 7) return `${diffDays}j`;
+    return date.toLocaleDateString("fr-FR");
+  };
   const messagingRef = useRef(null);
   const [messagingOpen, setMessagingOpen] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
-
+  const [messageUnreadCount, setMessageUnreadCount] = useState(0);
   const initials = userName
     ? userName
         .split(" ")
@@ -31,9 +141,9 @@ export default function Topbar({ pageTitle, userName, userRole, leftOffset = SID
         (count, conversation) => count + (conversation.unread_count || 0),
         0
       );
-      setUnreadCount(totalUnread);
+      setMessageUnreadCount(totalUnread);
     } catch {
-      setUnreadCount(0);
+      setMessageUnreadCount(0);
     }
   }, [user?.id_user]);
 
@@ -51,10 +161,10 @@ export default function Topbar({ pageTitle, userName, userRole, leftOffset = SID
           (count, conversation) => count + (conversation.unread_count || 0),
           0
         );
-        setUnreadCount(totalUnread);
+        setMessageUnreadCount(totalUnread);
       } catch {
         if (!cancelled) {
-          setUnreadCount(0);
+          setMessageUnreadCount(0);
         }
       }
     }
@@ -117,9 +227,9 @@ export default function Topbar({ pageTitle, userName, userRole, leftOffset = SID
             title="Ouvrir la messagerie"
           >
             <MessageSquare className="h-4 w-4" />
-            {unreadCount > 0 ? (
+            {messageUnreadCount > 0 ? (
               <span className="absolute -right-1 -top-1 inline-flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-[#58148E] px-1 text-[8px] font-semibold text-white">
-                {unreadCount > 9 ? "9+" : unreadCount}
+                {messageUnreadCount > 9 ? "9+" : messageUnreadCount}
               </span>
             ) : null}
           </button>
@@ -133,15 +243,159 @@ export default function Topbar({ pageTitle, userName, userRole, leftOffset = SID
           ) : null}
         </div>
 
-        <button
-          type="button"
-          className="relative inline-flex h-[34px] w-[34px] items-center justify-center rounded-md border border-[#E9E1F8] text-[#3B0A7A] transition hover:bg-[#F8F2FF] dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-        >
-          <Bell className="h-4 w-4" />
-          <span className="absolute -right-1 -top-1 inline-flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-[#58148E] px-1 text-[8px] font-semibold text-white">
-            3
-          </span>
-        </button>
+       <div className="relative">
+  <button
+    type="button"
+    onClick={() => setOpenNotif((prev) => !prev)}
+    className="relative inline-flex h-[34px] w-[34px] items-center justify-center rounded-md border border-[#E9E1F8] text-[#3B0A7A] transition hover:bg-[#F8F2FF] dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+    title="Notifications"
+  >
+    <Bell className="h-4 w-4" />
+
+    {notificationUnreadCount > 0 && (
+      <span className="absolute -right-1 -top-1 inline-flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-[#58148E] px-1 text-[8px] font-semibold text-white">
+        {notificationUnreadCount > 9 ? "9+" : notificationUnreadCount}
+      </span>
+    )}
+  </button>
+
+  {openNotif && (
+    <div className="absolute right-0 top-12 z-[9999] w-[400px] max-h-[440px] overflow-hidden rounded-2xl border border-violet-100 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+      {/* Header fixe */}
+      <div className="border-b border-slate-200 bg-gradient-to-r from-violet-50 to-orange-50 px-5 py-4 dark:border-slate-700 dark:from-slate-800 dark:to-slate-800">
+        <div className="flex items-center justify-between">
+          <h3 className="text-[15px] font-extrabold text-slate-900 dark:text-white">
+            Notifications
+          </h3>
+          {notificationUnreadCount > 0 && (
+            <button
+              type="button"
+              onClick={markAllAsRead}
+              className="text-[12px] text-[#3B0A7A] transition hover:text-[#58148E] dark:text-violet-400 dark:hover:text-violet-300"
+            >
+              Tout marquer comme lu
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Tabs fixe */}
+      <div className="border-b border-slate-200 bg-white px-5 dark:border-slate-700 dark:bg-slate-900">
+        <div className="flex items-center justify-between">
+          <div className="flex gap-1">
+            <button
+              type="button"
+              onClick={() => setNotifFilter("all")}
+              className={`px-3 py-3 text-[13px] font-medium transition ${
+                notifFilter === "all"
+                  ? "border-b-2 border-[#3B0A7A] text-[#3B0A7A] dark:border-violet-400 dark:text-violet-400"
+                  : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
+              }`}
+            >
+              Toutes
+            </button>
+            <button
+              type="button"
+              onClick={() => setNotifFilter("unread")}
+              className={`px-3 py-3 text-[13px] font-medium transition ${
+                notifFilter === "unread"
+                  ? "border-b-2 border-[#3B0A7A] text-[#3B0A7A] dark:border-violet-400 dark:text-violet-400"
+                  : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
+              }`}
+            >
+              Non lues ({notificationUnreadCount})
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Liste scrollable */}
+      <div className="h-[320px] overflow-y-auto">
+        {filteredNotifications.length === 0 ? (
+          <div className="flex items-center justify-center py-16">
+            <p className="text-[13px] text-slate-500 dark:text-slate-400">
+              Aucune notification
+            </p>
+          </div>
+        ) : (
+          <div className="divide-y divide-slate-100 dark:divide-slate-700">
+            {filteredNotifications.map((notification) => (
+              <button
+                key={notification.id_notification}
+                type="button"
+                onClick={() => handleRead(notification)}
+                className={`relative flex w-full items-start gap-3 px-3 py-2.5 text-left transition ${
+                  notification.lu
+                    ? isTaskNotification(notification)
+                      ? "bg-white hover:bg-red-50 dark:bg-slate-900 dark:hover:bg-slate-800"
+                      : "bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800"
+                    : isTaskNotification(notification)
+                      ? "bg-red-50/70 hover:bg-red-50 dark:bg-slate-800 dark:hover:bg-slate-700"
+                      : "bg-violet-50/70 hover:bg-violet-100/70 dark:bg-slate-800 dark:hover:bg-slate-700"
+                }`}
+              >
+                {/* Avatar / task icon */}
+                {isTaskNotification(notification) ? (
+                  <div className="mt-0.5 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-red-50 text-red-600">
+                    {(() => {
+                      const Icon = getTaskIcon(notification.type_notification);
+                      return <Icon className="h-5 w-5" />;
+                    })()}
+                  </div>
+                ) : isPvNotification(notification) ? (
+                  <div className="mt-0.5 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-700">
+                    {(() => {
+                      const Icon = getPvIcon(notification.type_notification);
+                      return <Icon className="h-5 w-5" />;
+                    })()}
+                  </div>
+                ) : (
+                  <div className={`mt-0.5 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-[12px] font-semibold text-white ${
+                    getAvatarColor(notification.type_notification)
+                  }`}>
+                    {getInitials(notification.titre)}
+                  </div>
+                )}
+
+                {/* Contenu */}
+                <div className="min-w-0 flex-1">
+                  <p className={`line-clamp-1 text-[13px] font-bold ${
+                    isTaskNotification(notification)
+                      ? "text-red-700"
+                      : isPvNotification(notification)
+                        ? "text-blue-700 dark:text-blue-400"
+                        : notification.lu
+                          ? "text-slate-700 dark:text-slate-300"
+                          : "text-slate-900 dark:text-white"
+                  }`}>
+                    {notification.titre}
+                  </p>
+                  <p className="mt-0.5 line-clamp-2 text-[12px] text-slate-600 dark:text-slate-400">
+                    {notification.message}
+                  </p>
+                </div>
+
+                {/* Date et indicateur */}
+                <div className="flex flex-shrink-0 flex-col items-end gap-1">
+                  <p className="text-[11px] text-slate-500 dark:text-slate-500">
+                    {formatTime(notification.created_at)}
+                  </p>
+                  {!notification.lu && (
+                    <div className={`h-2 w-2 rounded-full ${
+                      isTaskNotification(notification)
+                        ? "bg-red-500"
+                        : "bg-violet-600 dark:bg-violet-400"
+                    }`} />
+                  )}
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )}
+</div>
 
         <button
           type="button"

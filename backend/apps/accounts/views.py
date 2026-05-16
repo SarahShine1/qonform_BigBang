@@ -1,12 +1,13 @@
 import logging
 import socket
 
+from django.conf import settings
 from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
-from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework import status
 from rest_framework.exceptions import NotFound
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -18,9 +19,11 @@ from .serializers import (
     ChangePasswordSerializer,
     CustomTokenObtainPairSerializer,
     DepartementSerializer,
+    ForgotPasswordSerializer,
     ManagedUserSerializer,
     ManagedUserWriteSerializer,
     ProfilePhotoUploadSerializer,
+    ResetPasswordSerializer,
     RoleSerializer,
     UserPreferencesSerializer,
     UserProfileUpdateSerializer,
@@ -33,12 +36,9 @@ from .utils import (
     get_auth_user_for_utilisateur,
     get_profile_photo_url,
     profile_storage_is_configured,
-    upload_profile_photo_to_storage,
-)
-from .utils import (
-    get_active_role_labels_for_user,
-    get_auth_user_for_utilisateur,
+    send_password_reset_email,
     send_user_invitation_email,
+    upload_profile_photo_to_storage,
 )
 
 logger = logging.getLogger(__name__)
@@ -51,6 +51,61 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 
 class CustomTokenRefreshView(TokenRefreshView):
     permission_classes = [AllowAny]
+
+
+class ForgotPasswordView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = ForgotPasswordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        email = serializer.validated_data["email"]
+        utilisateur = Utilisateur.objects.filter(email__iexact=email).first()
+        auth_user = get_auth_user_for_utilisateur(utilisateur)
+
+        response_payload = {
+            "detail": (
+                "Si un compte existe avec cet email, un lien de reinitialisation a ete envoye."
+            )
+        }
+
+        if utilisateur and auth_user and auth_user.is_active and utilisateur.est_actif:
+            try:
+                payload = send_password_reset_email(utilisateur, auth_user)
+            except Exception as exc:
+                logger.exception("Password reset email failed for %s", utilisateur.email)
+                detail = "Impossible d'envoyer l'email de reinitialisation."
+                if isinstance(exc, (TimeoutError, socket.timeout)):
+                    detail = (
+                        "Impossible d'envoyer l'email de reinitialisation. "
+                        "Le serveur SMTP est indisponible."
+                    )
+                return Response(
+                    {"detail": detail},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+
+            if payload and settings.DEBUG:
+                response_payload["debug_reset_url"] = payload["reset_url"]
+                response_payload["debug_uid"] = payload["uid"]
+                response_payload["debug_token"] = payload["token"]
+
+        return Response(response_payload, status=status.HTTP_200_OK)
+
+
+class ResetPasswordView(APIView):
+    permission_classes = [AllowAny]
+
+    @transaction.atomic
+    def post(self, request):
+        serializer = ResetPasswordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(
+            {"detail": "Mot de passe reinitialise avec succes."},
+            status=status.HTTP_200_OK,
+        )
 
 
 class MeView(APIView):
@@ -139,10 +194,7 @@ class ManagedUserListCreateView(APIView):
                 user
                 for user in users
                 if role
-                in {
-                    label.upper()
-                    for label in get_active_role_labels_for_user(user.id_user)
-                }
+                in {label.upper() for label in get_active_role_labels_for_user(user.id_user)}
             ]
 
         return Response(ManagedUserSerializer(users, many=True).data)
@@ -154,22 +206,18 @@ class ManagedUserListCreateView(APIView):
 
         if getattr(serializer, "send_invitation_requested", False):
             try:
-                send_user_invitation_email(
-                    utilisateur,
-                    serializer.temporary_password,
-                )
+                send_user_invitation_email(utilisateur, serializer.temporary_password)
             except Exception as exc:
                 logger.exception(
                     "Invitation email failed after user creation for %s",
                     utilisateur.email,
                 )
-                detail = "Utilisateur créé, mais l’email n’a pas pu être envoyé."
+                detail = "Utilisateur cree, mais l'email n'a pas pu etre envoye."
                 if isinstance(exc, (TimeoutError, socket.timeout)):
                     detail = (
-                        "Utilisateur créé, mais l’email n’a pas pu être envoyé. "
+                        "Utilisateur cree, mais l'email n'a pas pu etre envoye. "
                         "Impossible de joindre le serveur SMTP."
                     )
-                # Keep the created user to avoid duplicate creation on retry.
                 return Response(
                     {
                         "detail": detail,
@@ -182,7 +230,7 @@ class ManagedUserListCreateView(APIView):
         return Response(
             {
                 **ManagedUserSerializer(utilisateur).data,
-                "detail": "Utilisateur créé avec succès.",
+                "detail": "Utilisateur cree avec succes.",
                 "email_sent": getattr(serializer, "send_invitation_requested", False),
             },
             status=status.HTTP_201_CREATED,
@@ -232,10 +280,7 @@ class RoleListView(APIView):
 
     def get(self, request):
         roles = list(Role.objects.all().order_by("libelle"))
-        has_dg_role = any(
-            str(role.libelle or "").strip().upper() == "DG"
-            for role in roles
-        )
+        has_dg_role = any(str(role.libelle or "").strip().upper() == "DG" for role in roles)
 
         if not has_dg_role:
             roles.append(Role(libelle="DG"))
@@ -264,10 +309,7 @@ class ManagedUserStatsView(APIView):
         }
 
         for user in Utilisateur.objects.all():
-            role_labels = {
-                label.upper()
-                for label in get_active_role_labels_for_user(user.id_user)
-            }
+            role_labels = {label.upper() for label in get_active_role_labels_for_user(user.id_user)}
 
             if user.est_actif:
                 stats["activeUsers"] += 1
@@ -302,9 +344,7 @@ class UserSettingsView(APIView):
         serializer.is_valid(raise_exception=True)
         utilisateur = serializer.save()
 
-        return Response(
-            UserSettingsSerializer(utilisateur, context={"request": request}).data
-        )
+        return Response(UserSettingsSerializer(utilisateur, context={"request": request}).data)
 
 
 class ProfilePhotoUploadView(APIView):

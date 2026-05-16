@@ -433,8 +433,7 @@ function TachesYearCalendar({ taches }) {
                               )} → ${formatDate(mainTache.dateFin)}`
                             : ""
                         }
-                        className={`relative z-10 flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-semibold ${
-                          mainTache
+className={`relative z-0 flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-semibold ${                          mainTache
                             ? isStart(day, mainTache) || isEnd(day, mainTache)
                               ? `${mainTache.color.dark} text-white shadow-sm`
                               : `${mainTache.color.text}`
@@ -446,8 +445,7 @@ function TachesYearCalendar({ taches }) {
                     )}
 
                     {tachesDuJour.length > 1 && (
-                      <span className="absolute -bottom-1 right-1 z-20 h-1.5 w-1.5 rounded-full bg-[#111827]" />
-                    )}
+                    <span className="absolute -bottom-1 right-1 z-0 h-1.5 w-1.5 rounded-full bg-[#111827]" />                    )}
                   </div>
                 );
               })}

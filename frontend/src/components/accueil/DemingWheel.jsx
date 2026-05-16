@@ -81,7 +81,7 @@ function WheelLabel({ step }) {
 
   return (
     <div
-      className={`absolute z-30 flex max-w-[78px] flex-col gap-1 text-white ${labelPositions[step.key]}`}
+      className={`absolute z-0 flex max-w-[78px] flex-col gap-1 text-white ${labelPositions[step.key]}`}
     >
       <div className="flex items-center gap-1.5">
         <span className="text-[8px] font-bold text-white/75">
@@ -117,18 +117,18 @@ export default function DemingWheel() {
               <WheelColorQuarter key={step.key} step={step} />
             ))}
 
-            <div className="absolute left-1/2 top-0 z-10 h-full w-[5px] -translate-x-1/2 bg-white" />
-            <div className="absolute left-0 top-1/2 z-10 h-[5px] w-full -translate-y-1/2 bg-white" />
+            <div className="absolute left-1/2 top-0 z-0 h-full w-[5px] -translate-x-1/2 bg-white" />
+            <div className="absolute left-0 top-1/2 z-0 h-[5px] w-full -translate-y-1/2 bg-white" />
           </div>
 
           {/* Labels layer. This is outside overflow-hidden, so it will not be cut. */}
-          <div className="absolute inset-[8px] z-20 rounded-full">
+          <div className="absolute inset-[8px] z-0 rounded-full">
             {pdcaSteps.map((step) => (
               <WheelLabel key={step.key} step={step} />
             ))}
           </div>
 
-          <div className="absolute inset-[31%] z-40 flex flex-col items-center justify-center rounded-full bg-white text-center shadow-[0_10px_24px_rgba(53,22,110,0.14)]">
+          <div className="absolute inset-[31%] z-0 flex flex-col items-center justify-center rounded-full bg-white text-center shadow-[0_10px_24px_rgba(53,22,110,0.14)]">
             <RotateCw className="mb-1 h-3.5 w-3.5 text-[#6B21D9]" />
             <span className="px-2 text-[8px] font-bold leading-[1.2] text-[#3B0A7A]">
               Amélioration
