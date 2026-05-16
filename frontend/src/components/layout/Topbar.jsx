@@ -1,5 +1,6 @@
-import { Bell, Menu, MessageSquare, Moon, Sun, ClipboardCheck, CheckCircle, XCircle, Edit3, FileText } from "lucide-react";
+import { Bell, Menu, MessageSquare, Moon, Sun, ClipboardCheck, CheckCircle, XCircle, Edit3, FileText, FilePen } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { messagingApi } from "../../api/messages.api";
 import { useAuth } from "../../hooks/useAuth";
 import { useTheme } from "../../hooks/useTheme";
@@ -9,6 +10,7 @@ import { getNotifications, markNotificationAsRead } from "../../services/notific
 export default function Topbar({ pageTitle, userName, userRole, leftOffset = SIDEBAR_WIDTH, onMenuClick }) {
   const { isDark, toggleTheme } = useTheme();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState([]);
   const [openNotif, setOpenNotif] = useState(false);
   const [notifFilter, setNotifFilter] = useState("all");
@@ -29,7 +31,10 @@ export default function Topbar({ pageTitle, userName, userRole, leftOffset = SID
   }, [user]);
 
   const isPvNotification = (notification) =>
-  notification.type_notification === "PV_CREE";
+    notification.type_notification === "PV_CREE";
+
+  const isFicheNotification = (notification) =>
+    notification.type_notification === "SOUMISSION_FICHE";
 
   const notificationUnreadCount = notifications.filter((n) => !n.lu).length;
   
@@ -44,7 +49,8 @@ export default function Topbar({ pageTitle, userName, userRole, leftOffset = SID
     }
 
     if (notification.lien) {
-      window.location.href = notification.lien;
+      navigate(notification.lien);
+      setOpenNotif(false);
     }
   }
 
@@ -56,9 +62,10 @@ export default function Topbar({ pageTitle, userName, userRole, leftOffset = SID
     setNotifications((prev) => prev.map((n) => ({ ...n, lu: true })));
   }
 
-  const filteredNotifications = notifFilter === "unread" 
+  const filteredNotifications = (notifFilter === "unread"
     ? notifications.filter((n) => !n.lu)
-    : notifications;
+    : notifications
+  ).slice().sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
   const getInitials = (title) => {
     return title?.split(" ")[0]?.[0]?.toUpperCase() || "N";
@@ -328,10 +335,14 @@ export default function Topbar({ pageTitle, userName, userRole, leftOffset = SID
                   notification.lu
                     ? isTaskNotification(notification)
                       ? "bg-white hover:bg-red-50 dark:bg-slate-900 dark:hover:bg-slate-800"
-                      : "bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800"
+                      : isFicheNotification(notification)
+                        ? "bg-white hover:bg-amber-50 dark:bg-slate-900 dark:hover:bg-slate-800"
+                        : "bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800"
                     : isTaskNotification(notification)
                       ? "bg-red-50/70 hover:bg-red-50 dark:bg-slate-800 dark:hover:bg-slate-700"
-                      : "bg-violet-50/70 hover:bg-violet-100/70 dark:bg-slate-800 dark:hover:bg-slate-700"
+                      : isFicheNotification(notification)
+                        ? "bg-amber-50/70 hover:bg-amber-50 dark:bg-slate-800 dark:hover:bg-slate-700"
+                        : "bg-violet-50/70 hover:bg-violet-100/70 dark:bg-slate-800 dark:hover:bg-slate-700"
                 }`}
               >
                 {/* Avatar / task icon */}
@@ -349,6 +360,10 @@ export default function Topbar({ pageTitle, userName, userRole, leftOffset = SID
                       return <Icon className="h-5 w-5" />;
                     })()}
                   </div>
+                ) : isFicheNotification(notification) ? (
+                  <div className="mt-0.5 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-amber-50 text-amber-600">
+                    <FilePen className="h-5 w-5" />
+                  </div>
                 ) : (
                   <div className={`mt-0.5 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-[12px] font-semibold text-white ${
                     getAvatarColor(notification.type_notification)
@@ -364,9 +379,11 @@ export default function Topbar({ pageTitle, userName, userRole, leftOffset = SID
                       ? "text-red-700"
                       : isPvNotification(notification)
                         ? "text-blue-700 dark:text-blue-400"
-                        : notification.lu
-                          ? "text-slate-700 dark:text-slate-300"
-                          : "text-slate-900 dark:text-white"
+                        : isFicheNotification(notification)
+                          ? "text-amber-700 dark:text-amber-400"
+                          : notification.lu
+                            ? "text-slate-700 dark:text-slate-300"
+                            : "text-slate-900 dark:text-white"
                   }`}>
                     {notification.titre}
                   </p>
@@ -384,7 +401,9 @@ export default function Topbar({ pageTitle, userName, userRole, leftOffset = SID
                     <div className={`h-2 w-2 rounded-full ${
                       isTaskNotification(notification)
                         ? "bg-red-500"
-                        : "bg-violet-600 dark:bg-violet-400"
+                        : isFicheNotification(notification)
+                          ? "bg-amber-500"
+                          : "bg-violet-600 dark:bg-violet-400"
                     }`} />
                   )}
                 </div>

@@ -180,12 +180,16 @@ class VersionFicheViewSet(viewsets.ModelViewSet):
         )
 
     def perform_update(self, serializer):
+        previous_statut = serializer.instance.statut
         instance = serializer.save()
         _sync_liaisons(
             instance.id_processus,
             self._get_liaison_ids("amont_ids"),
             self._get_liaison_ids("aval_ids"),
         )
+        if previous_statut != "Soumise" and instance.statut == "Soumise":
+            from apps.notifications.utils import notifier_auditeurs_soumission
+            notifier_auditeurs_soumission(instance)
 
     @action(detail=True, methods=["get", "post"], url_path="champs")
     def champs(self, request, pk=None):
