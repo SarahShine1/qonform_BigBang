@@ -178,7 +178,7 @@ class DocumentUploadView(APIView):
         evaluation     = request.data.get("evaluation") or None
         id_audit_field = request.data.get("id_audit_field") or None
 
-        allowed_types = {c[0] for c in Document.TYPE_CHOICES}
+        allowed_types = {c[0] for c in Document.TYPE_DOCUMENT_CHOICES}
         if type_document not in allowed_types:
             return Response(
                 {"detail": f"type_document invalide. Valeurs acceptées : {', '.join(sorted(allowed_types))}."},
