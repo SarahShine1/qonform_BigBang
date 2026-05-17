@@ -1,30 +1,11 @@
-const API_URL = "http://127.0.0.1:8000/api/v1/notifications/";
-
-function getToken() {
-  return localStorage.getItem("access_token");
-}
+import { apiClient } from "../api/auth";
 
 export async function getNotifications() {
-  const response = await fetch(API_URL, {
-    headers: {
-      Authorization: `Bearer ${getToken()}`,
-    },
-  });
-
-  if (!response.ok) throw new Error("Erreur notifications");
-
-  return response.json();
+  const { data } = await apiClient.get("/notifications/");
+  return data;
 }
 
 export async function markNotificationAsRead(id) {
-  const response = await fetch(`${API_URL}${id}/lue/`, {
-    method: "PATCH",
-    headers: {
-      Authorization: `Bearer ${getToken()}`,
-    },
-  });
-
-  if (!response.ok) throw new Error("Erreur marquage notification");
-
-  return response.json();
+  const { data } = await apiClient.patch(`/notifications/${id}/lue/`);
+  return data;
 }

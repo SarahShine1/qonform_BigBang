@@ -57,5 +57,62 @@ def notifier_participants_pv(pv):
                 f"Vous êtes inscrit comme participant au procès-verbal "
                 f"« {type_label} » du {date_formatee} ."
             ),
-            lien="/suivi",  
+            lien="/suivi",
         )
+
+
+def notifier_audit_fiche(fiche, type_notification, titre, message):
+    destinataire_ids = []
+    for key in ("id_redacteur", "id_pilote"):
+        destinataire_id = fiche.get(key)
+        if destinataire_id and destinataire_id not in destinataire_ids:
+            destinataire_ids.append(destinataire_id)
+
+    code_fiche = fiche.get("code_fiche") or fiche.get("code_process") or f"#{fiche.get('id_version')}"
+    id_processus = fiche.get("id_processus")
+
+    if not destinataire_ids:
+        return []
+
+    lien = f"/gestion-processus/dossier/{id_processus}" if id_processus else "/dashboard-pilote"
+
+    created_notifications = []
+    for destinataire_id in destinataire_ids:
+        notification, _ = Notification.objects.get_or_create(
+            destinataire_id=destinataire_id,
+            type_notification=type_notification,
+            lien=lien,
+            defaults={
+                "titre": titre,
+                "message": message.format(code_fiche=code_fiche),
+            },
+        )
+        created_notifications.append(notification)
+    return created_notifications
+
+
+def notifier_fiche_en_cours_audit(fiche):
+    return notifier_audit_fiche(
+        fiche,
+        "AUDIT_FICHE_EN_COURS",
+        "Fiche en cours d'audit",
+        "La fiche {code_fiche} est en cours d'audit.",
+    )
+
+
+def notifier_fiche_correction_demandee(fiche):
+    return notifier_audit_fiche(
+        fiche,
+        "AUDIT_CORRECTION_DEMANDEE",
+        "Correction demandée",
+        "La fiche {code_fiche} vous a été renvoyée pour correction.",
+    )
+
+
+def notifier_fiche_publiee(fiche):
+    return notifier_audit_fiche(
+        fiche,
+        "AUDIT_FICHE_PUBLIEE",
+        "Fiche publiée",
+        "La fiche {code_fiche} a été auditée et publiée.",
+    )
