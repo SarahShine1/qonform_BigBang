@@ -148,6 +148,7 @@ CREATE TABLE public.critere_evaluation (
   nom text NOT NULL,
   est_actif boolean NOT NULL DEFAULT true,
   created_at timestamp with time zone DEFAULT now(),
+  id_section_template integer,
   CONSTRAINT critere_evaluation_pkey PRIMARY KEY (id_critere)
 );
 CREATE TABLE public.departement (
@@ -349,6 +350,9 @@ CREATE TABLE public.section_template (
   CONSTRAINT section_template_pkey PRIMARY KEY (id_section_template),
   CONSTRAINT section_template_id_norme_fkey FOREIGN KEY (id_norme) REFERENCES public.norme(id_norme)
 );
+ALTER TABLE public.critere_evaluation
+ADD CONSTRAINT critere_evaluation_id_section_template_fkey
+FOREIGN KEY (id_section_template) REFERENCES public.section_template(id_section_template);
 CREATE TABLE public.statut_fiche (
   id_statut integer NOT NULL DEFAULT nextval('statut_fiche_id_statut_seq'::regclass),
   libelle character varying NOT NULL UNIQUE,
@@ -413,4 +417,50 @@ CREATE TABLE public.version_fiche (
   CONSTRAINT version_fiche_pkey PRIMARY KEY (id_version),
   CONSTRAINT version_fiche_id_processus_fkey FOREIGN KEY (id_processus) REFERENCES public.processus(id_processus),
   CONSTRAINT version_fiche_id_redacteur_fkey FOREIGN KEY (id_redacteur) REFERENCES public.utilisateur(id_user)
+);
+
+WITH criteria(section_key, nom) AS (
+  VALUES
+    ('contexte', 'Contexte cohérent avec les enjeux ESI — §4.1'),
+    ('leadership', 'Responsabilités du pilote claires — §5.3'),
+    ('planification', 'Risques : criticité P×I correcte + plan traitement — §6.1'),
+    ('ressources', 'Compétences RH définies et mappées — §7.2'),
+    ('amelioration', 'Dysfonctionnements avec action corrective — §10.2')
+),
+matched_sections AS (
+  SELECT
+    c.nom AS critere_nom,
+    st.id_section_template,
+    ROW_NUMBER() OVER (PARTITION BY c.nom ORDER BY st.ordre, st.id_section_template) AS rank
+  FROM criteria c
+  JOIN public.section_template st
+    ON st.est_actif = TRUE
+   AND (
+      (c.section_key = 'contexte' AND st.nom ILIKE '%Contexte%')
+      OR (c.section_key = 'leadership' AND st.nom ILIKE '%Leadership%')
+      OR (c.section_key = 'planification' AND st.nom ILIKE '%Planification%')
+      OR (c.section_key = 'ressources' AND (st.nom ILIKE '%Ressources%' OR st.nom ILIKE '%Support%'))
+      OR (c.section_key = 'amelioration' AND (st.nom ILIKE '%Amélioration%' OR st.nom ILIKE '%Amelioration%' OR st.nom ILIKE '%Dysfonction%'))
+   )
+),
+selected_sections AS (
+  SELECT critere_nom, id_section_template
+  FROM matched_sections
+  WHERE rank = 1
+),
+updated AS (
+  UPDATE public.critere_evaluation ce
+  SET id_section_template = ss.id_section_template,
+      est_actif = TRUE
+  FROM selected_sections ss
+  WHERE ce.nom = ss.critere_nom
+  RETURNING ce.nom
+)
+INSERT INTO public.critere_evaluation (nom, est_actif, id_section_template)
+SELECT ss.critere_nom, TRUE, ss.id_section_template
+FROM selected_sections ss
+WHERE NOT EXISTS (
+  SELECT 1
+  FROM public.critere_evaluation ce
+  WHERE ce.nom = ss.critere_nom
 );

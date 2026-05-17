@@ -1,4 +1,4 @@
-from collections import defaultdict
+﻿from collections import defaultdict
 from datetime import date
 from html import escape
 import unicodedata
@@ -33,8 +33,8 @@ VERSION_STATUS_BUCKETS = {
 
 VERSION_STATUS_LABELS = {
     "Soumise": "Soumise",
-    "En_revision": "En révision",
-    "Publiee": "Publiée",
+    "En_revision": "En rÃ©vision",
+    "Publiee": "PubliÃ©e",
 }
 
 ACTION_STATUS_TO_DB = {
@@ -280,6 +280,46 @@ def fiche_audit_report(request, id_version):
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
+def criteres_by_section(request, id_section):
+    with connection.cursor() as cursor:
+        if not table_exists(cursor, "critere_evaluation"):
+            return Response([])
+
+        if not table_has_column(cursor, "critere_evaluation", "id_section_template"):
+            return Response([])
+
+        cursor.execute(
+            """
+            SELECT id_critere, nom, est_actif, id_section_template
+            FROM critere_evaluation
+            WHERE est_actif = TRUE
+              AND id_section_template = %s
+            ORDER BY id_critere
+            """,
+            [id_section],
+        )
+        rows = dictfetchall(cursor)
+
+    return Response(
+        [
+            {
+                "id_critere": row["id_critere"],
+                "id_exigence": row["id_critere"],
+                "description": row["nom"],
+                "nom": row["nom"],
+                "id_section_template": row["id_section_template"],
+                "est_obligatoire": True,
+                "ponderation": 1,
+                "code_article": f"CR-{row['id_critere']}",
+                "article_titre": "Critère d'audit",
+            }
+            for row in rows
+        ]
+    )
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
 def audit_dashboard(request):
     auditeur_id = get_auditeur_id(request)
     if not auditeur_id:
@@ -396,12 +436,12 @@ def audit_dashboard(request):
     rapports = build_recent_reports(published, conformity_by_version)
 
     alertes = [
-        {"type": "warning", "message": f"{len(reauditer)} fiche(s) corrigée(s) attendent un réaudit."},
-        {"type": "danger", "message": f"{task_stats['en_retard']} tâche(s) sont en retard."},
+        {"type": "warning", "message": f"{len(reauditer)} fiche(s) corrigÃ©e(s) attendent un rÃ©audit."},
+        {"type": "danger", "message": f"{task_stats['en_retard']} tÃ¢che(s) sont en retard."},
         {"type": "danger", "message": f"{nc_gravite.get('Majeure', 0) + nc_gravite.get('Critique', 0)} NC majeures ou critiques sont ouvertes."},
         {
             "type": "info",
-            "message": f"{sum(1 for row in published if not row.get('rapport_nom'))} audit(s) publié(s) n'ont pas encore de rapport référencé.",
+            "message": f"{sum(1 for row in published if not row.get('rapport_nom'))} audit(s) publiÃ©(s) n'ont pas encore de rapport rÃ©fÃ©rencÃ©.",
         },
     ]
 
@@ -425,14 +465,14 @@ def audit_dashboard(request):
             "fichesParStatut": [
                 {"label": "Soumises", "value": len([row for row in soumises if not row.get("revue")])},
                 {"label": "En cours d'audit", "value": len(en_revision)},
-                {"label": "À réauditer", "value": len(reauditer)},
-                {"label": "Auditées / publiées", "value": len(published)},
+                {"label": "Ã€ rÃ©auditer", "value": len(reauditer)},
+                {"label": "AuditÃ©es / publiÃ©es", "value": len(published)},
             ],
             "tachesParStatut": [
-                {"label": "À faire", "value": task_stats["a_faire"]},
+                {"label": "Ã€ faire", "value": task_stats["a_faire"]},
                 {"label": "En cours", "value": task_stats["en_cours"]},
                 {"label": "En retard", "value": task_stats["en_retard"]},
-                {"label": "Terminées", "value": task_stats["terminees"]},
+                {"label": "TerminÃ©es", "value": task_stats["terminees"]},
             ],
             "tachesParPriorite": [
                 {"label": "Haute", "value": task_stats["priorite_haute"]},
@@ -496,7 +536,7 @@ def load_conformity_scores(cursor, version_ids):
 
 def normalize_task_status(value):
     normalized = str(value or "").strip().lower()
-    normalized = normalized.replace("Ã©", "e").replace("é", "e")
+    normalized = normalized.replace("ÃƒÂ©", "e").replace("Ã©", "e")
     if "termin" in normalized:
         return "terminee"
     if "cours" in normalized:
@@ -570,12 +610,12 @@ def build_nc_gravity(ncs):
 
 
 ISO_AXES = [
-    ("§4.4 Processus du SMQ", ("processus", "smq", "contexte")),
-    ("§6.1 Risques et opportunites", ("risque", "opportun")),
-    ("§6.2 Objectifs qualite", ("objectif", "qualite")),
-    ("§7.5 Informations documentees", ("document", "preuve", "enregistrement")),
-    ("§9.1 Surveillance et mesure", ("surveillance", "mesure", "kpi", "performance")),
-    ("§10.2 NC et actions correctives", ("dysfonction", "action corrective", "non-conform")),
+    ("Â§4.4 Processus du SMQ", ("processus", "smq", "contexte")),
+    ("Â§6.1 Risques et opportunites", ("risque", "opportun")),
+    ("Â§6.2 Objectifs qualite", ("objectif", "qualite")),
+    ("Â§7.5 Informations documentees", ("document", "preuve", "enregistrement")),
+    ("Â§9.1 Surveillance et mesure", ("surveillance", "mesure", "kpi", "performance")),
+    ("Â§10.2 NC et actions correctives", ("dysfonction", "action corrective", "non-conform")),
 ]
 
 
@@ -600,7 +640,7 @@ def build_clause_scores(evaluations):
     ]
 
 
-MONTH_LABELS = ["Jan", "Fév", "Mar", "Avr", "Mai", "Juin", "Juil", "Août", "Sep", "Oct", "Nov", "Déc"]
+MONTH_LABELS = ["Jan", "FÃ©v", "Mar", "Avr", "Mai", "Juin", "Juil", "AoÃ»t", "Sep", "Oct", "Nov", "DÃ©c"]
 
 
 def build_audit_evolution(published):
@@ -954,18 +994,18 @@ def load_fiche_audit_detail(id_version):
 
         criteres = []
         if table_exists(cursor, "critere_evaluation"):
-            ensure_default_audit_criteria(cursor)
             has_critere_section = table_has_column(cursor, "critere_evaluation", "id_section_template")
-            section_select = "id_section_template" if has_critere_section else "NULL::integer AS id_section_template"
-            cursor.execute(
-                f"""
-                SELECT id_critere, nom, est_actif, {section_select}
-                FROM critere_evaluation
-                WHERE est_actif = TRUE
-                ORDER BY id_critere
-                """
-            )
-            criteres = dictfetchall(cursor)
+            if has_critere_section:
+                cursor.execute(
+                    """
+                    SELECT id_critere, nom, est_actif, id_section_template
+                    FROM critere_evaluation
+                    WHERE est_actif = TRUE
+                      AND id_section_template IS NOT NULL
+                    ORDER BY id_critere
+                    """
+                )
+                criteres = dictfetchall(cursor)
 
         exigences = []
         if criteres:
@@ -1179,8 +1219,8 @@ def load_fiche_audit_detail(id_version):
                 "description": item["description"],
                 "date_detection": item["date_detection"],
                 "date_cloture": item["date_cloture"],
-                "gravite": severity or "Non renseignée",
-                "section": requirement_to_section.get(str(item["id_exigence"])) or "Section non liée",
+                "gravite": severity or "Non renseignÃ©e",
+                "section": requirement_to_section.get(str(item["id_exigence"])) or "Section non liÃ©e",
                 "actions_correctives": actions_by_nc.get(item["id_nc"], []),
             }
         )
@@ -1312,7 +1352,7 @@ def build_sections(champ_rows, template_sections=None):
 
 LEGACY_SECTION_FIELDS = {
     "Contexte de l'organisme": {
-        "Désignation du processus",
+        "DÃ©signation du processus",
         "Objectif du processus",
         "Description",
         "Enjeux",
@@ -1321,35 +1361,35 @@ LEGACY_SECTION_FIELDS = {
     },
     "Leadership": {
         "Pilote du processus",
-        "Structures concernées",
-        "Compétences clés",
+        "Structures concernÃ©es",
+        "CompÃ©tences clÃ©s",
     },
     "Planification": {
         "Risques",
         "Causes",
-        "Conséquences",
+        "ConsÃ©quences",
         "Niveau de risque",
         "Contraintes",
-        "Améliorations",
+        "AmÃ©liorations",
     },
     "Support": {
         "Ressources",
-        "Moyens alloués",
-        "Effectifs impliqués",
-        "Coût estimé",
-        "Délai global",
+        "Moyens allouÃ©s",
+        "Effectifs impliquÃ©s",
+        "CoÃ»t estimÃ©",
+        "DÃ©lai global",
     },
-    "Réalisation des activités": {
-        "Les entrées",
+    "RÃ©alisation des activitÃ©s": {
+        "Les entrÃ©es",
         "Les sorties (Produits / Services)",
-        "Tâches — Grandes étapes chronologiques",
+        "TÃ¢ches â€” Grandes Ã©tapes chronologiques",
         "Clients",
     },
-    "Évaluation des performances": {
+    "Ã‰valuation des performances": {
         "KPI",
     },
     "Documents et preuves": {
-        "Documents de référence",
+        "Documents de rÃ©fÃ©rence",
         "Enregistrements",
         "Cartographie BPMN",
         "Autres documents",
@@ -1526,7 +1566,7 @@ def get_section_weight(section_name):
 def normalize_section_name(value):
     text = unicodedata.normalize("NFKD", str(value or ""))
     text = "".join(char for char in text if not unicodedata.combining(char))
-    text = text.lower().replace("’", "").replace("'", "")
+    text = text.lower().replace("â€™", "").replace("'", "")
     return " ".join("".join(char if char.isalnum() else " " for char in text).split())
 
 
@@ -1965,10 +2005,10 @@ def render_report_html(detail):
         requirement_rows.append(
             f"""
             <tr>
-              <td>{section_title_by_requirement.get(str(requirement["id_exigence"]), "Section non liée")}</td>
+              <td>{section_title_by_requirement.get(str(requirement["id_exigence"]), "Section non liÃ©e")}</td>
               <td>{requirement.get("code_article") or f"EX-{requirement['id_exigence']}"}</td>
               <td>{requirement["description"]}</td>
-              <td>{status_labels.get(DB_TO_UI_RESULT.get(evaluation.get("resultat")), "Non coté")}</td>
+              <td>{status_labels.get(DB_TO_UI_RESULT.get(evaluation.get("resultat")), "Non cotÃ©")}</td>
             </tr>
             """
         )
@@ -1981,7 +2021,7 @@ def render_report_html(detail):
               <td>{item["section"]}</td>
               <td>{item["titre"]}</td>
               <td>{item.get("description") or ""}</td>
-              <td>{item.get("gravite") or "Non renseignée"}</td>
+              <td>{item.get("gravite") or "Non renseignÃ©e"}</td>
             </tr>
             """
         )
@@ -1990,7 +2030,7 @@ def render_report_html(detail):
     for item in detail.get("non_conformites", []):
         for action in item.get("actions_correctives", []):
             actions.append(
-                f"<li><strong>{item['titre']}</strong> - {action.get('description') or 'Action à préciser'} ({action.get('statut') or 'A faire'})</li>"
+                f"<li><strong>{item['titre']}</strong> - {action.get('description') or 'Action Ã  prÃ©ciser'} ({action.get('statut') or 'A faire'})</li>"
             )
 
     metrics = detail.get("metrics") or {}
@@ -2031,8 +2071,8 @@ def render_report_html(detail):
     <h1>{detail["rapport"]["titre"]}</h1>
     <p><strong>Code :</strong> {detail["processus"]["code_process"]}</p>
     <p><strong>Processus :</strong> {detail["processus"]["nom"]}</p>
-    <p><strong>Pilote :</strong> {detail["processus"].get("pilote") or "Non renseigné"}</p>
-    <p><strong>Auditeur :</strong> {format_user(detail["audit"]["auditeur"].get("prenom"), detail["audit"]["auditeur"].get("nom")) or "Non renseigné"}</p>
+    <p><strong>Pilote :</strong> {detail["processus"].get("pilote") or "Non renseignÃ©"}</p>
+    <p><strong>Auditeur :</strong> {format_user(detail["audit"]["auditeur"].get("prenom"), detail["audit"]["auditeur"].get("nom")) or "Non renseignÃ©"}</p>
     <p><strong>Date :</strong> {detail["audit"].get("date_realisation") or detail.get("date_validation") or detail.get("date_creation") or ""}</p>
     <div class="metrics">
       <div class="metric"><span>Completude</span><strong>{metrics.get("taux_completude_moyen", 0)}%</strong></div>
@@ -2040,12 +2080,12 @@ def render_report_html(detail):
       <div class="metric"><span>BPMN</span><strong>{metrics.get("score_bpmn", 0)}%</strong></div>
       <div class="metric"><span>Preuves</span><strong>{metrics.get("score_preuves", 0)}%</strong></div>
     </div>
-    <p class="score">Taux de conformité : {detail["taux_conformite"]}%</p>
+    <p class="score">Taux de conformitÃ© : {detail["taux_conformite"]}%</p>
 
-    <h2>Exigences évaluées</h2>
+    <h2>Exigences Ã©valuÃ©es</h2>
     <table>
       <thead>
-        <tr><th>Section</th><th>Réf.</th><th>Critère</th><th>Résultat</th></tr>
+        <tr><th>Section</th><th>RÃ©f.</th><th>CritÃ¨re</th><th>RÃ©sultat</th></tr>
       </thead>
       <tbody>{''.join(requirement_rows) or "<tr><td colspan='4'>Aucune exigence disponible.</td></tr>"}</tbody>
     </table>
@@ -2054,14 +2094,14 @@ def render_report_html(detail):
     <p>{detail["audit"].get("observations") or "Aucune observation globale saisie."}</p>
 
     <h2>Actions correctives</h2>
-    <ul>{''.join(actions) or "<li>Aucune action corrective liée à une NC saisie.</li>"}</ul>
+    <ul>{''.join(actions) or "<li>Aucune action corrective liÃ©e Ã  une NC saisie.</li>"}</ul>
 
-    <h2>Non-conformités relevées</h2>
+    <h2>Non-conformitÃ©s relevÃ©es</h2>
     <table>
       <thead>
-        <tr><th>Section</th><th>Titre</th><th>Description</th><th>Gravité</th></tr>
+        <tr><th>Section</th><th>Titre</th><th>Description</th><th>GravitÃ©</th></tr>
       </thead>
-      <tbody>{''.join(nc_rows) or "<tr><td colspan='4'>Aucune NC relevée.</td></tr>"}</tbody>
+      <tbody>{''.join(nc_rows) or "<tr><td colspan='4'>Aucune NC relevÃ©e.</td></tr>"}</tbody>
     </table>
     <h2>Conclusion</h2>
     <p>{h(conclusion)}</p>
