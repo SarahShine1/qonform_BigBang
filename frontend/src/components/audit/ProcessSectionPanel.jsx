@@ -118,7 +118,7 @@ function FlowView({ fields }) {
   return (
     <div className="space-y-5">
       <div>
-        <div className="mb-3 text-xs font-bold text-[#202044]">Taches - Grandes etapes chronologiques</div>
+        <div className="mb-3 text-xs font-bold text-[#202044]">Tâches - Grandes étapes chronologiques</div>
         <div className="space-y-2">
           {steps.map((field) => (
             <div key={field.label} className="grid grid-cols-[1fr_32px] items-center gap-4 rounded-lg border border-gray-100 px-3 py-2">
@@ -133,7 +133,7 @@ function FlowView({ fields }) {
         <div className="mb-3 text-xs font-bold text-[#202044]">Cartographie - BPMN</div>
         <div className="grid grid-cols-[1fr_32px] items-center gap-4 rounded-lg border-2 border-dashed border-gray-200 px-4 py-8">
           <div className="text-sm italic text-slate-400">
-            {bpmn?.value || "Inserer ici l'image du logigramme ou le lien vers le schema BPMN"}
+            {bpmn?.value || "Insérer ici l'image du logigramme ou le lien vers le schéma BPMN"}
           </div>
           <FieldStatusIcon valid={bpmn?.valid ?? isFieldValid(bpmn?.value)} />
         </div>
@@ -190,9 +190,14 @@ function StructuredTable({ rows }) {
     return <div className="text-sm italic text-slate-400">Non renseigné</div>;
   }
 
+  const minWidth = Math.max(columns.length * 190, 680);
+
   return (
-    <div className="w-full overflow-x-auto rounded-xl border border-purple-100 bg-white">
-      <table className="min-w-max w-full table-auto border-collapse text-left text-xs">
+    <div className="block w-full max-w-full overflow-x-auto rounded-xl border border-purple-100 bg-white">
+      <table
+        className="w-full table-auto border-collapse text-left text-xs"
+        style={{ minWidth: `${minWidth}px` }}
+      >
         <thead className="bg-purple-50 text-[#5b1fa8]">
           <tr>
             {columns.map((column) => (
@@ -209,7 +214,7 @@ function StructuredTable({ rows }) {
           {rows.map((row, rowIndex) => (
             <tr key={rowIndex} className="align-top">
               {columns.map((column) => (
-                <td key={`${rowIndex}-${column}`} className="min-w-[180px] whitespace-normal break-words px-4 py-3 align-top leading-5 text-slate-700">
+                <td key={`${rowIndex}-${column}`} className="min-w-[190px] whitespace-normal break-words px-4 py-3 align-top leading-5 text-slate-700">
                   {formatCellValue(row?.[column])}
                 </td>
               ))}

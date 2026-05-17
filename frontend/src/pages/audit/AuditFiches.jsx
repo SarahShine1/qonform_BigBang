@@ -15,17 +15,17 @@ const columns = [
   },
   {
     key: "en_revision",
-    title: "En revision",
+    title: "En révision",
     accent: "border-amber-400",
     dot: "bg-amber-500",
-    empty: "Aucune fiche en revision.",
+    empty: "Aucune fiche en révision.",
   },
   {
     key: "publiee_audit",
-    title: "Fiches auditees",
+    title: "Fiches auditées",
     accent: "border-emerald-400",
     dot: "bg-emerald-500",
-    empty: "Aucune fiche auditee.",
+    empty: "Aucune fiche auditée.",
   },
 ];
 
@@ -64,7 +64,7 @@ export default function AuditFiches() {
       })
       .catch((requestError) => {
         if (!mounted) return;
-        setError(extractApiError(requestError, "Impossible de charger les fiches a auditer."));
+        setError(extractApiError(requestError, "Impossible de charger les fiches à auditer."));
       })
       .finally(() => {
         if (mounted) setLoading(false);
@@ -246,7 +246,7 @@ function FicheCard({ fiche, columnKey, onClick }) {
             )}
           </div>
           <h3 className="mt-0.5 line-clamp-2 text-[13px] font-bold leading-4 text-gray-950">
-            {process.nom || "Processus non renseigne"}
+            {process.nom || "Processus non renseigné"}
           </h3>
         </div>
         <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[11px] font-bold text-slate-500">
@@ -257,15 +257,15 @@ function FicheCard({ fiche, columnKey, onClick }) {
       <div className="mt-2 space-y-1 text-[11px] text-slate-500">
         <div className="flex items-center gap-1.5">
           <ClipboardCheck className="h-3.5 w-3.5" />
-          <span>{redacteur || "Redacteur non renseigne"}</span>
+          <span>{redacteur || "Rédacteur non renseigné"}</span>
         </div>
         <div className="flex items-center gap-1.5">
           <FileText className="h-3.5 w-3.5" />
-          <span>{fiche.departement?.nom || "Service non renseigne"}</span>
+          <span>{fiche.departement?.nom || "Service non renseigné"}</span>
         </div>
         {columnKey === "en_revision" && (
           <div className="rounded-md border border-amber-100 bg-white/70 px-2 py-1 text-[11px] font-semibold text-amber-800">
-            Auditeur : {auditeur || "Non assigne"}
+            Auditeur : {auditeur || "Non assigné"}
           </div>
         )}
       </div>
@@ -274,7 +274,7 @@ function FicheCard({ fiche, columnKey, onClick }) {
         <StatusPill status={fiche.statut_audit} />
         {columnKey === "publiee_audit" && (
           <span className="text-[11px] font-bold text-purple-700">
-            {fiche.rapport_pdf ? "Voir rapport" : "Synthese"}
+            {fiche.rapport_pdf ? "Voir rapport" : "Synthèse"}
           </span>
         )}
       </div>
@@ -291,7 +291,7 @@ function RevueBadge({ revue }) {
           : "bg-blue-50 text-blue-700"
       }`}
     >
-      {revue ? "A reauditer" : "Nouvelle"}
+      {revue ? "À réauditer" : "Nouvelle"}
     </span>
   );
 }
@@ -299,8 +299,8 @@ function RevueBadge({ revue }) {
 function StatusPill({ status }) {
   const styles = {
     Soumise: "bg-blue-50 text-blue-700",
-    "En revision": "bg-amber-50 text-amber-700",
-    Publiee: "bg-emerald-50 text-emerald-700",
+    "En révision": "bg-amber-50 text-amber-700",
+    Publiée: "bg-emerald-50 text-emerald-700",
   };
 
   return (
