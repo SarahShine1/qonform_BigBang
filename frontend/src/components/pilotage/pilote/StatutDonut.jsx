@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { BarChart3, MoreVertical } from "lucide-react";
 
 const STATUT_COLORS = {
@@ -35,8 +36,26 @@ function slicePath(startDeg, endDeg) {
   return `M ${ox1} ${oy1} A ${R_OUT} ${R_OUT} 0 ${large} 1 ${ox2} ${oy2} L ${ix1} ${iy1} A ${R_IN} ${R_IN} 0 ${large} 0 ${ix2} ${iy2} Z`;
 }
 
+// Map chart statut keys → URL filter values
+const STATUT_TO_FILTER = {
+  Brouillon:      "Brouillon",
+  Soumise:        "Soumise",
+  En_revision:    "En_revision",
+  Publiee:        "Publiee",
+  Archivee:       "Archivee",
+  "Sans version": "_none",
+};
+
 export default function StatutDonut({ data = [] }) {
   const [hovered, setHovered] = useState(null);
+  const navigate = useNavigate();
+
+  const handleClick = (statut) => {
+    const filterVal = STATUT_TO_FILTER[statut];
+    if (filterVal) {
+      navigate(`/cartographie/processus?statut=${filterVal}`);
+    }
+  };
 
   const total = data.reduce((s, d) => s + d.count, 0);
 
@@ -85,6 +104,7 @@ export default function StatutDonut({ data = [] }) {
                     className="cursor-pointer transition-opacity duration-150"
                     onMouseEnter={() => setHovered(s.statut)}
                     onMouseLeave={() => setHovered(null)}
+                    onClick={() => handleClick(s.statut)}
                   />
                 );
               })}
@@ -110,6 +130,7 @@ export default function StatutDonut({ data = [] }) {
                     className="cursor-pointer"
                     onMouseEnter={() => setHovered(s.statut)}
                     onMouseLeave={() => setHovered(null)}
+                    onClick={() => handleClick(s.statut)}
                   >
                     <div className="flex items-center gap-2">
                       <span
