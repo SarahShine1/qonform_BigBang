@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Processus
+from .models import Processus, ProcessusExterne
 from apps.accounts.models import Utilisateur, Departement
 
 
@@ -11,8 +11,10 @@ TYPE_LABELS = {
 
 
 class ProcessusSerializer(serializers.ModelSerializer):
-    pilote_nom = serializers.SerializerMethodField()
-    departement_nom = serializers.SerializerMethodField()
+    pilote_nom              = serializers.SerializerMethodField()
+    departement_nom         = serializers.SerializerMethodField()
+    derniere_fiche_statut   = serializers.SerializerMethodField()
+    derniere_version_id     = serializers.SerializerMethodField()
 
     def get_pilote_nom(self, obj):
         if obj.id_pilote:
@@ -31,14 +33,33 @@ class ProcessusSerializer(serializers.ModelSerializer):
                 return None
         return None
 
+    def _best_version(self, obj):
+        from apps.fiches.models import VersionFiche
+        return (
+            VersionFiche.objects
+            .filter(id_processus=obj.id_processus)
+            .order_by("-date_creation")
+            .first()
+        )
+
+    def get_derniere_fiche_statut(self, obj):
+        v = self._best_version(obj)
+        return v.statut if v else None
+
+    def get_derniere_version_id(self, obj):
+        v = self._best_version(obj)
+        return v.id_version if v else None
+
     class Meta:
         model = Processus
         fields = [
             "id_processus", "code_process", "nom", "description",
             "type_process", "id_departement", "departement_nom",
             "id_pilote", "pilote_nom", "created_at",
+            "derniere_fiche_statut", "derniere_version_id",
         ]
-        read_only_fields = ["id_processus", "created_at", "pilote_nom", "departement_nom"]
+        read_only_fields = ["id_processus", "created_at", "pilote_nom", "departement_nom",
+                            "derniere_fiche_statut", "derniere_version_id"]
         extra_kwargs = {
             "code_process": {"required": False, "allow_blank": True},
             "type_process": {"required": False},
@@ -50,6 +71,13 @@ class ProcessusSerializer(serializers.ModelSerializer):
         if not Departement.objects.filter(id_departement=value).exists():
             raise serializers.ValidationError("Departement introuvable.")
         return value
+
+
+class ProcessusExterneSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProcessusExterne
+        fields = ["id_processus_externe", "nom", "created_at"]
+        read_only_fields = ["id_processus_externe", "created_at"]
 
 
 class InteractionProcessRefSerializer(serializers.Serializer):

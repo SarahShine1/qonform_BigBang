@@ -5,6 +5,7 @@ from django.contrib.auth import get_user_model
 from apps.accounts.models import Utilisateur
 from apps.documents.models import Document
 from .models import PV
+from apps.notifications.utils import notifier_participants_pv
 
 User = get_user_model()
 
@@ -118,7 +119,11 @@ class PVSerializer(serializers.ModelSerializer):
             stored_path = default_storage.save(file_path, fichier)
 
             # Convertir User en Utilisateur
-            utilisateur_current = Utilisateur.objects.get(auth_id=current_user.id)
+            utilisateur_current = Utilisateur.objects.filter(auth_id=current_user.id).first()
+            if not utilisateur_current:
+                raise serializers.ValidationError(
+                    {'detail': f"Profil introuvable pour auth_id={current_user.id} — vérifie la table Utilisateur."}
+                )
 
             Document.objects.create(
                 id_uploader=utilisateur_current.id_user,
@@ -131,9 +136,14 @@ class PVSerializer(serializers.ModelSerializer):
                 id_pv=pv.id,                 # ✅ lien vers le PV
             )
 
+            # ✅ Notifier les participants
+            notifier_participants_pv(pv)
+
             return pv
 
         except Exception as e:
+            import traceback
+            print(traceback.format_exc())
             if 'pv' in locals():
                 try:
                     pv.delete()

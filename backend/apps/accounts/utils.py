@@ -5,10 +5,12 @@ import re
 import uuid
 
 from django.conf import settings
+from django.contrib.auth.tokens import PasswordResetTokenGenerator
 from django.core.mail import send_mail
-import requests
-from django.conf import settings
 from django.db import connection
+from django.utils.encoding import force_bytes
+from django.utils.http import urlsafe_base64_encode
+import requests
 
 from .models import Role, User
 
@@ -94,26 +96,19 @@ def get_auth_user_for_utilisateur(utilisateur):
 
 
 def send_user_invitation_email(utilisateur, temporary_password):
-    """
-    Send the initial account credentials to a newly created user.
-
-    The message intentionally avoids localhost links because Qonform is not
-    deployed yet and local URLs would only work on the developer machine.
-    """
-
     prenom = str(getattr(utilisateur, "prenom", "") or "").strip() or "Utilisateur"
     email = str(getattr(utilisateur, "email", "") or "").strip()
 
-    subject = "Votre compte Qonform a été créé"
+    subject = "Votre compte Qonform a ete cree"
     body = (
         f"Bonjour {prenom},\n\n"
-        "Votre compte Qonform a été créé.\n\n"
+        "Votre compte Qonform a ete cree.\n\n"
         f"Email : {email}\n"
         f"Mot de passe temporaire : {temporary_password}\n\n"
-        "Veuillez vous connecter à la plateforme Qonform lorsque l’accès "
-        "vous sera communiqué, puis changer votre mot de passe.\n\n"
+        "Veuillez vous connecter a la plateforme Qonform lorsque l'acces "
+        "vous sera communique, puis changer votre mot de passe.\n\n"
         "Cordialement,\n"
-        "L’équipe Qonform"
+        "L'equipe Qonform"
     )
 
     send_mail(
@@ -123,6 +118,8 @@ def send_user_invitation_email(utilisateur, temporary_password):
         recipient_list=[email],
         fail_silently=False,
     )
+
+
 def _profile_bucket():
     return (
         getattr(settings, "SUPABASE_PROFILE_BUCKET", "")
@@ -149,7 +146,9 @@ def _storage_headers():
 def safe_storage_filename(name: str) -> str:
     import unicodedata
 
-    normalized = unicodedata.normalize("NFKD", str(name or "")).encode("ascii", "ignore").decode("ascii")
+    normalized = unicodedata.normalize("NFKD", str(name or "")).encode(
+        "ascii", "ignore"
+    ).decode("ascii")
     normalized = re.sub(r"[^a-zA-Z0-9.\-_]", "_", normalized)
     return normalized[:200] or "profile"
 
@@ -158,15 +157,16 @@ def upload_profile_photo_to_storage(file_obj, utilisateur_id: int) -> str:
     extension = os.path.splitext(file_obj.name or "")[1].lower() or ".bin"
     safe_name = safe_storage_filename(os.path.splitext(file_obj.name or "profile")[0])
     storage_path = f"profiles/{utilisateur_id}/{uuid.uuid4().hex}_{safe_name}{extension}"
-    mime = getattr(file_obj, "content_type", None) or mimetypes.guess_type(file_obj.name or "")[0] or "application/octet-stream"
+    mime = (
+        getattr(file_obj, "content_type", None)
+        or mimetypes.guess_type(file_obj.name or "")[0]
+        or "application/octet-stream"
+    )
 
     file_obj.seek(0)
     file_bytes = file_obj.read()
 
-    url = (
-        f"{settings.SUPABASE_URL}/storage/v1/object/"
-        f"{_profile_bucket()}/{storage_path}"
-    )
+    url = f"{settings.SUPABASE_URL}/storage/v1/object/{_profile_bucket()}/{storage_path}"
     response = requests.post(
         url,
         data=file_bytes,
@@ -245,3 +245,48 @@ def delete_profile_photo_from_storage(stored_name: str):
         headers=_storage_headers(),
     )
     response.raise_for_status()
+
+
+def build_password_reset_payload(auth_user):
+    if not auth_user:
+        return None
+
+    uid = urlsafe_base64_encode(force_bytes(auth_user.pk))
+    token = PasswordResetTokenGenerator().make_token(auth_user)
+    reset_url = f"{settings.FRONTEND_URL}/reset-password?uid={uid}&token={token}"
+
+    return {
+        "uid": uid,
+        "token": token,
+        "reset_url": reset_url,
+    }
+
+
+def send_password_reset_email(utilisateur, auth_user):
+    prenom = str(getattr(utilisateur, "prenom", "") or "").strip() or "Utilisateur"
+    email = str(getattr(utilisateur, "email", "") or "").strip()
+    payload = build_password_reset_payload(auth_user)
+
+    if not payload:
+        return None
+
+    subject = "Reinitialisation de votre mot de passe Qonform"
+    body = (
+        f"Bonjour {prenom},\n\n"
+        "Une demande de reinitialisation de mot de passe a ete recue pour votre compte Qonform.\n\n"
+        "Cliquez sur le lien ci-dessous pour definir un nouveau mot de passe :\n"
+        f"{payload['reset_url']}\n\n"
+        "Si vous n'etes pas a l'origine de cette demande, vous pouvez ignorer cet email.\n\n"
+        "Cordialement,\n"
+        "L'equipe Qonform"
+    )
+
+    send_mail(
+        subject=subject,
+        message=body,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[email],
+        fail_silently=False,
+    )
+
+    return payload

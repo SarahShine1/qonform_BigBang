@@ -17,4 +17,7 @@ export const usersApi = {
     const { data } = await apiClient.post("/auth/users/", payload);
     return data;
   },
+  deleteUser: async (userId) => {
+    await apiClient.delete(`/auth/users/${userId}/`);
+  },
 };

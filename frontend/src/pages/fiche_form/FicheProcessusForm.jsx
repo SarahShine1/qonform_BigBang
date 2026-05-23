@@ -2,7 +2,7 @@ import { useState, useEffect, useLayoutEffect, useCallback, useRef } from "react
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   ChevronLeft, Save, Loader2, AlertCircle, Send,
-  CheckCircle2, AlertTriangle, XCircle, X, Lock,
+  CheckCircle2, AlertTriangle, XCircle, X, Lock, Plus, Search,
 } from "lucide-react";
 import AppLayout from "../../components/layout/AppLayout";
 import PipelineFiche from "../../components/fiche/PipelineFiche";
@@ -11,16 +11,17 @@ import SectionBlock from "../../components/fiche/SectionBlock";
 import DocumentSection from "../../components/fiche/DocumentSection";
 import { PURPLE, PURPLE_HOVER, BORDER } from "../../components/fiche/ficheConstants";
 import { useAuth } from "../../hooks/useAuth";
-import { getProcessusList } from "../../api/processus.api";
+import { getProcessusList, getProcessusExternes, createProcessusExterne } from "../../api/processus.api";
 import {
   getSectionTemplates, getChampTemplates, getFiches,
   createVersionFiche, updateVersionFiche, saveChampFiches,
   getVersionFiche, getChampsFiche, getNormes,
 } from "../../api/fiches.api";
 
-// ── Multi-process selector ───────────────────────────────────────────────────
-function MultiProcessSelect({ label, value, onChange, options, disabled }) {
+// ── MultiProcessSelect avec recherche ────────────────────────────────────────
+function MultiProcessSelect({ value, onChange, options, disabled }) {
   const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
   const ref = useRef(null);
 
   useEffect(() => {
@@ -35,6 +36,11 @@ function MultiProcessSelect({ label, value, onChange, options, disabled }) {
   };
 
   const selected = options.filter((p) => value.includes(p.id_processus));
+  const filtered = options.filter((p) =>
+    !search ||
+    p.code_process.toLowerCase().includes(search.toLowerCase()) ||
+    p.nom.toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
     <div ref={ref} className="relative">
@@ -43,9 +49,7 @@ function MultiProcessSelect({ label, value, onChange, options, disabled }) {
         className="min-h-[36px] flex flex-wrap gap-1.5 items-center rounded-lg px-2.5 py-1.5 cursor-pointer"
         style={{ border: `1px solid ${BORDER}`, backgroundColor: disabled ? "#F9FAFB" : "#fff" }}
       >
-        {selected.length === 0 && (
-          <span className="text-[12.5px] text-slate-400">— Aucun —</span>
-        )}
+        {selected.length === 0 && <span className="text-[12.5px] text-slate-400">— Aucun —</span>}
         {selected.map((p) => (
           <span key={p.id_processus}
             className="flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-semibold text-white"
@@ -57,25 +61,173 @@ function MultiProcessSelect({ label, value, onChange, options, disabled }) {
             )}
           </span>
         ))}
-        {!disabled && (
-          <span className="ml-auto text-slate-400 text-[11px]">{open ? "▲" : "▼"}</span>
-        )}
+        {!disabled && <span className="ml-auto text-slate-400 text-[11px]">{open ? "▲" : "▼"}</span>}
       </div>
       {open && (
         <div className="absolute z-50 mt-1 w-full rounded-xl border bg-white shadow-lg"
-          style={{ borderColor: BORDER, maxHeight: 220, overflowY: "auto" }}>
-          {options.map((p) => {
-            const checked = value.includes(p.id_processus);
-            return (
-              <label key={p.id_processus}
-                className="flex items-center gap-3 px-3 py-2 text-[12.5px] cursor-pointer hover:bg-slate-50">
-                <input type="checkbox" checked={checked} onChange={() => toggle(p.id_processus)}
-                  className="accent-purple-700" />
-                <span className="font-semibold" style={{ color: PURPLE }}>{p.code_process}</span>
-                <span className="text-slate-500 truncate">{p.nom}</span>
-              </label>
-            );
-          })}
+          style={{ borderColor: BORDER }}>
+          {/* Search box */}
+          <div className="flex items-center gap-2 border-b px-3 py-2" style={{ borderColor: BORDER }}>
+            <Search size={12} className="shrink-0 text-slate-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Rechercher…"
+              className="flex-1 text-[12px] outline-none bg-transparent"
+              onClick={(e) => e.stopPropagation()}
+              autoFocus
+            />
+          </div>
+          <div style={{ maxHeight: 180, overflowY: "auto" }}>
+            {filtered.length === 0
+              ? <p className="px-3 py-2 text-[12px] text-slate-400">Aucun résultat</p>
+              : filtered.map((p) => {
+                  const checked = value.includes(p.id_processus);
+                  return (
+                    <label key={p.id_processus}
+                      className="flex items-center gap-3 px-3 py-2 text-[12.5px] cursor-pointer hover:bg-slate-50">
+                      <input type="checkbox" checked={checked} onChange={() => toggle(p.id_processus)}
+                        className="accent-purple-700" />
+                      <span className="font-semibold" style={{ color: PURPLE }}>{p.code_process}</span>
+                      <span className="text-slate-500 truncate">{p.nom}</span>
+                    </label>
+                  );
+                })
+            }
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── ExternalProcessSelect ─────────────────────────────────────────────────────
+function ExternalProcessSelect({ value, onChange, externalOptions, onCreateNew, disabled }) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [newNom, setNewNom] = useState("");
+  const [createLoading, setCreateLoading] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) {
+        setOpen(false);
+        setCreating(false);
+        setNewNom("");
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const toggle = (id) => {
+    onChange(value.includes(id) ? value.filter((v) => v !== id) : [...value, id]);
+  };
+
+  const selected = externalOptions.filter((e) => value.includes(e.id_processus_externe));
+  const filtered = externalOptions.filter((e) =>
+    !search || e.nom.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const handleCreate = async () => {
+    if (!newNom.trim()) return;
+    setCreateLoading(true);
+    try {
+      const created = await onCreateNew(newNom.trim());
+      if (created) {
+        onChange([...value, created.id_processus_externe]);
+        setNewNom("");
+        setCreating(false);
+      }
+    } finally {
+      setCreateLoading(false);
+    }
+  };
+
+  return (
+    <div ref={ref} className="relative">
+      <div
+        onClick={() => { if (!disabled) setOpen((o) => !o); }}
+        className="min-h-[36px] flex flex-wrap gap-1.5 items-center rounded-lg px-2.5 py-1.5 cursor-pointer"
+        style={{ border: `1px solid ${BORDER}`, backgroundColor: disabled ? "#F9FAFB" : "#fff" }}
+      >
+        {selected.length === 0 && <span className="text-[12.5px] text-slate-400">— Aucun —</span>}
+        {selected.map((e) => (
+          <span key={e.id_processus_externe}
+            className="flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-semibold"
+            style={{ backgroundColor: "#EFF6FF", color: "#1E40AF" }}>
+            {e.nom}
+            {!disabled && (
+              <button type="button" onClick={(ev) => { ev.stopPropagation(); toggle(e.id_processus_externe); }}
+                className="ml-0.5 opacity-70 hover:opacity-100">✕</button>
+            )}
+          </span>
+        ))}
+        {!disabled && <span className="ml-auto text-slate-400 text-[11px]">{open ? "▲" : "▼"}</span>}
+      </div>
+      {open && (
+        <div className="absolute z-50 mt-1 w-full rounded-xl border bg-white shadow-lg"
+          style={{ borderColor: BORDER }}>
+          {/* Search */}
+          <div className="flex items-center gap-2 border-b px-3 py-2" style={{ borderColor: BORDER }}>
+            <Search size={12} className="shrink-0 text-slate-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Rechercher un processus externe…"
+              className="flex-1 text-[12px] outline-none bg-transparent"
+              onClick={(e) => e.stopPropagation()}
+              autoFocus
+            />
+          </div>
+          <div style={{ maxHeight: 150, overflowY: "auto" }}>
+            {filtered.length === 0 && !creating && (
+              <p className="px-3 py-2 text-[12px] text-slate-400">Aucun résultat</p>
+            )}
+            {filtered.map((e) => {
+              const checked = value.includes(e.id_processus_externe);
+              return (
+                <label key={e.id_processus_externe}
+                  className="flex items-center gap-3 px-3 py-2 text-[12.5px] cursor-pointer hover:bg-slate-50">
+                  <input type="checkbox" checked={checked} onChange={() => toggle(e.id_processus_externe)}
+                    className="accent-blue-700" />
+                  <span className="text-slate-700 truncate">{e.nom}</span>
+                </label>
+              );
+            })}
+          </div>
+          {/* Nouvelle ligne */}
+          <div className="border-t" style={{ borderColor: BORDER }}>
+            {!creating ? (
+              <button type="button"
+                onClick={(e) => { e.stopPropagation(); setCreating(true); }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-[12px] font-semibold text-blue-600 hover:bg-blue-50 transition">
+                <Plus size={13} /> Nouveau processus externe
+              </button>
+            ) : (
+              <div className="flex gap-2 p-2" onClick={(e) => e.stopPropagation()}>
+                <input
+                  type="text"
+                  value={newNom}
+                  onChange={(e) => setNewNom(e.target.value)}
+                  placeholder="Nom du processus externe"
+                  className="flex-1 rounded-lg border px-2.5 py-1.5 text-[12px] outline-none"
+                  style={{ borderColor: BORDER }}
+                  autoFocus
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleCreate(); } }}
+                />
+                <button type="button" onClick={handleCreate} disabled={createLoading || !newNom.trim()}
+                  className="rounded-lg px-3 py-1.5 text-[12px] font-semibold text-white disabled:opacity-50"
+                  style={{ backgroundColor: "#1D4ED8" }}>
+                  {createLoading ? "…" : "Créer"}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -95,7 +247,6 @@ const isFieldFilled = (val) => {
   return true;
 };
 
-// ── calcul du pourcentage de complétion ──────────────────────────────────────
 const calcCompletion = (sections, formValues) => {
   const allChamps = sections.flatMap((s) => s.champs);
   const total = allChamps.length;
@@ -110,7 +261,6 @@ const verifColors = (pct) => {
   return       { bg: "#FEF2F2", border: "#FCA5A5", text: "#991B1B", bar: "#EF4444", barBg: "#FEE2E2" };
 };
 
-// ── composant bannière de notif ──────────────────────────────────────────────
 function NotifBanner({ notif, onClose, overlayStyle }) {
   if (!notif) return null;
   const cfg = {
@@ -120,16 +270,8 @@ function NotifBanner({ notif, onClose, overlayStyle }) {
   }[notif.type] ?? { bg: "#EDE9FE", border: "#C4B5FD", text: "#4C1D95", Icon: CheckCircle2 };
   const { Icon } = cfg;
   return (
-    <div
-      className="fixed flex items-center justify-between gap-4 rounded-xl px-5 py-3 shadow-lg"
-      style={{
-        ...overlayStyle,
-        top: "1rem",
-        zIndex: 9999,
-        backgroundColor: cfg.bg,
-        border: `1px solid ${cfg.border}`,
-      }}
-    >
+    <div className="fixed flex items-center justify-between gap-4 rounded-xl px-5 py-3 shadow-lg"
+      style={{ ...overlayStyle, top: "1rem", zIndex: 9999, backgroundColor: cfg.bg, border: `1px solid ${cfg.border}` }}>
       <div className="flex items-center gap-2 text-[13px] font-semibold" style={{ color: cfg.text }}>
         <Icon size={15} /> {notif.message}
       </div>
@@ -141,7 +283,6 @@ function NotifBanner({ notif, onClose, overlayStyle }) {
   );
 }
 
-// ── composant panneau de vérification ───────────────────────────────────────
 function VerifPanel({ data, onClose, overlayStyle }) {
   if (!data) return null;
   const { pct, filled, total } = data;
@@ -151,16 +292,8 @@ function VerifPanel({ data, onClose, overlayStyle }) {
     pct >= 50 ? "La fiche est partiellement complète. Continuez à remplir avant de soumettre." :
                 "La fiche nécessite encore beaucoup de travail avant soumission.";
   return (
-    <div
-      className="fixed rounded-xl px-5 py-4 shadow-lg"
-      style={{
-        ...overlayStyle,
-        top: "1rem",
-        zIndex: 9999,
-        backgroundColor: c.bg,
-        border: `1px solid ${c.border}`,
-      }}
-    >
+    <div className="fixed rounded-xl px-5 py-4 shadow-lg"
+      style={{ ...overlayStyle, top: "1rem", zIndex: 9999, backgroundColor: c.bg, border: `1px solid ${c.border}` }}>
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1">
           <p className="text-[13px] font-bold" style={{ color: c.text }}>
@@ -174,8 +307,7 @@ function VerifPanel({ data, onClose, overlayStyle }) {
           </div>
         </div>
         <button type="button" onClick={onClose}
-          className="mt-0.5 shrink-0 rounded p-1 opacity-60 transition hover:opacity-100"
-          style={{ color: c.text }}>
+          className="mt-0.5 shrink-0 rounded p-1 opacity-60 transition hover:opacity-100" style={{ color: c.text }}>
           <X size={14} />
         </button>
       </div>
@@ -194,10 +326,13 @@ export default function FicheProcessusForm() {
 
   const [sections,             setSections]           = useState([]);
   const [processusList,        setProcessusList]      = useState([]);
+  const [externalOptions,      setExternalOptions]    = useState([]);
   const [selectedProcessusId,  setSelectedProcessusId] = useState("");
   const [formValues,           setFormValues]         = useState({});
   const [amontIds,             setAmontIds]           = useState([]);
   const [avalIds,              setAvalIds]            = useState([]);
+  const [amontExtIds,          setAmontExtIds]        = useState([]);
+  const [avalExtIds,           setAvalExtIds]         = useState([]);
   const [currentStatut,        setCurrentStatut]      = useState("Brouillon");
   const [versionNumero,        setVersionNumero]      = useState(null);
   const [existingVersionId,    setExistingVersionId]  = useState(null);
@@ -219,7 +354,6 @@ export default function FicheProcessusForm() {
   const userRole  = user?.roles?.[0] ?? "";
   const selectedProcessus = processusList.find((p) => p.id_processus === Number(selectedProcessusId)) ?? null;
 
-  // suit la position/largeur du conteneur pour les popups fixes
   useLayoutEffect(() => {
     const update = () => {
       if (!containerRef.current) return;
@@ -237,29 +371,28 @@ export default function FicheProcessusForm() {
     notifTimer.current = setTimeout(() => setNotif(null), 5000);
   }, []);
 
-  // ── Chargement initial (sections + processus + URL edit mode) ─────────────
+  // ── Chargement initial ─────────────────────────────────────────────────────
   useEffect(() => {
     async function load() {
       setLoading(true);
       setError(null);
       try {
-        const [processusList, normesList] = await Promise.all([
+        const [rawProcessus, normesList, externes] = await Promise.all([
           getProcessusList(),
           getNormes(),
+          getProcessusExternes(),
         ]);
-        setProcessusList(processusList);
+        setProcessusList(rawProcessus);
+        setExternalOptions(externes);
 
         let rawSections;
 
         if (isUrlEdit) {
-          // Must know the version's norm BEFORE loading sections so archived
-          // versions display the sections that actually belong to their norm.
           const [fiche, champsExistants] = await Promise.all([
             getVersionFiche(id),
             getChampsFiche(id),
           ]);
 
-          // Load sections for this version's specific norm (fallback: active norm)
           rawSections = await getSectionTemplates(
             fiche.id_norme ? { id_norme: fiche.id_norme } : {}
           );
@@ -283,6 +416,8 @@ export default function FicheProcessusForm() {
           setVersionNumero(fiche.numero_version);
           setAmontIds(fiche.liaisons_amont ?? []);
           setAvalIds(fiche.liaisons_aval   ?? []);
+          setAmontExtIds(fiche.liaisons_amont_externes?.map((e) => e.id_processus_externe) ?? []);
+          setAvalExtIds(fiche.liaisons_aval_externes?.map((e) => e.id_processus_externe)   ?? []);
           setReadOnly(fiche.statut !== "Brouillon");
 
           const n = normesList.find((nm) => nm.id_norme === fiche.id_norme);
@@ -294,7 +429,6 @@ export default function FicheProcessusForm() {
           });
           setFormValues(vals);
         } else {
-          // New / create mode: use sections from the currently active norm
           rawSections = await getSectionTemplates();
           const sectionsWithChamps = await Promise.all(
             rawSections
@@ -321,16 +455,17 @@ export default function FicheProcessusForm() {
     load();
   }, [id, isUrlEdit, processusFromQuery]);
 
-  // ── Auto-détection fiche existante au changement de processus ─────────────
+  // ── Auto-détection fiche existante ─────────────────────────────────────────
   useEffect(() => {
-    if (isUrlEdit) return; // URL edit mode gère ça lui-même
-
+    if (isUrlEdit) return;
     if (!selectedProcessusId) {
       setExistingVersionId(null);
       setReadOnly(false);
       setFormValues({});
       setAmontIds([]);
       setAvalIds([]);
+      setAmontExtIds([]);
+      setAvalExtIds([]);
       setCurrentStatut("Brouillon");
       setVersionNumero(null);
       setVerifData(null);
@@ -350,18 +485,21 @@ export default function FicheProcessusForm() {
           setFormValues({});
           setAmontIds([]);
           setAvalIds([]);
+          setAmontExtIds([]);
+          setAvalExtIds([]);
           setCurrentStatut("Brouillon");
           setVersionNumero(null);
           return;
         }
 
-        // prend la fiche la plus récente
         const fiche = fiches.reduce((a, b) => (a.id_version > b.id_version ? a : b));
         setExistingVersionId(fiche.id_version);
         setCurrentStatut(fiche.statut ?? "Brouillon");
         setVersionNumero(fiche.numero_version);
         setAmontIds(fiche.liaisons_amont ?? []);
         setAvalIds(fiche.liaisons_aval   ?? []);
+        setAmontExtIds(fiche.liaisons_amont_externes?.map((e) => e.id_processus_externe) ?? []);
+        setAvalExtIds(fiche.liaisons_aval_externes?.map((e) => e.id_processus_externe)   ?? []);
 
         const champsExistants = await getChampsFiche(fiche.id_version);
         if (cancelled) return;
@@ -387,6 +525,18 @@ export default function FicheProcessusForm() {
     setFormValues((prev) => ({ ...prev, [champId]: value }));
   }, []);
 
+  // ── Création d'un nouveau processus externe ────────────────────────────────
+  const handleCreateExterne = useCallback(async (nom) => {
+    try {
+      const created = await createProcessusExterne(nom);
+      setExternalOptions((prev) => [...prev, created].sort((a, b) => a.nom.localeCompare(b.nom)));
+      return created;
+    } catch (err) {
+      console.error(err);
+      return null;
+    }
+  }, []);
+
   const resetForm = () => {
     if (!isUrlEdit) {
       if (!processusFromQuery) setSelectedProcessusId("");
@@ -396,16 +546,32 @@ export default function FicheProcessusForm() {
     setFormValues({});
     setAmontIds([]);
     setAvalIds([]);
+    setAmontExtIds([]);
+    setAvalExtIds([]);
     setCurrentStatut("Brouillon");
     setVersionNumero(null);
     setVerifData(null);
   };
 
-  // ── Sauvegarde ─────────────────────────────────────────────────────────────
-  const handleSave = async (targetStatut) => {
-    if (!selectedProcessusId) { setError("Veuillez sélectionner un processus."); return; }
+  // ── Sauvegarde (silent = sans notif, pour l'autosave) ─────────────────────
+  const doSave = useCallback(async ({ targetStatut, silent = false }) => {
+    if (!selectedProcessusId) return false;
+
+    // Validation des champs obligatoires UNIQUEMENT à la soumission
+    if (targetStatut === "Soumise") {
+      const missing = sections.flatMap((s) =>
+        s.champs.filter((c) => c.est_obligatoire && !isFieldFilled(formValues[c.id_champ_template]))
+      );
+      if (missing.length > 0) {
+        setError(
+          `${missing.length} champ(s) obligatoire(s) non rempli(s) : ${missing.map((c) => c.libelle).slice(0, 3).join(", ")}${missing.length > 3 ? "…" : ""}`
+        );
+        return false;
+      }
+    }
+
     setSaving(true);
-    setError(null);
+    if (!silent) setError(null);
     try {
       const versionIdToUpdate = id ?? existingVersionId;
       let versionId;
@@ -418,14 +584,18 @@ export default function FicheProcessusForm() {
           statut:         targetStatut,
           amont_ids:      amontIds,
           aval_ids:       avalIds,
+          amont_ext_ids:  amontExtIds,
+          aval_ext_ids:   avalExtIds,
         });
         versionId = fiche.id_version;
         if (!isUrlEdit) setExistingVersionId(fiche.id_version);
       } else {
         await updateVersionFiche(versionIdToUpdate, {
-          statut:    targetStatut,
-          amont_ids: amontIds,
-          aval_ids:  avalIds,
+          statut:        targetStatut,
+          amont_ids:     amontIds,
+          aval_ids:      avalIds,
+          amont_ext_ids: amontExtIds,
+          aval_ext_ids:  avalExtIds,
         });
         versionId = versionIdToUpdate;
       }
@@ -448,35 +618,50 @@ export default function FicheProcessusForm() {
       );
       await saveChampFiches(versionId, payload);
 
-      showNotif(
-        "success",
-        targetStatut === "Soumise"
-          ? "Fiche soumise avec succès !"
-          : "Brouillon enregistré avec succès !"
-      );
-      resetForm();
+      if (!silent) {
+        showNotif(
+          "success",
+          targetStatut === "Soumise"
+            ? "Fiche soumise avec succès !"
+            : "Brouillon enregistré avec succès !"
+        );
+      }
+
+      if (targetStatut === "Soumise") resetForm();
+      return true;
     } catch (err) {
-      setError("Une erreur est survenue lors de l'enregistrement.");
+      if (!silent) setError("Une erreur est survenue lors de l'enregistrement.");
       console.error(err);
+      return false;
     } finally {
       setSaving(false);
     }
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedProcessusId, id, existingVersionId, amontIds, avalIds, amontExtIds, avalExtIds, formValues, sections, user, isUrlEdit]);
 
-  const handleSubmit = (e) => { e.preventDefault(); handleSave("Brouillon"); };
+  // ── Autosave brouillon toutes les 3 minutes ────────────────────────────────
+  useEffect(() => {
+    if (readOnly || loading) return;
 
-  const handleVerifier = () => {
-    setVerifData(calcCompletion(sections, formValues));
-  };
+    const interval = setInterval(() => {
+      if (!selectedProcessusId) return;
+      doSave({ targetStatut: "Brouillon", silent: true });
+    }, 3 * 60 * 1000);
+
+    return () => clearInterval(interval);
+  }, [readOnly, loading, selectedProcessusId, doSave]);
+
+  const handleSave    = () => doSave({ targetStatut: "Brouillon" });
+  const handleSubmit  = (e) => { e.preventDefault(); doSave({ targetStatut: "Brouillon" }); };
+  const handleSoumettre = () => doSave({ targetStatut: "Soumise" });
+  const handleVerifier  = () => setVerifData(calcCompletion(sections, formValues));
 
   const selectCls = "w-full rounded-lg bg-white px-3 py-2 text-[12.5px] text-slate-700 outline-none transition";
-  const inputCls  = "w-full rounded-lg bg-white px-3 py-2 text-[13px] text-slate-700 outline-none transition focus:ring-1 focus:ring-[#58148E]/20";
 
   // ── Rendu ──────────────────────────────────────────────────────────────────
   return (
     <AppLayout pageTitle="Gestion des processus" userName={userName} userRole={userRole}>
       <div ref={containerRef} style={{ fontFamily: "'DM Sans', sans-serif" }} className="pb-12">
-        {/* Popups fixes — positionnées par rapport au conteneur */}
         <NotifBanner notif={notif} onClose={() => setNotif(null)} overlayStyle={overlayStyle} />
         <VerifPanel data={verifData} onClose={() => setVerifData(null)} overlayStyle={overlayStyle} />
 
@@ -506,7 +691,7 @@ export default function FicheProcessusForm() {
                 </div>
               )}
               {!readOnly && (
-                <button type="submit" disabled={saving || loading || checkingFiche}
+                <button type="button" onClick={handleSave} disabled={saving || loading || checkingFiche}
                   className="flex items-center gap-2 rounded-xl px-5 py-2 text-[12px] font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-50"
                   style={{ backgroundColor: PURPLE, boxShadow: "0 4px 14px rgba(88,20,142,0.3)" }}
                   onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = PURPLE_HOVER)}
@@ -518,7 +703,7 @@ export default function FicheProcessusForm() {
             </div>
           </div>
 
-          {/* ── Sélecteur de processus — caché si pré-sélectionné depuis l'URL ── */}
+          {/* ── Sélecteur de processus ── */}
           {!processusFromQuery && !isUrlEdit && (
             <div className="mb-3 flex items-center gap-4 rounded-xl bg-white px-5 py-3"
               style={{ border: `1px solid ${BORDER}` }}>
@@ -617,13 +802,11 @@ export default function FicheProcessusForm() {
                     </span>
                   </div>
                   <div className="bg-white px-6">
-                    <div className="py-4 grid items-start gap-5"
-                      style={{ gridTemplateColumns: "200px 1fr" }}>
-                      <div className="flex items-start gap-1 pt-0.5">
-                        <span className="text-[12px] font-semibold" style={{ color: PURPLE }}>
-                          Processus en amont
-                        </span>
-                      </div>
+                    {/* Amont interne */}
+                    <div className="py-4 grid items-start gap-5" style={{ gridTemplateColumns: "200px 1fr" }}>
+                      <span className="text-[12px] font-semibold pt-0.5" style={{ color: PURPLE }}>
+                        Processus en amont
+                      </span>
                       <MultiProcessSelect
                         value={amontIds}
                         onChange={setAmontIds}
@@ -631,17 +814,44 @@ export default function FicheProcessusForm() {
                         disabled={readOnly}
                       />
                     </div>
+                    {/* Amont externe */}
                     <div className="py-4 grid items-start gap-5"
                       style={{ gridTemplateColumns: "200px 1fr", borderTop: `1px solid ${BORDER}` }}>
-                      <div className="flex items-start gap-1 pt-0.5">
-                        <span className="text-[12px] font-semibold" style={{ color: PURPLE }}>
-                          Processus en aval
-                        </span>
-                      </div>
+                      <span className="text-[12px] font-semibold pt-0.5 text-blue-700">
+                        En amont externe
+                      </span>
+                      <ExternalProcessSelect
+                        value={amontExtIds}
+                        onChange={setAmontExtIds}
+                        externalOptions={externalOptions}
+                        onCreateNew={handleCreateExterne}
+                        disabled={readOnly}
+                      />
+                    </div>
+                    {/* Aval interne */}
+                    <div className="py-4 grid items-start gap-5"
+                      style={{ gridTemplateColumns: "200px 1fr", borderTop: `1px solid ${BORDER}` }}>
+                      <span className="text-[12px] font-semibold pt-0.5" style={{ color: PURPLE }}>
+                        Processus en aval
+                      </span>
                       <MultiProcessSelect
                         value={avalIds}
                         onChange={setAvalIds}
                         options={processusList.filter((p) => p.id_processus !== Number(selectedProcessusId))}
+                        disabled={readOnly}
+                      />
+                    </div>
+                    {/* Aval externe */}
+                    <div className="py-4 grid items-start gap-5"
+                      style={{ gridTemplateColumns: "200px 1fr", borderTop: `1px solid ${BORDER}` }}>
+                      <span className="text-[12px] font-semibold pt-0.5 text-blue-700">
+                        En aval externe
+                      </span>
+                      <ExternalProcessSelect
+                        value={avalExtIds}
+                        onChange={setAvalExtIds}
+                        externalOptions={externalOptions}
+                        onCreateNew={handleCreateExterne}
                         disabled={readOnly}
                       />
                     </div>
@@ -663,7 +873,6 @@ export default function FicheProcessusForm() {
                     ))
                 }
 
-                {/* Section Documents & Fichiers — toujours présente */}
                 <DocumentSection
                   versionId={id ? Number(id) : existingVersionId}
                   readOnly={readOnly}
@@ -682,7 +891,7 @@ export default function FicheProcessusForm() {
                 style={{ backgroundColor: "#fff", border: `1.5px solid ${PURPLE}`, color: PURPLE }}>
                 Vérifier avant soumettre
               </button>
-              <button type="button" disabled={saving || loading} onClick={() => handleSave("Soumise")}
+              <button type="button" disabled={saving || loading} onClick={handleSoumettre}
                 className="flex items-center gap-2 rounded-xl px-6 py-2 text-[12px] font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-50"
                 style={{ backgroundColor: PURPLE }}
                 onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = PURPLE_HOVER)}

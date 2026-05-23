@@ -1,4 +1,4 @@
-from collections import defaultdict
+﻿from collections import defaultdict
 from datetime import date
 from html import escape
 import unicodedata
@@ -9,6 +9,11 @@ from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from apps.notifications.utils import (
+    notifier_fiche_correction_demandee,
+    notifier_fiche_en_cours_audit,
+    notifier_fiche_publiee,
+)
 
 
 RESULT_TO_DB = {
@@ -114,6 +119,25 @@ def get_auditeur_id(request):
         )
         row = cursor.fetchone()
     return row[0] if row else None
+
+
+def get_audit_notification_context(cursor, id_version):
+    cursor.execute(
+        """
+        SELECT
+            vf.id_version,
+            vf.statut,
+            vf.id_redacteur,
+            p.id_processus,
+            p.code_process AS code_fiche,
+            p.id_pilote
+        FROM version_fiche vf
+        JOIN processus p ON p.id_processus = vf.id_processus
+        WHERE vf.id_version = %s
+        """,
+        [id_version],
+    )
+    return dictfetchone(cursor)
 
 
 def get_status_bucket(version_status):
@@ -276,6 +300,46 @@ def fiche_audit_report(request, id_version):
     response = StreamingHttpResponse([html], content_type="text/html; charset=utf-8")
     response["Content-Disposition"] = f'{disposition}; filename="{filename}"'
     return response
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def criteres_by_section(request, id_section):
+    with connection.cursor() as cursor:
+        if not table_exists(cursor, "critere_evaluation"):
+            return Response([])
+
+        if not table_has_column(cursor, "critere_evaluation", "id_section_template"):
+            return Response([])
+
+        cursor.execute(
+            """
+            SELECT id_critere, nom, est_actif, id_section_template
+            FROM critere_evaluation
+            WHERE est_actif = TRUE
+              AND id_section_template = %s
+            ORDER BY id_critere
+            """,
+            [id_section],
+        )
+        rows = dictfetchall(cursor)
+
+    return Response(
+        [
+            {
+                "id_critere": row["id_critere"],
+                "id_exigence": row["id_critere"],
+                "description": row["nom"],
+                "nom": row["nom"],
+                "id_section_template": row["id_section_template"],
+                "est_obligatoire": True,
+                "ponderation": 1,
+                "code_article": f"CR-{row['id_critere']}",
+                "article_titre": "Critère d'audit",
+            }
+            for row in rows
+        ]
+    )
 
 
 @api_view(["GET"])
@@ -496,7 +560,7 @@ def load_conformity_scores(cursor, version_ids):
 
 def normalize_task_status(value):
     normalized = str(value or "").strip().lower()
-    normalized = normalized.replace("Ã©", "e").replace("é", "e")
+    normalized = normalized.replace("é", "e").replace("è", "e").replace("ê", "e")
     if "termin" in normalized:
         return "terminee"
     if "cours" in normalized:
@@ -672,9 +736,12 @@ def start_audit_execution(request, id_version):
 
     payload = request.data or {}
     with transaction.atomic(), connection.cursor() as cursor:
+        fiche_context = get_audit_notification_context(cursor, id_version)
         update_version_status(cursor, id_version, "En_revision")
         update_version_commit(cursor, id_version, payload.get("currentIndex", 0))
         upsert_audit_terrain(cursor, id_version, auditeur_id, "En_cours", "")
+        if fiche_context:
+            notifier_fiche_en_cours_audit(fiche_context)
 
     return Response({"ok": True, "id_version": id_version, "status": "En_revision"})
 
@@ -723,6 +790,7 @@ def complete_audit_execution(request, id_version):
         )
 
     with transaction.atomic(), connection.cursor() as cursor:
+        fiche_context = get_audit_notification_context(cursor, id_version)
         replace_evaluations(cursor, id_version, auditeur_id, evaluations)
         replace_non_conformities(
             cursor,
@@ -743,6 +811,8 @@ def complete_audit_execution(request, id_version):
             )
             result_status = "Brouillon"
             report_name = None
+            if fiche_context:
+                notifier_fiche_correction_demandee(fiche_context)
         else:
             update_version_status(cursor, id_version, "Publiee", revue=False)
             report_name = ensure_report_reference(cursor, id_version, auditeur_id)
@@ -755,6 +825,8 @@ def complete_audit_execution(request, id_version):
                 report_name,
             )
             result_status = "Publiee"
+            if fiche_context:
+                notifier_fiche_publiee(fiche_context)
 
     return Response(
         {
@@ -954,18 +1026,18 @@ def load_fiche_audit_detail(id_version):
 
         criteres = []
         if table_exists(cursor, "critere_evaluation"):
-            ensure_default_audit_criteria(cursor)
             has_critere_section = table_has_column(cursor, "critere_evaluation", "id_section_template")
-            section_select = "id_section_template" if has_critere_section else "NULL::integer AS id_section_template"
-            cursor.execute(
-                f"""
-                SELECT id_critere, nom, est_actif, {section_select}
-                FROM critere_evaluation
-                WHERE est_actif = TRUE
-                ORDER BY id_critere
-                """
-            )
-            criteres = dictfetchall(cursor)
+            if has_critere_section:
+                cursor.execute(
+                    """
+                    SELECT id_critere, nom, est_actif, id_section_template
+                    FROM critere_evaluation
+                    WHERE est_actif = TRUE
+                      AND id_section_template IS NOT NULL
+                    ORDER BY id_critere
+                    """
+                )
+                criteres = dictfetchall(cursor)
 
         exigences = []
         if criteres:
@@ -1158,7 +1230,7 @@ def load_fiche_audit_detail(id_version):
     normalized_nc = []
     for item in non_conformites:
         parsed_title, severity = parse_nc_title(item["titre"])
-        linked_section = "Section non liee"
+        linked_section = "Section non liée"
         if item.get("id_exigence"):
             linked_section = requirement_to_section.get(str(item["id_exigence"]), linked_section)
         elif item.get("id_section_template"):
@@ -1239,7 +1311,7 @@ def load_fiche_audit_detail(id_version):
             "titre": f"Rapport d'audit - {fiche['code_process']}",
             "fichier": report_file,
             "genere_le": fiche.get("date_realisation") or fiche.get("date_validation") or fiche.get("date_creation"),
-            "mention": "Genere automatiquement lors de l'audit",
+            "mention": "Généré automatiquement lors de l'audit",
         },
     }
     return detail
@@ -2035,7 +2107,7 @@ def render_report_html(detail):
     <p><strong>Auditeur :</strong> {format_user(detail["audit"]["auditeur"].get("prenom"), detail["audit"]["auditeur"].get("nom")) or "Non renseigné"}</p>
     <p><strong>Date :</strong> {detail["audit"].get("date_realisation") or detail.get("date_validation") or detail.get("date_creation") or ""}</p>
     <div class="metrics">
-      <div class="metric"><span>Completude</span><strong>{metrics.get("taux_completude_moyen", 0)}%</strong></div>
+      <div class="metric"><span>Complétude</span><strong>{metrics.get("taux_completude_moyen", 0)}%</strong></div>
       <div class="metric"><span>Checklist</span><strong>{metrics.get("score_checklist", 0)}%</strong></div>
       <div class="metric"><span>BPMN</span><strong>{metrics.get("score_bpmn", 0)}%</strong></div>
       <div class="metric"><span>Preuves</span><strong>{metrics.get("score_preuves", 0)}%</strong></div>
@@ -2074,7 +2146,7 @@ def get_report_conclusion(rate):
     if rate >= 80:
         return "Fiche globalement conforme."
     if rate >= 50:
-        return "Fiche partiellement conforme, ameliorations necessaires."
+        return "Fiche partiellement conforme, améliorations nécessaires."
     return "Fiche non conforme, actions correctives prioritaires."
 
 

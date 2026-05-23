@@ -174,14 +174,14 @@ export default function AuditExecution() {
     setFeedback(null);
     try {
       await auditApi.saveDraft(buildPayload());
-      setAuditStatus("En revision");
-      redirectToKanban("Le brouillon a bien ete enregistre et la fiche est maintenant en revision.");
+      setAuditStatus("En révision");
+      redirectToKanban("Le brouillon a bien été enregistré et la fiche est maintenant en révision.");
     } catch (error) {
       setFeedback({
         type: "error",
         message: extractApiError(
           error,
-          "Le brouillon n'a pas pu etre enregistre. Verifions le backend ou l'identifiant de la fiche."
+          "Le brouillon n'a pas pu ?tre enregistr?. V?rifions le backend ou l'identifiant de la fiche."
         ),
       });
       throw error;
@@ -196,13 +196,13 @@ export default function AuditExecution() {
     try {
       await auditApi.completeExecution(buildPayload(), "send_back");
       setAuditStatus("Brouillon");
-      redirectToKanban("La fiche a bien ete renvoyee au pilote pour correction.");
+      redirectToKanban("La fiche a bien été renvoyée au pilote pour correction.");
     } catch (error) {
       setFeedback({
         type: "error",
         message: extractApiError(
           error,
-          "Le renvoi au pilote a echoue. Aucun changement de statut n'a ete confirme."
+          "Le renvoi au pilote a échoué. Aucun changement de statut n'a été confirmé."
         ),
       });
       throw error;
@@ -223,13 +223,13 @@ export default function AuditExecution() {
           fichier: response.rapport_pdf,
         }));
       }
-      redirectToKanban("La fiche a ete publiee avec succes et le rapport d'audit est maintenant lie.");
+      redirectToKanban("La fiche a été publiée avec succès et le rapport d'audit est maintenant lié.");
     } catch (error) {
       setFeedback({
         type: "error",
         message: extractApiError(
           error,
-          "La publication a echoue. Le rapport ou le changement de statut n'a pas ete enregistre."
+          "La publication a échoué. Le rapport ou le changement de statut n'a pas été enregistré."
         ),
       });
       throw error;
@@ -553,9 +553,9 @@ function mapInitialNonConformities(payload) {
     requirementId: nc.id_exigence ? String(nc.id_exigence) : "",
     title: nc.titre || nc.title,
     description: nc.description || "",
-    severity: nc.gravite || nc.severity || "Non renseignee",
+    severity: nc.gravite || nc.severity || "Non renseignée",
     sectionId: "",
-    sectionTitle: nc.section || nc.sectionTitle || "Section non liee",
+    sectionTitle: nc.section || nc.sectionTitle || "Section non liée",
     actions: nc.actions_correctives || nc.actions || [],
   }));
 }
@@ -584,7 +584,7 @@ function extractApiError(error, fallbackMessage) {
 
 function mapAuditStatus(status) {
   if (status === "Publiee") return "Publié";
-  if (status === "En_revision") return "En revision";
+  if (status === "En_revision") return "En révision";
   if (status === "Brouillon") return "Brouillon";
   return status || "";
 }

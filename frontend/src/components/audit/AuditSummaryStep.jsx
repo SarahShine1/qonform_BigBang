@@ -352,7 +352,7 @@ export default function AuditSummaryStep({
                           <td className="w-[220px] bg-gray-50 px-3 py-2 font-bold text-purple-700">
                             {field.label}
                           </td>
-                          <td className="px-3 py-2 text-slate-700">{field.value}</td>
+                          <td className="px-3 py-2 text-slate-700">{formatSummaryFieldValue(field.value)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -483,6 +483,39 @@ function SummaryMetric({ label, value }) {
       <p className="mt-1 text-xl font-bold text-gray-950">{value}</p>
     </div>
   );
+}
+
+function formatSummaryFieldValue(value) {
+  if (value === null || value === undefined || value === "") {
+    return "Non renseigné";
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (["[", "{"].includes(trimmed[0])) {
+      try {
+        return formatSummaryFieldValue(JSON.parse(trimmed));
+      } catch {
+        return value;
+      }
+    }
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => formatSummaryFieldValue(item))
+      .filter(Boolean)
+      .join(" | ");
+  }
+
+  if (typeof value === "object") {
+    return Object.entries(value)
+      .map(([key, item]) => `${key}: ${formatSummaryFieldValue(item)}`)
+      .join(" - ");
+  }
+
+  return String(value);
 }
 
 function Metric({ label, value, tone }) {

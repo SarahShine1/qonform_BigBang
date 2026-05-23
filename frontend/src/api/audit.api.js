@@ -25,7 +25,16 @@ export const auditApi = {
 
   getExecution: async (idVersion) => {
     const { data } = await apiClient.get(`/audit/fiches/${idVersion}/`);
-    return mapFicheDetailToExecution(data);
+    const criteriaBySection = await fetchCriteriaBySection(data.sections || []);
+    const enrichedData = criteriaBySection.length
+      ? { ...data, section_requirements: criteriaBySection }
+      : data;
+    return mapFicheDetailToExecution(enrichedData);
+  },
+
+  getCriteriaBySection: async (idSection) => {
+    const { data } = await apiClient.get(`/audit/criteres/sections/${idSection}/`);
+    return data;
   },
 
   startExecution: async (idVersion, currentIndex = 0) => {
@@ -86,19 +95,44 @@ export const auditApi = {
   },
 };
 
+async function fetchCriteriaBySection(sections) {
+  const sectionIds = (sections || [])
+    .map((section) => section.id_section_template)
+    .filter(Boolean);
+
+  if (!sectionIds.length) {
+    return [];
+  }
+
+  try {
+    const results = await Promise.all(
+      sectionIds.map(async (idSection) => {
+        const { data } = await apiClient.get(`/audit/criteres/sections/${idSection}/`);
+        return {
+          id_section_template: idSection,
+          requirements: data || [],
+        };
+      })
+    );
+
+    return results;
+  } catch {
+    return [];
+  }
+}
+
 function mapFicheDetailToExecution(fiche) {
-  const sectionRequirements = fiche.section_requirements || distributeRequirementsBySection(
-    fiche.exigences || [],
-    fiche.sections || []
-  );
+  const hasSectionRequirements = Array.isArray(fiche.section_requirements);
+  const sectionRequirements = hasSectionRequirements
+    ? fiche.section_requirements
+    : distributeRequirementsBySection(fiche.exigences || [], fiche.sections || []);
 
   const ficheSections = (fiche.sections || []).map((section, index) => {
-    const requirementSection =
-      sectionRequirements.find(
-        (item) =>
-          String(item.id_section_template ?? "") ===
-          String(section.id_section_template ?? "")
-      ) || sectionRequirements[index];
+    const requirementSection = sectionRequirements.find(
+      (item) =>
+        String(item.id_section_template ?? "") ===
+        String(section.id_section_template ?? "")
+    ) || (hasSectionRequirements ? null : sectionRequirements[index]);
 
     return {
       id: String(section.id_section_template || `section-${index + 1}`),
@@ -280,7 +314,7 @@ function mapDocumentEvaluations(documents = {}) {
 
 function formatFieldValue(value) {
   if (value === null || value === undefined || value === "") return "Non renseigné";
-  if (typeof value === "object") return JSON.stringify(value);
+  if (typeof value === "object") return value;
   return value;
 }
 

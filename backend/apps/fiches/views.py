@@ -126,6 +126,24 @@ def _sync_liaisons(id_processus, amont_ids, aval_ids):
         ProcessusLiaison.objects.create(id_processus_amont=id_processus, id_processus_aval=int(pid))
 
 
+def _sync_liaisons_externes(id_processus, amont_ext_ids, aval_ext_ids):
+    """Replace all external liaisons for this processus."""
+    from apps.processus.models import ProcessusLiaisonExterne
+    ProcessusLiaisonExterne.objects.filter(id_processus=id_processus).delete()
+    for ext_id in amont_ext_ids:
+        ProcessusLiaisonExterne.objects.get_or_create(
+            id_processus=id_processus,
+            id_processus_externe=int(ext_id),
+            sens="amont",
+        )
+    for ext_id in aval_ext_ids:
+        ProcessusLiaisonExterne.objects.get_or_create(
+            id_processus=id_processus,
+            id_processus_externe=int(ext_id),
+            sens="aval",
+        )
+
+
 class VersionFicheViewSet(viewsets.ModelViewSet):
     """
     POST  /api/v1/fiches/                  – créer une fiche
@@ -166,7 +184,6 @@ class VersionFicheViewSet(viewsets.ModelViewSet):
             id_redacteur = self.request.user.utilisateur.id_user
         except Exception:
             id_redacteur = self.request.data.get("id_redacteur")
-        # Auto-assign active norm if caller did not supply one
         id_norme = serializer.validated_data.get("id_norme") or (
             Norme.objects.filter(est_active=True)
             .values_list("id_norme", flat=True)
@@ -178,14 +195,28 @@ class VersionFicheViewSet(viewsets.ModelViewSet):
             self._get_liaison_ids("amont_ids"),
             self._get_liaison_ids("aval_ids"),
         )
+        _sync_liaisons_externes(
+            instance.id_processus,
+            self._get_liaison_ids("amont_ext_ids"),
+            self._get_liaison_ids("aval_ext_ids"),
+        )
 
     def perform_update(self, serializer):
+        previous_statut = serializer.instance.statut
         instance = serializer.save()
         _sync_liaisons(
             instance.id_processus,
             self._get_liaison_ids("amont_ids"),
             self._get_liaison_ids("aval_ids"),
         )
+        _sync_liaisons_externes(
+            instance.id_processus,
+            self._get_liaison_ids("amont_ext_ids"),
+            self._get_liaison_ids("aval_ext_ids"),
+        )
+        if previous_statut != "Soumise" and instance.statut == "Soumise":
+            from apps.notifications.utils import notifier_auditeurs_soumission
+            notifier_auditeurs_soumission(instance)
 
     @action(detail=True, methods=["get", "post"], url_path="champs")
     def champs(self, request, pk=None):
@@ -334,6 +365,14 @@ class VersionFicheViewSet(viewsets.ModelViewSet):
 
         pdf_filename = f"fiche_{proc_code}_v{version.numero_version}.pdf"
 
+        type_labels = {
+            "Management":  "Management",
+            "Realisation": "Réalisation",
+            "Support":     "Soutien",
+        }
+        proc_type_label = type_labels.get(proc_type, proc_type)
+        date_validation_str = version.date_validation.strftime("%d/%m/%Y") if version.date_validation else "—"
+
         html = f"""<!doctype html>
 <html lang="fr">
 <head>
@@ -341,32 +380,57 @@ class VersionFicheViewSet(viewsets.ModelViewSet):
   <title>Fiche {proc_code} — v{version.numero_version}</title>
   <style>
     *{{box-sizing:border-box}}
-    body{{font-family:Arial,sans-serif;color:#1f2937;margin:0;padding:0}}
+    body{{font-family:Arial,sans-serif;color:#1f2937;margin:0;padding:0;font-size:13px}}
     #toolbar{{position:fixed;top:0;left:0;right:0;z-index:999;
               display:flex;align-items:center;gap:12px;
               background:#1e1b4b;padding:10px 24px;box-shadow:0 2px 8px rgba(0,0,0,.3)}}
     #toolbar span{{color:#c4b5fd;font-size:13px;font-weight:600;flex:1;
                    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
     #toolbar button{{background:#7c3aed;color:#fff;border:none;border-radius:6px;
-                     padding:7px 18px;font-size:12px;font-weight:700;cursor:pointer;
-                     display:flex;align-items:center;gap:6px}}
+                     padding:7px 18px;font-size:12px;font-weight:700;cursor:pointer}}
     #toolbar button:hover{{background:#6d28d9}}
-    #content{{margin-top:56px;padding:32px;max-width:960px;margin-left:auto;margin-right:auto}}
-    header{{background:#f3f0ff;border-left:5px solid #58148e;padding:16px 20px;
-            margin-bottom:28px;border-radius:4px}}
-    header h1{{margin:0 0 8px;color:#58148e;font-size:20px}}
-    .meta{{display:flex;flex-wrap:wrap;gap:20px;font-size:12px;color:#555}}
-    .meta span{{white-space:nowrap}} .meta strong{{color:#1f2937}}
-    h2{{margin:28px 0 6px;font-size:14px;color:#58148e;
-        border-bottom:2px solid #e9d5ff;padding-bottom:4px}}
+    #content{{margin-top:56px;padding:32px 40px;max-width:960px;
+              margin-left:auto;margin-right:auto}}
+
+    /* ── Identity header ── */
+    .fiche-header{{
+      border:2px solid #58148e;border-radius:6px;
+      overflow:hidden;margin-bottom:32px;
+    }}
+    .fiche-header-title{{
+      background:#58148e;color:#fff;
+      padding:10px 18px;
+      display:flex;align-items:center;justify-content:space-between;
+    }}
+    .fiche-header-title .org{{font-size:11px;opacity:.8;font-style:italic}}
+    .fiche-header-title .doc-title{{font-size:15px;font-weight:700;letter-spacing:.3px}}
+    .fiche-header-grid{{
+      display:grid;grid-template-columns:1fr 1fr;
+    }}
+    .fiche-header-grid .cell{{
+      padding:9px 16px;border-bottom:1px solid #e5e7eb;
+      display:grid;grid-template-columns:180px 1fr;align-items:center;
+    }}
+    .fiche-header-grid .cell:nth-child(odd){{border-right:1px solid #e5e7eb}}
+    .fiche-header-grid .cell:nth-last-child(-n+2){{border-bottom:none}}
+    .cell-label{{font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;
+                 letter-spacing:.4px}}
+    .cell-value{{font-size:13px;color:#111827;font-weight:600}}
+    .cell-value.code{{font-family:monospace;color:#58148e;font-size:14px}}
+
+    /* ── Sections ── */
+    h2{{margin:28px 0 6px;font-size:13px;font-weight:700;color:#58148e;
+        text-transform:uppercase;letter-spacing:.5px;
+        border-bottom:2px solid #e9d5ff;padding-bottom:5px}}
     table{{width:100%;border-collapse:collapse;margin-top:4px;font-size:13px}}
     td{{border:1px solid #e5e7eb;padding:9px 12px;vertical-align:top}}
-    td.lbl{{width:35%;font-weight:600;color:#374151;background:#fafafa}}
+    td.lbl{{width:35%;font-weight:600;color:#374151;background:#fafafa;font-size:12px}}
     table.inner{{width:100%;border-collapse:collapse;font-size:12px}}
     table.inner th{{background:#ede9fe;color:#4c1d95;padding:5px 8px;
                     border:1px solid #ddd;text-align:left}}
-    table.inner td{{padding:5px 8px;border:1px solid #ddd}}
-    .badge{{display:inline-block;padding:2px 10px;border-radius:12px;font-size:11px;font-weight:700}}
+    table.inner td{{padding:5px 8px;border:1px solid #ddd;background:#fff}}
+    .badge{{display:inline-block;padding:2px 10px;border-radius:12px;
+            font-size:11px;font-weight:700}}
     .badge-brouillon{{background:#f1f5f9;color:#64748b}}
     .badge-soumise{{background:#fef3c7;color:#92400e}}
     .badge-revision{{background:#dbeafe;color:#1d4ed8}}
@@ -374,39 +438,62 @@ class VersionFicheViewSet(viewsets.ModelViewSet):
     .badge-archivee{{background:#f3f4f6;color:#6b7280}}
     @media print{{
       #toolbar{{display:none!important}}
-      #content{{margin-top:0;padding:20px}}
+      #content{{margin-top:0;padding:16px 20px}}
       body{{margin:0}}
-      header{{-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}}
+      .fiche-header{{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+      .fiche-header-title{{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
       .badge{{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
       td.lbl{{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
       h2{{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
-      @page{{margin:15mm 12mm;size:A4}}
+      @page{{margin:12mm 10mm;size:A4}}
     }}
   </style>
 </head>
 <body>
   <div id="toolbar">
     <span>&#128196;&nbsp; Fiche {proc_code} &mdash; Version {version.numero_version}</span>
-    <button onclick="window.print()">
-      &#8595;&nbsp; Enregistrer en PDF
-    </button>
+    <button onclick="window.print()">&#8595;&nbsp; Enregistrer en PDF</button>
   </div>
   <div id="content">
-    <header>
-      <h1>Fiche Processus &mdash; {proc_nom}</h1>
-      <div class="meta">
-        <span><strong>Code :</strong> {proc_code}</span>
-        <span><strong>Type :</strong> {proc_type}</span>
-        <span><strong>Version :</strong> {version.numero_version}</span>
-        <span><strong>Statut :</strong> <span class="badge {s_class}">{s_label}</span></span>
-        <span><strong>Rédacteur :</strong> {redacteur_nom}</span>
-        <span><strong>Date :</strong> {date_str}</span>
+
+    <div class="fiche-header">
+      <div class="fiche-header-title">
+        <span class="doc-title">FICHE DE PROCESSUS</span>
+        <span class="org">Système de Management de la Qualité</span>
       </div>
-    </header>
+      <div class="fiche-header-grid">
+        <div class="cell">
+          <span class="cell-label">Code processus</span>
+          <span class="cell-value code">{proc_code}</span>
+        </div>
+        <div class="cell">
+          <span class="cell-label">Version</span>
+          <span class="cell-value">V-{version.numero_version}</span>
+        </div>
+        <div class="cell">
+          <span class="cell-label">Statut</span>
+          <span class="cell-value">
+            <span class="badge {s_class}">{s_label}</span>
+          </span>
+        </div>
+        <div class="cell">
+          <span class="cell-label">Date</span>
+          <span class="cell-value">{date_validation_str}</span>
+        </div>
+        <div class="cell">
+          <span class="cell-label">Désignation du processus</span>
+          <span class="cell-value">{proc_nom}</span>
+        </div>
+        <div class="cell">
+          <span class="cell-label">Type de processus</span>
+          <span class="cell-value">&bull;&nbsp;{proc_type_label}</span>
+        </div>
+      </div>
+    </div>
+
     {body_html}
   </div>
   <script>
-    // Auto-open print dialog so the user can immediately save as PDF
     window.addEventListener('load', function() {{
       setTimeout(function() {{ window.print(); }}, 400);
     }});
