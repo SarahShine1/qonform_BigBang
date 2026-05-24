@@ -3,12 +3,6 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { getDownloadUrl } from "../../api/documents";
 
-const TYPE_SUPPORT_STYLES = {
-  Guide: "bg-blue-50 text-blue-700",
-  Reglementation: "bg-amber-50 text-amber-700",
-  Norme: "bg-emerald-50 text-emerald-700",
-};
-
 function formatDate(value) {
   if (!value) return "";
   try {
@@ -79,24 +73,21 @@ export default function AuditResourcesCard({
               onClick={() => handleOpenResource(resource)}
               className="flex w-full items-center justify-between gap-3 border-b border-[#F1EBFB] px-0 py-1 text-left text-[10.5px] text-slate-600 transition hover:bg-[#FCFAFF] last:border-b-0"
             >
-              <div className="min-w-0 flex-1">
-                <p className="truncate leading-4 text-slate-700">
-                  {resource.nom_fichier}
-                </p>
-                <div className="mt-0.5 flex items-center gap-1.5 text-[9.5px] text-slate-400">
-                  {resource.type_support ? (
-                    <span
-                      className={[
-                        "rounded-full px-1.5 py-0.5 font-medium",
-                        TYPE_SUPPORT_STYLES[resource.type_support] || "bg-slate-100 text-slate-600",
-                      ].join(" ")}
-                    >
-                      {resource.type_support}
-                    </span>
-                  ) : null}
-                  {resource.date_upload ? <span>{formatDate(resource.date_upload)}</span> : null}
-                </div>
-              </div>
+              <span className="min-w-0 flex-1 truncate leading-4 text-slate-700">
+                {resource.nom_fichier}
+              </span>
+
+              {resource.type_support ? (
+                <span className="hidden truncate text-[9.5px] text-slate-400 sm:inline">
+                  {resource.type_support}
+                </span>
+              ) : null}
+
+              {resource.date_upload ? (
+                <span className="whitespace-nowrap text-[9.5px] text-slate-400">
+                  {formatDate(resource.date_upload)}
+                </span>
+              ) : null}
 
               {openingId === resource.id_document ? (
                 <Loader2 className="h-[11px] w-[11px] animate-spin text-[#7C61C0]" />
