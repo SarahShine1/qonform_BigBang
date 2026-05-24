@@ -781,6 +781,7 @@ class ManagedUsersApiTests(APITestCase):
         response = self.client.get("/api/v1/auth/roles/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         labels = [item["libelle"] for item in response.data]
+        self.assertIn("Auditeur Externe", labels)
         self.assertIn("CAQ", labels)
         self.assertIn("Pilote", labels)
 
@@ -866,6 +867,32 @@ class ManagedUsersApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.target_utilisateur.refresh_from_db()
         self.assertFalse(self.target_utilisateur.est_actif)
+
+    def test_external_auditor_cannot_access_user_management_endpoints(self):
+        external_client = APIClient()
+        external_user, _ = make_user(
+            username="external_auditor_user",
+            email="external.auditor@esi.dz",
+            password="externalpass123",
+            roles=["Auditeur Externe"],
+        )
+        del external_user
+
+        response = external_client.post(
+            "/api/v1/auth/token/",
+            {"email": "external.auditor@esi.dz", "password": "externalpass123"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        external_client.credentials(HTTP_AUTHORIZATION=f"Bearer {response.data['access']}")
+
+        for url in (
+            "/api/v1/auth/roles/",
+            "/api/v1/auth/users/",
+            "/api/v1/auth/users/stats/",
+        ):
+            denied = external_client.get(url)
+            self.assertEqual(denied.status_code, status.HTTP_403_FORBIDDEN)
 
 
 class MySettingsApiTests(APITestCase):

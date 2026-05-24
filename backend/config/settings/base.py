@@ -38,6 +38,7 @@ THIRD_PARTY_APPS = [
 
 LOCAL_APPS = [
     'apps.accounts',
+    'apps.dictionary',
     'apps.messaging',
     'apps.organigramme',
     'apps.processus',

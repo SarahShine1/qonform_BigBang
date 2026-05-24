@@ -3,6 +3,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.accounts.permissions import ReadOnlyForRole
 from .models import (
     MaturityAssessment,
     MaturityArticle,
@@ -58,7 +59,7 @@ def get_or_create_assessment(user):
 
 
 class MyMaturityAssessmentView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, ReadOnlyForRole("Auditeur Externe")]
 
     def get(self, request):
         assessment = get_or_create_assessment(request.user)

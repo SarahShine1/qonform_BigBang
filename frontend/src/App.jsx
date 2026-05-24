@@ -20,6 +20,7 @@ import NormeTemplatePage from "./pages/canevas/NormeTemplatePage";
 import InteractionMapPage from "./pages/cartographie/InteractionMapPage";
 import AuditTerrainPage from "./pages/audit/AuditTerrainPage";
 import DashboardAuditeur from "./pages/audit/DashboardAuditeur";
+import ExternalAuditorDashboard from "./pages/audit/ExternalAuditorDashboard";
 import DocumentationPage from "./pages/Documentationpage";
 import ChefTachesPage from "./pages/tache/ChefTachesPage";
 import DossierProcessusPage from "./pages/processus/DossierProcessusPage";
@@ -30,6 +31,14 @@ import PVPage from "./pages/pv/PVPage";
 import DashboardDG from "./pages/pilotage/DashboardDG";
 import ParametresPage from "./pages/settings/ParametresPage";
 
+const INTERNAL_AUDITOR_ROLES = [
+  "AUDITEUR",
+  "Auditeur",
+  "Auditeur interne",
+  "Auditeur Interne",
+];
+const EXTERNAL_AUDITOR_ROLES = ["Auditeur Externe"];
+const DG_ROLES = ["DG", "Direction generale", "Direction générale"];
 
 export default function App() {
   return (
@@ -44,28 +53,19 @@ export default function App() {
             <Route path="/accueil" element={<AccueilPage />} />
 
             <Route
-              element={
-                <RoleProtectedRoute
-                  roles={["DG", "Direction generale", "Direction générale"]}
-                />
-              }
+              element={<RoleProtectedRoute roles={DG_ROLES} />}
             >
               <Route path="/dashboard-DG" element={<DashboardDG />} />
             </Route>
 
             <Route
-              element={
-                <RoleProtectedRoute roles={["CAQ", "ADMIN", "Admin"]} />
-              }
+              element={<RoleProtectedRoute roles={["CAQ", "ADMIN", "Admin"]} />}
             >
-            <Route path="/dashboard" element={<DashboardCAQ />} />
+              <Route path="/dashboard" element={<DashboardCAQ />} />
+              <Route path="/gestion-utilisateurs" element={<GestionUtilisateurs />} />
             </Route>
-            
+
             <Route path="/organigramme" element={<Organigramme />} />
-            <Route
-              path="/gestion-utilisateurs"
-              element={<GestionUtilisateurs />}
-            />
 
             <Route
               path="/cartographie"
@@ -79,10 +79,11 @@ export default function App() {
             />
 
             <Route path="/cartographie/processus" element={<ProcessusPage />} />
+
             <Route
               element={
                 <RoleProtectedRoute
-                  excludedRoles={["DG", "Direction generale", "Direction générale"]}
+                  excludedRoles={[...DG_ROLES, ...EXTERNAL_AUDITOR_ROLES]}
                 />
               }
             >
@@ -94,26 +95,57 @@ export default function App() {
                 path="/cartographie/canevas-fiche/:id"
                 element={<NormeTemplatePage />}
               />
+            </Route>
+
+            <Route
+              element={<RoleProtectedRoute excludedRoles={DG_ROLES} />}
+            >
               <Route
                 path="/cartographie/interactions"
                 element={<InteractionMapPage />}
               />
             </Route>
-            <Route path="/suivi" element={<PVPage />} />
-            <Route path="/audit/preaudit" element={<PreAuditPage />} />
-            <Route path="/audit/pre-audit" element={<PreAuditPage />} />
-            <Route path="/audit/mes-audits" element={<MesAudits />} />
-            <Route
-              path="/audit/audits-terrain"
-              element={<AuditTerrainPage />}
-            />
-            <Route path="/dashboard-pilote" element={<DashboardPilote />} />
-            <Route
-              path="/dashboard-auditeur"
-              element={<DashboardAuditeur />}
-            />
-            <Route path="/planification" element={<ChefTachesPage />} />
 
+            <Route
+              element={<RoleProtectedRoute excludedRoles={EXTERNAL_AUDITOR_ROLES} />}
+            >
+              <Route path="/suivi" element={<PVPage />} />
+              <Route path="/audit/preaudit" element={<PreAuditPage />} />
+              <Route path="/audit/pre-audit" element={<PreAuditPage />} />
+              <Route path="/planification" element={<ChefTachesPage />} />
+              <Route
+                path="/gestion-processus/fiches/nouveau"
+                element={<FicheProcessusForm />}
+              />
+              <Route
+                path="/gestion-processus/fiches/:id/modifier"
+                element={<FicheProcessusForm />}
+              />
+            </Route>
+
+            <Route path="/audit/mes-audits" element={<MesAudits />} />
+            <Route path="/audit/audits-terrain" element={<AuditTerrainPage />} />
+
+            <Route
+              element={<RoleProtectedRoute roles={["Pilote", "Pilote de processus"]} />}
+            >
+              <Route path="/dashboard-pilote" element={<DashboardPilote />} />
+            </Route>
+
+            <Route
+              element={<RoleProtectedRoute roles={INTERNAL_AUDITOR_ROLES} />}
+            >
+              <Route path="/dashboard-auditeur" element={<DashboardAuditeur />} />
+            </Route>
+
+            <Route
+              element={<RoleProtectedRoute roles={EXTERNAL_AUDITOR_ROLES} />}
+            >
+              <Route
+                path="/dashboard-auditeur-externe"
+                element={<ExternalAuditorDashboard />}
+              />
+            </Route>
 
             <Route path="/audits" element={<MesAudits />} />
             <Route path="/mes-audits" element={<MesAudits />} />
@@ -137,22 +169,13 @@ export default function App() {
               path="/gestion-processus/dossier/:id"
               element={<DossierProcessusPage />}
             />
-            <Route
-              path="/gestion-processus/fiches/nouveau"
-              element={<FicheProcessusForm />}
-            />
-            <Route
-              path="/gestion-processus/fiches/:id/modifier"
-              element={<FicheProcessusForm />}
-            />
 
             <Route path="/niveau-maturite" element={<MaturityPage />} />
-
             <Route path="/parametres" element={<ParametresPage />} />
           </Route>
 
           <Route
-            element={<RoleProtectedRoute roles={["AUDITEUR", "Auditeur"]} />}
+            element={<RoleProtectedRoute roles={INTERNAL_AUDITOR_ROLES} />}
           >
             <Route path="/auditeur/audit-fiches" element={<AuditFiches />} />
             <Route
@@ -164,12 +187,21 @@ export default function App() {
               element={<AuditExecution />}
             />
             <Route
-              path="/auditeur/fiches-auditees/:idVersion"
-              element={<AuditPublishedDetail />}
-            />
-            <Route
               path="/mes-audits/execution/:auditId"
               element={<AuditExecution />}
+            />
+          </Route>
+
+          <Route
+            element={
+              <RoleProtectedRoute
+                roles={[...INTERNAL_AUDITOR_ROLES, ...EXTERNAL_AUDITOR_ROLES]}
+              />
+            }
+          >
+            <Route
+              path="/auditeur/fiches-auditees/:idVersion"
+              element={<AuditPublishedDetail />}
             />
           </Route>
 
