@@ -5,6 +5,7 @@ from rest_framework.response import Response
 from django.db.models import Q
 from django.http import HttpResponse
 
+from apps.accounts.permissions import DenyRole, ReadOnlyForRole, request_has_role
 from .models import Norme, SectionTemplate, ChampTemplate, VersionFiche, ChampFiche, ProcessusLiaison
 from .serializers import (
     NormeSerializer,
@@ -26,7 +27,7 @@ class NormeViewSet(viewsets.ModelViewSet):
     POST   /api/v1/fiches/normes/{id}/toggle-active/  – changer la norme active
     """
     serializer_class = NormeSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, DenyRole("Auditeur Externe")]
 
     def get_queryset(self):
         return Norme.objects.all().order_by("created_at")
@@ -53,7 +54,7 @@ class SectionTemplateViewSet(viewsets.ModelViewSet):
     GET    /api/v1/fiches/template/sections/{id}/champs/      – champs d'une section
     """
     serializer_class = SectionTemplateSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, DenyRole("Auditeur Externe")]
 
     def get_queryset(self):
         id_norme = self.request.query_params.get("id_norme")
@@ -93,7 +94,7 @@ class ChampTemplateViewSet(viewsets.ModelViewSet):
     PATCH  /api/v1/fiches/template/champs/{id}/  – modifier un champ
     DELETE /api/v1/fiches/template/champs/{id}/  – soft-delete
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, DenyRole("Auditeur Externe")]
 
     def get_serializer_class(self):
         if self.action == "create":
@@ -136,7 +137,7 @@ class VersionFicheViewSet(viewsets.ModelViewSet):
     """
 
     serializer_class = VersionFicheSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, ReadOnlyForRole("Auditeur Externe")]
 
     def get_permissions(self):
         if self.action == "report":
@@ -146,6 +147,8 @@ class VersionFicheViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = VersionFiche.objects.all()
+        if request_has_role(self.request, "Auditeur Externe"):
+            qs = qs.filter(statut="Publiee")
         id_processus = self.request.query_params.get("id_processus")
         if id_processus:
             qs = qs.filter(id_processus=id_processus)

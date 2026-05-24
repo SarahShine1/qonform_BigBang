@@ -11,6 +11,7 @@ export default function ArticleRequirementCard({
   requirement,
   onScoreChange,
   onEvidenceChange,
+  disabled = false,
 }) {
   return (
     <article className="rounded-[14px] border border-[#E5E7EB] bg-white px-3 py-3 shadow-[0_6px_18px_rgba(45,11,104,0.04)]">
@@ -24,7 +25,7 @@ export default function ArticleRequirementCard({
         </span>
       </div>
 
-      <ScoreSelector value={requirement.score} onChange={onScoreChange} />
+      <ScoreSelector value={requirement.score} onChange={onScoreChange} disabled={disabled} />
 
       <label className="mt-2.5 block">
         <span className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
@@ -33,9 +34,11 @@ export default function ArticleRequirementCard({
         <textarea
           value={requirement.preuve}
           onChange={(event) => onEvidenceChange(event.target.value)}
+          disabled={disabled}
+          readOnly={disabled}
           rows={2}
           placeholder="Ex: PV, fiche, procedure, capture, lien documentaire..."
-          className="w-full resize-none rounded-[10px] border border-[#E5E7EB] bg-white px-3 py-2 text-[12px] text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-[#C8B7F5] focus:ring-2 focus:ring-[#F3ECFF]"
+          className="w-full resize-none rounded-[10px] border border-[#E5E7EB] bg-white px-3 py-2 text-[12px] text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-[#C8B7F5] focus:ring-2 focus:ring-[#F3ECFF] disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500"
         />
       </label>
     </article>

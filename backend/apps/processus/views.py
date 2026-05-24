@@ -2,10 +2,11 @@ import re
 
 from django.db.models import Q
 from rest_framework import viewsets
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, SAFE_METHODS
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.accounts.permissions import ReadOnlyForRole
 from .models import Processus
 from .serializers import (
     TYPE_LABELS,
@@ -64,6 +65,11 @@ class ProcessusViewSet(viewsets.ModelViewSet):
 
     serializer_class = ProcessusSerializer
     permission_classes = [IsAuthenticated]
+
+    def get_permissions(self):
+        if self.request.method in SAFE_METHODS:
+            return [IsAuthenticated()]
+        return [IsAuthenticated(), ReadOnlyForRole("Auditeur Externe")()]
 
     def get_queryset(self):
         qs = Processus.objects.all()
