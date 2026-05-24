@@ -1,6 +1,9 @@
-export default function KpiCard({ icon: Icon, label, value, color, bg }) {
+export default function KpiCard({ icon: Icon, label, value, color, bg, onClick }) {
   return (
-    <div className="rounded-lg border border-gray-200 bg-white px-4 py-4 shadow-sm">
+    <div
+      className={`rounded-lg border border-gray-200 bg-white px-4 py-4 shadow-sm transition ${onClick ? "cursor-pointer hover:shadow-md hover:border-violet-200" : ""}`}
+      onClick={onClick}
+    >
       <div className="flex items-center justify-between">
         <p className="text-xs font-semibold text-slate-500 leading-4">{label}</p>
         <span className={`flex h-8 w-8 items-center justify-center rounded-full ${bg}`}>

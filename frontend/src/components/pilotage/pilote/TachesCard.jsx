@@ -1,4 +1,4 @@
-import { CalendarClock, MoreVertical } from "lucide-react";
+import { CalendarClock, ChevronRight } from "lucide-react";
 
 const PRIORITE_STYLES = {
   Haute:   { bg: "bg-red-50",    text: "text-red-600"    },
@@ -27,15 +27,18 @@ function DueBadge({ dateStr }) {
   return <span className={`text-[10px] ${cls}`}>{label}</span>;
 }
 
-export default function TachesCard({ taches = [] }) {
+export default function TachesCard({ taches = [], onNavigate }) {
   return (
     <section className="rounded-lg border border-gray-200 bg-white shadow-sm">
-      <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
+      <div
+        className={`flex items-center justify-between border-b border-gray-100 px-4 py-3 ${onNavigate ? "cursor-pointer hover:bg-slate-50" : ""}`}
+        onClick={onNavigate}
+      >
         <div className="flex items-center gap-2">
           <CalendarClock className="h-4 w-4 text-violet-700" />
           <h2 className="text-sm font-bold text-gray-950">Tâches à venir</h2>
         </div>
-        <MoreVertical className="h-4 w-4 text-slate-400" />
+        {onNavigate && <ChevronRight className="h-4 w-4 text-slate-400" />}
       </div>
 
       {taches.length === 0 ? (

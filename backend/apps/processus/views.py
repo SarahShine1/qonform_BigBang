@@ -8,10 +8,12 @@ from rest_framework.views import APIView
 
 from apps.accounts.permissions import ReadOnlyForRole
 from .models import Processus
+from .models import Processus, ProcessusExterne
 from .serializers import (
     TYPE_LABELS,
     ProcessInteractionSerializer,
     ProcessusSerializer,
+    ProcessusExterneSerializer,
 )
 from apps.accounts.models import Departement, Utilisateur
 from apps.fiches.models import ProcessusLiaison, VersionFiche
@@ -118,6 +120,28 @@ def _serialize_process_ref(process):
         "name": process.nom,
         "type": process.type_process,
     }
+
+
+class ProcessusExterneViewSet(viewsets.ViewSet):
+    """
+    GET  /api/v1/processus/externes/  – liste tous les processus externes
+    POST /api/v1/processus/externes/  – crée ou retourne un processus externe existant
+    """
+    permission_classes = [IsAuthenticated]
+
+    def list(self, request):
+        qs = ProcessusExterne.objects.all()
+        search = request.query_params.get("search", "").strip()
+        if search:
+            qs = qs.filter(nom__icontains=search)
+        return Response(ProcessusExterneSerializer(qs, many=True).data)
+
+    def create(self, request):
+        nom = (request.data.get("nom") or "").strip()
+        if not nom:
+            return Response({"detail": "Le champ 'nom' est requis."}, status=400)
+        externe, _ = ProcessusExterne.objects.get_or_create(nom=nom)
+        return Response(ProcessusExterneSerializer(externe).data, status=201)
 
 
 class ProcessInteractionsAPIView(APIView):

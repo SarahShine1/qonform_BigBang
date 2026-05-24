@@ -93,13 +93,20 @@ def pilote_dashboard(request):
         row = cursor.fetchone()
         active_norme_id = row[0] if row else None
 
-        # ── Processus du département du pilote ────────────────────────────────
+        # ── Processus du département du pilote (+ sous-départements) ────────────
         if user_dept:
             cursor.execute(
                 """
+                WITH RECURSIVE subdepts AS (
+                    SELECT id_departement FROM departement WHERE id_departement = %s
+                    UNION ALL
+                    SELECT d.id_departement
+                    FROM departement d
+                    INNER JOIN subdepts sd ON d.id_parent = sd.id_departement
+                )
                 SELECT p.id_processus, p.code_process, p.nom AS processus_nom, p.type_process
                 FROM processus p
-                WHERE p.id_departement = %s
+                WHERE p.id_departement IN (SELECT id_departement FROM subdepts)
                 ORDER BY p.nom
                 """,
                 [user_dept],
