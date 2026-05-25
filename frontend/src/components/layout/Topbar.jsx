@@ -1,4 +1,4 @@
-import { Bell, Menu, MessageSquare, Moon, Sun, ClipboardCheck, CheckCircle, XCircle, Edit3, FileText, FilePen, BookOpen, Bot } from "lucide-react";
+import { Bell, Menu, MessageSquare, Moon, Sun, ClipboardCheck, CheckCircle, XCircle, Edit3, FileText, FilePen, BookOpen, Bot, Send } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { messagingApi } from "../../api/messages.api";
@@ -32,8 +32,8 @@ export default function Topbar({ pageTitle, userName, userRole, leftOffset = SID
     }
   }, [user]);
 
-  const isPvNotification = (notification) =>
-    notification.type_notification === "PV_CREE";
+const isPvNotification = (n) =>
+  ["PV_CREE", "PV_SOUMIS", "PV_REJETE", "PV_VALIDE"].includes(n.type_notification);
 
   const isFicheNotification = (notification) =>
     notification.type_notification === "SOUMISSION_FICHE";
@@ -73,12 +73,12 @@ export default function Topbar({ pageTitle, userName, userRole, leftOffset = SID
     return title?.split(" ")[0]?.[0]?.toUpperCase() || "N";
   };
   
-  const getPvIcon = (typeNotification) => {
-  switch (typeNotification) {
-    case "PV_CREE":
-      return FileText;
-    default:
-      return FileText;
+ const getPvIcon = (type) => {
+  switch (type) {
+    case "PV_VALIDE":  return CheckCircle;
+    case "PV_REJETE":  return XCircle;
+    case "PV_SOUMIS":  return Send;
+    default:           return FileText;
   }
 };
 
@@ -131,6 +131,10 @@ export default function Topbar({ pageTitle, userName, userRole, leftOffset = SID
       if (isFicheNotification(notification)) {
         return "bg-white hover:bg-amber-50 dark:bg-slate-900 dark:hover:bg-slate-800";
       }
+      
+      if (isPvNotification(notification)) {
+        return "bg-white hover:bg-blue-50 dark:bg-slate-900 dark:hover:bg-slate-800";
+      }
       return "bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800";
     }
 
@@ -143,6 +147,10 @@ export default function Topbar({ pageTitle, userName, userRole, leftOffset = SID
     if (isFicheNotification(notification)) {
       return "bg-amber-50/70 hover:bg-amber-50 dark:bg-slate-800 dark:hover:bg-slate-700";
     }
+     if (isPvNotification(notification)) {
+      return "bg-blue-50/70 hover:bg-blue-50 dark:bg-slate-800 dark:hover:bg-slate-700";
+     }
+      
     return "bg-violet-50/70 hover:bg-violet-100/70 dark:bg-slate-800 dark:hover:bg-slate-700";
   };
 
@@ -158,6 +166,7 @@ export default function Topbar({ pageTitle, userName, userRole, leftOffset = SID
     if (isTaskNotification(notification)) return "bg-red-500";
     if (isAuditNotification(notification)) return "bg-yellow-600";
     if (isFicheNotification(notification)) return "bg-amber-500";
+    if (isPvNotification(notification)) return "bg-blue-500";
     return "bg-violet-600 dark:bg-violet-400";
   };
 

@@ -10,25 +10,14 @@ class PVParticipantInline(admin.TabularInline):
 
 @admin.register(PV)
 class PVAdmin(admin.ModelAdmin):
-    list_display = ["code", "type", "date", "participant_count", "created_at"]
-    list_filter = ["type", "date", "created_at"]
-    search_fields = ["code", "type"]
-    readonly_fields = ["code", "categorie", "statut", "created_at", "updated_at"]
+    list_display = ["code", "categorie", "sous_type", "statut", "date", "participant_count", "created_at"]
+    list_filter = ["categorie", "sous_type", "statut", "date", "created_at"]
+    search_fields = ["code", "categorie", "sous_type"]
+    readonly_fields = ["code", "created_at", "updated_at"]
     inlines = [PVParticipantInline]
     fieldsets = (
-        (
-            "PV Information",
-            {
-                "fields": ("code", "type", "categorie", "statut", "date"),
-            },
-        ),
-        (
-            "Metadata",
-            {
-                "fields": ("created_at", "updated_at"),
-                "classes": ("collapse",),
-            },
-        ),
+        ("PV Information", {"fields": ("code", "categorie", "sous_type", "statut", "date")}),
+        ("Metadata", {"fields": ("created_at", "updated_at"), "classes": ("collapse",)}),
     )
     filter_horizontal = []
 
