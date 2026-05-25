@@ -71,8 +71,10 @@ class ChampTemplateSerializer(serializers.ModelSerializer):
 
 
 class VersionFicheSerializer(serializers.ModelSerializer):
-    liaisons_amont = serializers.SerializerMethodField()
-    liaisons_aval  = serializers.SerializerMethodField()
+    liaisons_amont          = serializers.SerializerMethodField()
+    liaisons_aval           = serializers.SerializerMethodField()
+    liaisons_amont_externes = serializers.SerializerMethodField()
+    liaisons_aval_externes  = serializers.SerializerMethodField()
 
     def get_liaisons_amont(self, obj):
         return list(
@@ -86,6 +88,28 @@ class VersionFicheSerializer(serializers.ModelSerializer):
             .values_list("id_processus_aval", flat=True)
         )
 
+    def get_liaisons_amont_externes(self, obj):
+        from apps.processus.models import ProcessusLiaisonExterne, ProcessusExterne
+        ids = list(
+            ProcessusLiaisonExterne.objects.filter(id_processus=obj.id_processus, sens="amont")
+            .values_list("id_processus_externe", flat=True)
+        )
+        return [
+            {"id_processus_externe": e.id_processus_externe, "nom": e.nom}
+            for e in ProcessusExterne.objects.filter(id_processus_externe__in=ids)
+        ]
+
+    def get_liaisons_aval_externes(self, obj):
+        from apps.processus.models import ProcessusLiaisonExterne, ProcessusExterne
+        ids = list(
+            ProcessusLiaisonExterne.objects.filter(id_processus=obj.id_processus, sens="aval")
+            .values_list("id_processus_externe", flat=True)
+        )
+        return [
+            {"id_processus_externe": e.id_processus_externe, "nom": e.nom}
+            for e in ProcessusExterne.objects.filter(id_processus_externe__in=ids)
+        ]
+
     class Meta:
         model = VersionFiche
         fields = [
@@ -93,7 +117,9 @@ class VersionFicheSerializer(serializers.ModelSerializer):
             "numero_version", "commentaire_version",
             "date_creation", "date_derniere_modif", "date_validation",
             "revue", "commit",
-            "liaisons_amont", "liaisons_aval", "id_norme",
+            "liaisons_amont", "liaisons_aval",
+            "liaisons_amont_externes", "liaisons_aval_externes",
+            "id_norme",
         ]
         read_only_fields = ["id_version", "id_redacteur", "date_creation"]
 

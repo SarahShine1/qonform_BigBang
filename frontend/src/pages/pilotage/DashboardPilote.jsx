@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   CheckCircle2,
   Clock,
@@ -19,6 +20,7 @@ import {
 
 export default function DashboardPilote() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -75,6 +77,7 @@ export default function DashboardPilote() {
           value={kpis.totalProcessus ?? 0}
           color="text-violet-700"
           bg="bg-violet-50"
+          onClick={() => navigate("/cartographie/processus")}
         />
         <KpiCard
           icon={FileEdit}
@@ -82,6 +85,7 @@ export default function DashboardPilote() {
           value={kpis.brouillon ?? 0}
           color="text-slate-600"
           bg="bg-slate-100"
+          onClick={() => navigate("/cartographie/processus?statut=Brouillon")}
         />
         <KpiCard
           icon={Clock}
@@ -89,6 +93,7 @@ export default function DashboardPilote() {
           value={kpis.enAttente ?? 0}
           color="text-amber-600"
           bg="bg-amber-50"
+          onClick={() => navigate("/cartographie/processus?statut=En_revision")}
         />
         <KpiCard
           icon={CheckCircle2}
@@ -96,6 +101,7 @@ export default function DashboardPilote() {
           value={kpis.publiee ?? 0}
           color="text-emerald-600"
           bg="bg-emerald-50"
+          onClick={() => navigate("/cartographie/processus?statut=Publiee")}
         />
       </section>
 
@@ -104,7 +110,7 @@ export default function DashboardPilote() {
         <div className="lg:col-span-2">
           <StatutDonut data={statutDistribution} />
         </div>
-        <TachesCard taches={tachesAVenir} />
+        <TachesCard taches={tachesAVenir} onNavigate={() => navigate("/planification")} />
       </div>
 
       {/* Zone 3 — NC bar chart + Timeline */}

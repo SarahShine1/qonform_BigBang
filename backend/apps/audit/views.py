@@ -9,6 +9,7 @@ from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from apps.accounts.permissions import DenyRole, ReadOnlyForRole, request_has_role
 from apps.notifications.utils import (
     notifier_fiche_correction_demandee,
     notifier_fiche_en_cours_audit,
@@ -267,6 +268,9 @@ def fiches_audit_list(request):
         )
         rows = dictfetchall(cursor)
 
+    if request_has_role(request, "Auditeur Externe"):
+        rows = [row for row in rows if row["statut_fiche"] == "Publiee"]
+
     grouped = {"soumise": [], "en_revision": [], "publiee_audit": []}
     for row in rows:
         card = serialize_fiche_card(row)
@@ -281,6 +285,8 @@ def fiche_audit_detail(request, id_version):
     detail = load_fiche_audit_detail(id_version)
     if not detail:
         return Response({"detail": "Fiche introuvable."}, status=status.HTTP_404_NOT_FOUND)
+    if request_has_role(request, "Auditeur Externe") and detail.get("statut") != "Publiee":
+        return Response({"detail": "Fiche introuvable."}, status=status.HTTP_404_NOT_FOUND)
     return Response(detail)
 
 
@@ -289,6 +295,8 @@ def fiche_audit_detail(request, id_version):
 def fiche_audit_report(request, id_version):
     detail = load_fiche_audit_detail(id_version)
     if not detail:
+        return Response({"detail": "Fiche introuvable."}, status=status.HTTP_404_NOT_FOUND)
+    if request_has_role(request, "Auditeur Externe") and detail.get("statut") != "Publiee":
         return Response({"detail": "Fiche introuvable."}, status=status.HTTP_404_NOT_FOUND)
 
     html = render_report_html(detail)
@@ -343,7 +351,7 @@ def criteres_by_section(request, id_section):
 
 
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, DenyRole("Auditeur Externe")])
 def audit_dashboard(request):
     auditeur_id = get_auditeur_id(request)
     if not auditeur_id:
@@ -728,7 +736,7 @@ def serialize_dashboard_tasks(tasks, today):
 
 
 @api_view(["POST"])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ReadOnlyForRole("Auditeur Externe")])
 def start_audit_execution(request, id_version):
     auditeur_id = get_auditeur_id(request)
     if not auditeur_id:
@@ -747,7 +755,7 @@ def start_audit_execution(request, id_version):
 
 
 @api_view(["POST"])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ReadOnlyForRole("Auditeur Externe")])
 def save_audit_draft(request, id_version):
     auditeur_id = get_auditeur_id(request)
     if not auditeur_id:
@@ -773,7 +781,7 @@ def save_audit_draft(request, id_version):
 
 
 @api_view(["POST"])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ReadOnlyForRole("Auditeur Externe")])
 def complete_audit_execution(request, id_version):
     auditeur_id = get_auditeur_id(request)
     if not auditeur_id:
@@ -839,7 +847,7 @@ def complete_audit_execution(request, id_version):
 
 
 @api_view(["POST"])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ReadOnlyForRole("Auditeur Externe")])
 def create_nc(request, id_version):
     auditeur_id = get_auditeur_id(request)
     if not auditeur_id:
@@ -874,7 +882,7 @@ def create_nc(request, id_version):
 
 
 @api_view(["POST"])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ReadOnlyForRole("Auditeur Externe")])
 def create_action_corrective(request, id_nc):
     description = request.data.get("description")
     if not description:

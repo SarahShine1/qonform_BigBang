@@ -1,8 +1,30 @@
-import { ArrowRight, CircleCheck, Square } from "lucide-react";
+import { AlertCircle, ArrowRight, CircleCheck, Loader2, Square } from "lucide-react";
 import { Link } from "react-router-dom";
-import { todayTasks } from "../../data/accueilData";
 
-export default function TodayTasksCard() {
+function formatTaskWindow(task) {
+  if (!task?.dateDebut && !task?.dateFin) return "";
+
+  const start = task.dateDebut
+    ? new Date(task.dateDebut).toLocaleDateString("fr-FR", {
+        day: "2-digit",
+        month: "2-digit",
+      })
+    : "";
+  const end = task.dateFin
+    ? new Date(task.dateFin).toLocaleDateString("fr-FR", {
+        day: "2-digit",
+        month: "2-digit",
+      })
+    : "";
+
+  if (start && end && start !== end) {
+    return `${start} - ${end}`;
+  }
+
+  return end || start;
+}
+
+export default function TodayTasksCard({ tasks = [], loading = false, error = "" }) {
   return (
     <section className="flex h-full flex-col rounded-[12px] border border-[#E9E1F8] bg-white p-2.5 shadow-[0_10px_20px_rgba(48,16,103,0.07)]">
       <div className="flex items-center gap-2.5">
@@ -16,20 +38,43 @@ export default function TodayTasksCard() {
       </div>
 
       <div className="mt-1.5 space-y-0">
-        {todayTasks.map((task, index) => (
-          <div
-            key={task}
-            className="flex items-center gap-2 border-b border-[#F1EBFB] px-0 py-1 text-[10.5px] text-slate-600 last:border-b-0"
-          >
-            <Square className="h-[11px] w-[11px] flex-shrink-0 text-[#8C86A1]" />
-            <span className="min-w-0 flex-1 leading-4">{task}</span>
-            <span className="text-[9.5px] text-slate-400">{["09:00", "11:00", "14:00", "16:00"][index]}</span>
+        {loading ? (
+          <div className="flex items-center gap-2 rounded-[10px] border border-dashed border-[#E9E1F8] px-2.5 py-3 text-[11px] text-slate-500">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            Chargement des taches...
           </div>
-        ))}
+        ) : error ? (
+          <div className="flex items-center gap-2 rounded-[10px] border border-rose-200 bg-rose-50 px-2.5 py-3 text-[11px] text-rose-700">
+            <AlertCircle className="h-3.5 w-3.5" />
+            {error}
+          </div>
+        ) : tasks.length === 0 ? (
+          <div className="rounded-[10px] border border-dashed border-[#E9E1F8] px-2.5 py-3 text-[11px] text-slate-500">
+            Aucune tache planifiee a afficher.
+          </div>
+        ) : (
+          tasks.map((task) => (
+            <div
+              key={task.id || task.intitule}
+              className="flex items-center gap-2 border-b border-[#F1EBFB] px-0 py-1 text-[10.5px] text-slate-600 last:border-b-0"
+            >
+              <Square className="h-[11px] w-[11px] flex-shrink-0 text-[#8C86A1]" />
+              <div className="min-w-0 flex-1">
+                <p className="truncate leading-4 text-slate-700">{task.intitule}</p>
+                <p className="truncate text-[9.5px] text-slate-400">
+                  {task.responsableNom || task.priorite || "Planification"}
+                </p>
+              </div>
+              <span className="text-[9.5px] text-slate-400">
+                {formatTaskWindow(task)}
+              </span>
+            </div>
+          ))
+        )}
       </div>
 
       <Link
-        to="/actions"
+        to="/planification"
         className="mt-1.5 inline-flex items-center gap-1.5 text-[9.5px] font-semibold text-[#58148E] transition hover:text-[#3B0A7A]"
       >
         Voir toutes les taches

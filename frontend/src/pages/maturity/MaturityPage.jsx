@@ -62,6 +62,14 @@ function apiErrorMessage(error) {
     .join(" ");
 }
 
+function normalizeRole(role) {
+  return String(role || "")
+    .trim()
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
 export default function MaturityPage() {
   const { user } = useAuth();
   const [articles, setArticles] = useState([]);
@@ -73,6 +81,7 @@ export default function MaturityPage() {
 
   const userName = `${user?.prenom || ""} ${user?.nom || ""}`.trim() || user?.email || "Utilisateur";
   const userRole = user?.roles?.[0] || "CAQ";
+  const isExternalAuditor = (user?.roles || []).map(normalizeRole).includes("AUDITEUR EXTERNE");
 
   useEffect(() => {
     let active = true;
@@ -145,6 +154,7 @@ export default function MaturityPage() {
   };
 
   const saveDraft = async () => {
+    if (isExternalAuditor) return;
     setSaving(true);
     setError("");
 
@@ -202,6 +212,12 @@ export default function MaturityPage() {
           </div>
         ) : null}
 
+        {isExternalAuditor ? (
+          <div className="rounded-[14px] border border-[#E9E1F8] bg-[#F8F5FF] px-4 py-3 text-[12px] text-slate-600">
+            Mode consultation : le niveau de maturite est visible pour l'audit de certification, sans modification des scores ni des preuves.
+          </div>
+        ) : null}
+
         {loading ? (
           <section className="rounded-[16px] border border-[#E9E1F8] bg-white px-4 py-10 text-center text-[13px] text-slate-500 shadow-sm">
             Chargement du diagnostic de maturite...
@@ -224,11 +240,11 @@ export default function MaturityPage() {
                   <button
                     type="button"
                     onClick={saveDraft}
-                    disabled={saving}
+                    disabled={saving || isExternalAuditor}
                     className="inline-flex h-8 items-center gap-1.5 rounded-[10px] border border-[#E9E1F8] bg-white px-3 text-[11px] font-semibold text-slate-700 transition hover:bg-slate-50"
                   >
                     <Save className="h-3.5 w-3.5" />
-                    {saving ? "Enregistrement..." : "Enregistrer le brouillon"}
+                    {isExternalAuditor ? "Lecture seule" : saving ? "Enregistrement..." : "Enregistrer le brouillon"}
                   </button>
                   <button
                     type="button"
@@ -274,6 +290,7 @@ export default function MaturityPage() {
                   <ArticleRequirementCard
                     key={requirement.ref}
                     requirement={requirement}
+                    disabled={isExternalAuditor}
                     onScoreChange={(score) =>
                       updateRequirement(activeArticle.id, requirement.ref, { score })
                     }

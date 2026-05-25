@@ -5,9 +5,11 @@ from django.conf import settings
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.parsers import FormParser, MultiPartParser
+from rest_framework.permissions import IsAuthenticated, SAFE_METHODS
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.accounts.permissions import ReadOnlyForRole
 from apps.accounts.models import Departement, Utilisateur
 from apps.documents.models import Document
 from .models_terrain import AuditTerrain
@@ -27,6 +29,8 @@ def _get_utilisateur(user):
 # ──────────────────────────────────────────────
 
 class DepartementListView(APIView):
+    permission_classes = [IsAuthenticated]
+
     def get(self, request):
         deps = Departement.objects.all().order_by("nom")
         return Response(DepartementSerializer(deps, many=True).data)
@@ -38,6 +42,12 @@ class DepartementListView(APIView):
 
 class AuditTerrainListCreateView(APIView):
     parser_classes = [MultiPartParser, FormParser]
+    permission_classes = [IsAuthenticated]
+
+    def get_permissions(self):
+        if self.request.method in SAFE_METHODS:
+            return [IsAuthenticated()]
+        return [IsAuthenticated(), ReadOnlyForRole("Auditeur Externe")()]
 
     def get(self, request):
         qs = AuditTerrain.objects.select_related(
@@ -117,6 +127,13 @@ class AuditTerrainListCreateView(APIView):
 # ──────────────────────────────────────────────
 
 class AuditTerrainDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_permissions(self):
+        if self.request.method in SAFE_METHODS:
+            return [IsAuthenticated()]
+        return [IsAuthenticated(), ReadOnlyForRole("Auditeur Externe")()]
+
     def _get(self, pk):
         try:
             return AuditTerrain.objects.select_related(

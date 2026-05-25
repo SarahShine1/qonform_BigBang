@@ -24,3 +24,32 @@ class Processus(models.Model):
 
     def __str__(self):
         return self.nom
+
+
+class ProcessusExterne(models.Model):
+    id_processus_externe = models.AutoField(primary_key=True)
+    nom = models.CharField(max_length=255)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        managed = False
+        db_table = "processus_externe"
+        ordering = ["nom"]
+
+    def __str__(self):
+        return self.nom
+
+
+class ProcessusLiaisonExterne(models.Model):
+    SENS_CHOICES = [("amont", "Amont"), ("aval", "Aval")]
+
+    id = models.AutoField(primary_key=True)
+    id_processus = models.IntegerField()
+    id_processus_externe = models.IntegerField()
+    sens = models.CharField(max_length=10, choices=SENS_CHOICES)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        managed = False
+        db_table = "processus_liaison_externe"
+        unique_together = [("id_processus", "id_processus_externe", "sens")]

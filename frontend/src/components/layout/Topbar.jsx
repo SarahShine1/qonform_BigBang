@@ -1,10 +1,12 @@
-import { Bell, Menu, MessageSquare, Moon, Sun, ClipboardCheck, CheckCircle, XCircle, Edit3, FileText, FilePen, Send } from "lucide-react";
+import { Bell, Menu, MessageSquare, Moon, Sun, ClipboardCheck, CheckCircle, XCircle, Edit3, FileText, FilePen, BookOpen, Bot, Send } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { messagingApi } from "../../api/messages.api";
 import { useAuth } from "../../hooks/useAuth";
 import { useTheme } from "../../hooks/useTheme";
 import { SIDEBAR_WIDTH, TOPBAR_HEIGHT } from "./layout.constants";
+import AssistantPanel from "./AssistantPanel";
+import DictionaryPanel from "./DictionaryPanel";
 import MessagingPanel from "./MessagingPanel";
 import { getNotifications, markNotificationAsRead } from "../../services/notificationService";
 export default function Topbar({ pageTitle, userName, userRole, leftOffset = SIDEBAR_WIDTH, onMenuClick }) {
@@ -183,7 +185,11 @@ const isPvNotification = (n) =>
     return date.toLocaleDateString("fr-FR");
   };
   const messagingRef = useRef(null);
+  const dictionaryRef = useRef(null);
+  const assistantRef = useRef(null);
   const [messagingOpen, setMessagingOpen] = useState(false);
+  const [dictionaryOpen, setDictionaryOpen] = useState(false);
+  const [assistantOpen, setAssistantOpen] = useState(false);
   const [messageUnreadCount, setMessageUnreadCount] = useState(0);
   const initials = userName
     ? userName
@@ -262,6 +268,54 @@ const isPvNotification = (n) =>
     };
   }, [messagingOpen]);
 
+  useEffect(() => {
+    if (!dictionaryOpen) return undefined;
+
+    function handleClickOutside(event) {
+      if (!dictionaryRef.current?.contains(event.target)) {
+        setDictionaryOpen(false);
+      }
+    }
+
+    function handleEscape(event) {
+      if (event.key === "Escape") {
+        setDictionaryOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [dictionaryOpen]);
+
+  useEffect(() => {
+    if (!assistantOpen) return undefined;
+
+    function handleClickOutside(event) {
+      if (!assistantRef.current?.contains(event.target)) {
+        setAssistantOpen(false);
+      }
+    }
+
+    function handleEscape(event) {
+      if (event.key === "Escape") {
+        setAssistantOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [assistantOpen]);
+
   return (
     <header
       className="fixed top-0 right-0 z-10 flex items-center justify-between border-b border-[#EEE7FA] bg-white px-5 transition-colors dark:border-slate-800 dark:bg-slate-900 xl:px-6"
@@ -281,6 +335,45 @@ const isPvNotification = (n) =>
       </div>
 
       <div className="flex items-center gap-3">
+        <div ref={dictionaryRef} className="relative">
+          <button
+            type="button"
+            onClick={() => setDictionaryOpen((current) => !current)}
+            className="relative inline-flex h-[34px] w-[34px] items-center justify-center rounded-md border border-[#E9E1F8] text-[#3B0A7A] transition hover:bg-[#F8F2FF] dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+            title="Ouvrir le dictionnaire qualite"
+            aria-label="Ouvrir le dictionnaire qualite"
+          >
+            <BookOpen className="h-4 w-4" />
+          </button>
+
+          {dictionaryOpen ? (
+            <DictionaryPanel
+              open={dictionaryOpen}
+              onClose={() => setDictionaryOpen(false)}
+            />
+          ) : null}
+        </div>
+
+        <div ref={assistantRef} className="relative">
+          <button
+            type="button"
+            onClick={() => setAssistantOpen((current) => !current)}
+            className="relative inline-flex h-[34px] w-[34px] items-center justify-center rounded-md border border-[#E9E1F8] text-[#3B0A7A] transition hover:bg-[#F8F2FF] dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+            title="Ouvrir l'assistant Qonform"
+            aria-label="Ouvrir l'assistant Qonform"
+          >
+            <Bot className="h-4 w-4" />
+          </button>
+
+          {assistantOpen ? (
+            <AssistantPanel
+              open={assistantOpen}
+              onClose={() => setAssistantOpen(false)}
+              pageTitle={pageTitle}
+            />
+          ) : null}
+        </div>
+
         <div ref={messagingRef} className="relative">
           <button
             type="button"
