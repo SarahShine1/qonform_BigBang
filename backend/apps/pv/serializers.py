@@ -4,10 +4,39 @@ from django.core.files.storage import default_storage
 from django.contrib.auth import get_user_model
 from apps.accounts.models import Utilisateur
 from apps.documents.models import Document
-from .models import PV
-from apps.notifications.utils import notifier_participants_pv
+from .models import PV, PVValidation
+from apps.notifications.utils import (
+    notifier_participants_pv_creation,
+    notifier_participants_pv_soumission,
+    notifier_createur_pv_rejet,
+    notifier_createur_pv_valide,
+)
 
 User = get_user_model()
+
+
+class PVValidationDetailSerializer(serializers.ModelSerializer):
+    participant = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PVValidation
+        fields = ['id', 'participant', 'decision', 'motif', 'date_decision']
+
+    def get_participant(self, obj):
+        profil = Utilisateur.objects.filter(auth_id=obj.utilisateur_id).first()
+        if profil:
+            return {'id': profil.id_user, 'nom': profil.nom, 'prenom': profil.prenom, 'email': profil.email}
+        return {'id': obj.utilisateur_id, 'nom': '', 'prenom': '', 'email': ''}
+
+
+class DecisionSerializer(serializers.Serializer):
+    decision = serializers.ChoiceField(choices=['APPROUVE', 'REJETE'])
+    motif = serializers.CharField(required=False, allow_blank=True)
+
+    def validate(self, attrs):
+        if attrs['decision'] == 'REJETE' and not attrs.get('motif'):
+            raise serializers.ValidationError({'motif': 'Un motif est obligatoire en cas de rejet.'})
+        return attrs
 
 
 class PVSerializer(serializers.ModelSerializer):
@@ -17,35 +46,45 @@ class PVSerializer(serializers.ModelSerializer):
         many=True,
         required=True,
     )
-
-    fichier = serializers.FileField(
-        write_only=True,
-        required=True,
-    )
+    fichier = serializers.FileField(write_only=True, required=True)
 
     code = serializers.CharField(read_only=True)
-    document_data = serializers.SerializerMethodField(read_only=True)  # ✅ renommé
+    statut = serializers.CharField(read_only=True)
+    document_data = serializers.SerializerMethodField(read_only=True)
     participants_data = serializers.SerializerMethodField(read_only=True)
+    validation_status = serializers.SerializerMethodField(read_only=True)
+    createur_data = serializers.SerializerMethodField(read_only=True)  # ← NOUVEAU
 
     class Meta:
         model = PV
         fields = [
             'id',
             'code',
-            'type',
+            'categorie',
+            'sous_type',
+            'statut',
             'date',
+            'createur_data',       # ← NOUVEAU
             'participants',
             'participants_data',
-            'document_data',  # ✅ renommé
+            'document_data',
             'fichier',
+            'validation_status',
             'created_at',
             'updated_at',
         ]
-        read_only_fields = ['id', 'code', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'code', 'statut', 'created_at', 'updated_at']
+
+    # ← NOUVEAU
+    def get_createur_data(self, obj):
+        if not obj.createur:
+            return None
+        profil = Utilisateur.objects.filter(auth_id=obj.createur_id).first()
+        if profil:
+            return {'id': profil.id_user, 'nom': profil.nom, 'prenom': profil.prenom, 'email': profil.email}
+        return {'id': obj.createur_id, 'nom': '', 'prenom': '', 'email': ''}
 
     def get_document_data(self, obj):
-        """Récupérer le document lié via id_pv."""
-        # ✅ on cherche dans Document par id_pv
         document = Document.objects.filter(id_pv=obj.id).first()
         if document:
             return {
@@ -58,36 +97,41 @@ class PVSerializer(serializers.ModelSerializer):
         return None
 
     def get_participants_data(self, obj):
-        participants_data = []
+        result = []
         for user in obj.participants.all():
-            # Retrouver l'Utilisateur correspondant
             try:
-                utilisateur = Utilisateur.objects.get(auth_id=user.id)
-                participants_data.append({
-                    'id': utilisateur.id_user,        # ← id_user de Utilisateur
-                    'nom': utilisateur.nom,
-                    'prenom': utilisateur.prenom,
-                    'email': utilisateur.email,
-                })
+                u = Utilisateur.objects.get(auth_id=user.id)
+                result.append({'id': u.id_user, 'nom': u.nom, 'prenom': u.prenom, 'email': u.email})
             except Utilisateur.DoesNotExist:
-                # Fallback si l'Utilisateur n'existe pas
-                participants_data.append({
-                    'id': user.id,
-                    'nom': user.last_name,
-                    'prenom': user.first_name,
-                    'email': user.email,
-                })
-        return participants_data
+                result.append({'id': user.id, 'nom': user.last_name, 'prenom': user.first_name, 'email': user.email})
+        return result
+
+    def get_validation_status(self, obj):
+        if not obj.is_pv:
+            return None
+        validations = obj.validations.select_related('utilisateur').all()
+        return {
+            'total': obj.total_participants,
+            'approuves': obj.nb_approuves,
+            'rejetes': obj.nb_rejetes,
+            'en_attente': obj.nb_en_attente,
+            'detail': PVValidationDetailSerializer(validations, many=True).data,
+        }
 
     def validate(self, attrs):
+        categorie = attrs.get('categorie')
+        sous_type = attrs.get('sous_type')
+        pv_sous_types = [k for k, _ in PV.SOUS_TYPE_PV]
+        cr_sous_types = [k for k, _ in PV.SOUS_TYPE_CR]
+
+        if categorie == 'PV' and sous_type not in pv_sous_types:
+            raise serializers.ValidationError({'sous_type': f"Pour un PV, sous_type doit être parmi : {pv_sous_types}"})
+        if categorie == 'COMPTE_RENDU' and sous_type not in cr_sous_types:
+            raise serializers.ValidationError({'sous_type': f"Pour un Compte Rendu, sous_type doit être parmi : {cr_sous_types}"})
         if not attrs.get('participants'):
-            raise serializers.ValidationError(
-                {'participants': 'At least one participant is required.'}
-            )
+            raise serializers.ValidationError({'participants': 'Au moins un participant est requis.'})
         if not attrs.get('fichier'):
-            raise serializers.ValidationError(
-                {'fichier': 'A PDF file is required.'}
-            )
+            raise serializers.ValidationError({'fichier': 'Un fichier PDF est requis.'})
         return attrs
 
     def create(self, validated_data):
@@ -98,46 +142,42 @@ class PVSerializer(serializers.ModelSerializer):
         current_user = request.user if request else None
 
         if not current_user or not current_user.is_authenticated:
-            raise serializers.ValidationError(
-                {'detail': 'Authentication required.'}
-            )
+            raise serializers.ValidationError({'detail': 'Authentification requise.'})
 
         try:
-            # ✅ Convertir les IDs de Utilisateur en User objects
-            participants_users = []
-            for utilisateur in participants_utilisateurs:
-                if utilisateur.auth_id:  # Vérifier que l'utilisateur a un auth lié
-                    participants_users.append(utilisateur.auth)
-            
-            # ✅ Créer le PV d'abord
+            participants_users = [u.auth for u in participants_utilisateurs if u.auth_id]
+            categorie = validated_data.get('categorie')
+
+            validated_data['statut'] = 'EN_VALIDATION' if categorie == 'PV' else 'VALIDE'
+            validated_data['createur'] = current_user  # déjà présent, inchangé
+
             pv = PV.objects.create(**validated_data)
             pv.participants.set(participants_users)
 
-            # ✅ Créer le Document ensuite avec id_pv
             file_name = fichier.name
             file_path = f"pv/{timezone.now().strftime('%Y/%m/%d')}/{file_name}"
             stored_path = default_storage.save(file_path, fichier)
 
-            # Convertir User en Utilisateur
             utilisateur_current = Utilisateur.objects.filter(auth_id=current_user.id).first()
             if not utilisateur_current:
-                raise serializers.ValidationError(
-                    {'detail': f"Profil introuvable pour auth_id={current_user.id} — vérifie la table Utilisateur."}
-                )
+                raise serializers.ValidationError({'detail': f"Profil introuvable pour auth_id={current_user.id}."})
 
             Document.objects.create(
                 id_uploader=utilisateur_current.id_user,
                 nom_fichier=file_name,
-                type_document='PV',          # ✅ type PV
+                type_document='PV',
                 chemin_stockage=stored_path,
                 taille=fichier.size,
-                description=f"Document PV {pv.code}",
+                description=f"Document {pv.code}",
                 type_support='PDF',
-                id_pv=pv.id,                 # ✅ lien vers le PV
+                id_pv=pv.id,
             )
 
-            # ✅ Notifier les participants
-            notifier_participants_pv(pv)
+            if categorie == 'PV':
+                pv._creer_validations()
+                notifier_participants_pv_soumission(pv)
+
+            notifier_participants_pv_creation(pv)
 
             return pv
 
@@ -147,20 +187,13 @@ class PVSerializer(serializers.ModelSerializer):
             if 'pv' in locals():
                 try:
                     pv.delete()
-                except:
+                except Exception:
                     pass
-            raise serializers.ValidationError(
-                {'detail': f'Error creating PV: {str(e)}'}
-            )
+            raise serializers.ValidationError({'detail': f'Erreur création : {str(e)}'})
 
     def update(self, instance, validated_data):
         validated_data.pop('participants', None)
         validated_data.pop('fichier', None)
-
         instance.date = validated_data.get('date', instance.date)
-
-        if 'participants' in validated_data:
-            instance.participants.set(validated_data['participants'])
-
         instance.save()
         return instance

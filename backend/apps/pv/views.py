@@ -1,138 +1,144 @@
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.parsers import MultiPartParser, FormParser
-from django.utils import timezone
-from .models import PV
-from .serializers import PVSerializer
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from .models import PV, PVValidation
+from .serializers import PVSerializer, DecisionSerializer
+from apps.notifications.utils import (
+    notifier_participants_pv_soumission,
+    notifier_createur_pv_rejet,
+    notifier_createur_pv_valide,
+    notifier_participants_pv_rejet,
+    notifier_participants_pv_valide,
+)
 
 
 class PVViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet for PV (Procès-Verbal) management.
-    
-    Provides:
-    - List: GET /api/v1/pv/ - List all PVs with filtering
-    - Create: POST /api/v1/pv/ - Create new PV with document upload
-    - Retrieve: GET /api/v1/pv/{id}/ - Get specific PV
-    - Update: PUT /api/v1/pv/{id}/ - Update PV
-    - Partial Update: PATCH /api/v1/pv/{id}/ - Partial update PV
-    - Delete: DELETE /api/v1/pv/{id}/ - Delete PV
-    
-    Custom Actions:
-    - /api/v1/pv/by-type/{type}/ - Filter PVs by type
-    """
-    
     queryset = PV.objects.all()
     serializer_class = PVSerializer
     permission_classes = [permissions.IsAuthenticated]
-    parser_classes = (MultiPartParser, FormParser)
-    
-    filterset_fields = ['type', 'date']
+    parser_classes = (MultiPartParser, FormParser, JSONParser)
+
+    filterset_fields = ['categorie', 'sous_type', 'statut', 'date']
     ordering_fields = ['date', 'created_at', 'code']
     ordering = ['-date', '-created_at']
-    
+
     def get_queryset(self):
-        """
-        Optionally filter PVs by:
-        - type: GET /api/v1/pv/?type=AUDIT
-        - date: GET /api/v1/pv/?date=2026-05-11
-        """
-        # ✅ supprimer 'document'
-        queryset = PV.objects.all().prefetch_related('participants')
-        
-        pv_type = self.request.query_params.get('type')
-        if pv_type:
-            queryset = queryset.filter(type=pv_type)
-        
+        from django.db.models import Q
+        user = self.request.user
+        queryset = PV.objects.all().prefetch_related('participants', 'validations')
+
+        for param in ['categorie', 'sous_type', 'statut']:
+            val = self.request.query_params.get(param)
+            if val:
+                queryset = queryset.filter(**{param: val})
+
         date = self.request.query_params.get('date')
         if date:
             queryset = queryset.filter(date=date)
-        
+
+        queryset = queryset.filter(
+            Q(statut='VALIDE') |
+            Q(statut__in=['EN_VALIDATION', 'REJETE'], participants=user) |
+            Q(statut__in=['EN_VALIDATION', 'REJETE'], createur=user)  # ← simple
+        ).distinct()
+
         return queryset
-    
-    @action(detail=False, methods=['get'])
-    def by_type(self, request):
-        """
-        Custom action to filter PVs by type.
-        Usage: GET /api/v1/pv/by-type/?type=AUDIT
-        """
-        pv_type = request.query_params.get('type')
-        
-        if not pv_type:
-            return Response(
-                {'error': 'type parameter is required'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        if pv_type not in dict(PV.PV_TYPES):
-            return Response(
-                {'error': f'Invalid type. Choices: {", ".join(dict(PV.PV_TYPES).keys())}'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        pvs = self.get_queryset().filter(type=pv_type)
-        serializer = self.get_serializer(pvs, many=True)
-        return Response(serializer.data)
-    
-    @action(detail=False, methods=['get'])
-    def by_date(self, request):
-        """
-        Custom action to filter PVs by date range.
-        Usage: GET /api/v1/pv/by-date/?start_date=2026-05-01&end_date=2026-05-31
-        """
-        start_date = request.query_params.get('start_date')
-        end_date = request.query_params.get('end_date')
-        
-        if not start_date or not end_date:
-            return Response(
-                {'error': 'start_date and end_date parameters are required'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        pvs = self.get_queryset().filter(date__range=[start_date, end_date])
-        serializer = self.get_serializer(pvs, many=True)
-        return Response(serializer.data)
-    
-    @action(detail=False, methods=['get'])
-    def statistics(self, request):
-        """
-        Custom action to get PV statistics.
-        Usage: GET /api/v1/pv/statistics/
-        """
-        total_pvs = PV.objects.count()
-        pv_by_type = {
-            type_choice[0]: PV.objects.filter(type=type_choice[0]).count()
-            for type_choice in PV.PV_TYPES
-        }
-        recent_pvs = PV.objects.all()[:5].values('id', 'code', 'type', 'date')
-        
-        return Response({
-            'total_pvs': total_pvs,
-            'by_type': pv_by_type,
-            'recent_pvs': list(recent_pvs),
-        })
-    
+
+
+    # ------------------------------------------------------------------ #
+    #  Action : décision (valider ou rejeter)                              #
+    # ------------------------------------------------------------------ #
+
+    @action(detail=True, methods=['post'])
+    def decision(self, request, pk=None):
+        pv = self.get_object()
+
+        if not pv.participants.filter(id=request.user.id).exists():
+            return Response({'error': "Vous n'êtes pas participant de ce PV."}, status=403)
+
+        validation = PVValidation.objects.filter(pv=pv, utilisateur=request.user).first()
+        if not validation:
+            return Response({'error': "Aucune validation en attente pour vous sur ce PV."}, status=400)
+        if validation.decision is not None:
+            return Response({'error': "Vous avez déjà enregistré votre décision."}, status=400)
+
+        serializer = DecisionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        resultat = pv.enregistrer_decision(
+            user=request.user,
+            decision=serializer.validated_data['decision'],
+            motif=serializer.validated_data.get('motif'),
+        )
+
+        if resultat == 'REJETE':
+            notifier_createur_pv_rejet(pv, request.user, serializer.validated_data['motif'])
+            # notifier aussi les autres participants
+            notifier_participants_pv_rejet(pv, request.user)
+        elif resultat == 'VALIDE':
+            notifier_createur_pv_valide(pv)
+            notifier_participants_pv_valide(pv)
+
+        return Response(self.get_serializer(pv).data)
+
+
+    # ------------------------------------------------------------------ #
+    #  Action : statut validation (temps réel via polling)                 #
+    # ------------------------------------------------------------------ #
+
     @action(detail=True, methods=['get'])
-    def participants(self, request, pk=None):
+    def statut_validation(self, request, pk=None):
         """
-        Get participants for a specific PV.
-        Usage: GET /api/v1/pv/{id}/participants/
+        GET /api/v1/pv/{id}/statut_validation/
+        Retourne la progression des validations pour le front.
         """
         pv = self.get_object()
-        participants = pv.participants.values(
-            'id', 'username', 'email', 'first_name', 'last_name'
-        )
+
+        if not pv.is_pv:
+            return Response(
+                {'error': "Les Comptes Rendus n'ont pas de workflow de validation."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        validations = pv.validations.select_related('utilisateur').all()
+        from .serializers import PVValidationDetailSerializer
         return Response({
             'pv_code': pv.code,
-            'participants_count': pv.participants.count(),
-            'participants': list(participants),
+            'statut': pv.statut,
+            'total': pv.total_participants,
+            'approuves': pv.nb_approuves,
+            'rejetes': pv.nb_rejetes,
+            'en_attente': pv.nb_en_attente,
+            'detail': PVValidationDetailSerializer(validations, many=True).data,
         })
     
+    @action(detail=True, methods=['delete'])
+    def supprimer(self, request, pk=None):
+        pv = self.get_object()
+        if pv.statut != 'REJETE':
+            return Response({'error': "Seul un PV rejeté peut être supprimé."}, status=400)
+        # Si vous avez un champ createur : if pv.createur != request.user: 403
+        pv.delete()
+        return Response(status=204)
+
+    # ------------------------------------------------------------------ #
+    #  Actions existantes                                                  #
+    # ------------------------------------------------------------------ #
+
+    @action(detail=False, methods=['get'])
+    def statistics(self, request):
+        total = PV.objects.count()
+        by_categorie = {c: PV.objects.filter(categorie=c).count() for c, _ in PV.CATEGORIE_CHOICES}
+        by_statut = {s: PV.objects.filter(statut=s).count() for s, _ in PV.STATUT_CHOICES}
+        return Response({
+            'total': total,
+            'by_categorie': by_categorie,
+            'by_statut': by_statut,
+        })
+
     def perform_create(self, serializer):
-        """Create PV with automatic code generation."""
         serializer.save()
-    
+
     def perform_update(self, serializer):
-        """Update PV."""
         serializer.save()

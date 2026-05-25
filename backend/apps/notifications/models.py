@@ -15,6 +15,9 @@ class Notification(models.Model):
         ("AUDIT_FICHE_EN_COURS", "Fiche en cours d'audit"),
         ("AUDIT_CORRECTION_DEMANDEE", "Correction demandée"),
         ("AUDIT_FICHE_PUBLIEE", "Fiche publiée"),
+        ("PV_SOUMIS", "PV soumis pour validation"),
+        ("PV_REJETE", "PV rejeté"),
+        ("PV_VALIDE", "PV validé"),
     ]
 
     id_notification = models.AutoField(primary_key=True)
