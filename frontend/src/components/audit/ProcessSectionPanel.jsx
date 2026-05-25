@@ -1,20 +1,33 @@
 import { CheckCircle2, CircleX, ExternalLink, FileText } from "lucide-react";
 
-export default function ProcessSectionPanel({ section, sectionIndex, onOpenDocument }) {
+export default function ProcessSectionPanel({ section, sectionIndex, sectionScore, onOpenDocument }) {
   return (
-    <section className="min-h-[520px] rounded-xl border border-gray-200 bg-white shadow-sm">
-      <div className="flex items-center justify-center bg-[#5b1fa8] px-5 py-3.5">
-        <div className="text-base font-bold text-white">Fiche Processus</div>
+    <section className="min-h-[480px] rounded-xl border border-gray-200 bg-white shadow-sm">
+      <div className="flex items-center justify-center bg-[#5b1fa8] px-4 py-3">
+        <div className="text-sm font-bold text-white">Fiche Processus</div>
       </div>
-      <div className="flex items-center gap-3 border-b border-gray-200 bg-gray-50 px-5 py-3.5">
-        <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#5b1fa8] text-xs font-bold text-white">
+      <div className="flex items-center gap-2.5 border-b border-gray-200 bg-gray-50 px-4 py-3">
+        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#5b1fa8] text-[11px] font-bold text-white">
           {sectionIndex + 1}
         </span>
-        <div className="text-xs font-bold uppercase tracking-[0.08em] text-[#202044]">{section.title}</div>
-        <FileText className="ml-auto h-4 w-4 text-slate-400" />
+        <div className="min-w-0 flex-1 text-xs font-bold uppercase tracking-[0.08em] text-[#202044]">
+          {section.title}
+        </div>
+        {typeof sectionScore?.score === "number" && (
+          <div className="ml-auto flex shrink-0 items-center gap-2 rounded-lg border border-purple-100 bg-purple-50/70 px-3 py-1.5">
+            <div className="text-[11px] font-bold normal-case tracking-normal text-[#5b1fa8]">
+              Taux conformité section
+              <div className="mt-0.5 text-[10px] font-medium text-slate-500">
+                Score de la section actuelle
+              </div>
+            </div>
+            <div className="text-sm font-bold text-[#5b1fa8]">{sectionScore.score}%</div>
+          </div>
+        )}
+        <FileText className="h-4 w-4 shrink-0 text-slate-400" />
       </div>
 
-      <div className="px-5 py-3.5">
+      <div className="px-4 py-3">
         {section.id === "flow" ? (
           <FlowView fields={section.processFields} />
         ) : section.id === "documents" ? (
@@ -47,9 +60,9 @@ function Rows({ fields, onOpenDocument }) {
         }
 
         return (
-          <div key={field.label} className="grid grid-cols-[220px_1fr_32px] items-start gap-5 py-2.5">
-            <div className="text-xs font-bold text-[#5b1fa8]">{field.label}</div>
-            <div className="min-h-[22px] border-b border-gray-100 pb-1 text-sm text-slate-500">
+          <div key={field.label} className="grid grid-cols-[minmax(120px,180px)_minmax(0,1fr)_28px] items-start gap-4 py-2.5">
+            <div className="min-w-0 break-words text-xs font-bold text-[#5b1fa8]">{field.label}</div>
+            <div className="min-h-[22px] min-w-0 border-b border-gray-100 pb-1 text-sm text-slate-500">
               <FieldValue value={field.value} />
               {field.documentId && (
                 <button
@@ -175,7 +188,7 @@ function FieldValue({ value }) {
     return <StructuredTable rows={[parsedValue]} />;
   }
 
-  return <div className="text-sm italic text-slate-500">{formatCellValue(parsedValue)}</div>;
+  return <div className="min-w-0 whitespace-normal break-words text-sm italic text-slate-500">{formatCellValue(parsedValue)}</div>;
 }
 
 function StructuredTable({ rows }) {
@@ -299,8 +312,14 @@ function formatCellValue(value) {
 }
 
 function isFieldValid(value) {
-  if (Array.isArray(value)) return value.length > 0;
-  if (isPlainObject(value)) return Object.keys(value).length > 0;
-  const normalized = String(value || "").trim().toLowerCase();
-  return Boolean(normalized) && normalized !== "non renseigne" && normalized !== "non renseigné";
+  if (value === null || value === undefined) return false;
+  if (typeof value === "number" || typeof value === "boolean") return true;
+  if (Array.isArray(value)) return value.some((item) => isFieldValid(item));
+  if (isPlainObject(value)) return Object.values(value).some((item) => isFieldValid(item));
+  const normalized = String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+  return Boolean(normalized) && normalized !== "non renseigne" && normalized !== "non applicable";
 }

@@ -47,6 +47,21 @@ export const auditApi = {
     return data;
   },
 
+  saveDraftOnUnload: (payload) => {
+    const token = localStorage.getItem("access_token");
+    const headers = { "Content-Type": "application/json" };
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
+    return fetch(`${apiClient.defaults.baseURL}/audit/fiches/${payload.auditId}/draft/`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(payload),
+      keepalive: true,
+    }).catch(() => {});
+  },
+
   completeExecution: async (payload, action) => {
     const { data } = await apiClient.post(`/audit/fiches/${payload.auditId}/complete/`, {
       ...payload,
@@ -202,6 +217,12 @@ function mapFicheDetailToExecution(fiche) {
       status: mapVersionStatusToUi(fiche.statut),
       observations: fiche.audit?.observations || "",
     },
+    processMeta: {
+      codeProcess: fiche.processus?.code_process || "",
+      processusAmont: fiche.processus?.processus_amont || fiche.processus?.amont || "",
+      processusAval: fiche.processus?.processus_aval || fiche.processus?.aval || "",
+      statutProcessus: fiche.processus?.statut || fiche.statut || "",
+    },
     sections,
     initialEvaluations: {
       ...mapEvaluations(fiche.evaluations || []),
@@ -214,7 +235,7 @@ function mapFicheDetailToExecution(fiche) {
       title: item.titre,
       description: item.description || "",
       severity: item.gravite || "Non renseignée",
-      sectionId: "",
+      sectionId: item.id_section_template ? String(item.id_section_template) : "",
       sectionTitle: item.section || "Section non liée",
       actions: (item.actions_correctives || []).map((action) => ({
         id: String(action.id_action),
@@ -265,7 +286,7 @@ function buildDocumentSection({ id, title, shortTitle, emptyLabel, documents }) 
     processFields:
       safeDocuments.length > 0
         ? safeDocuments.map((document) => ({
-            label: document.nom_fichier || `Document ${document.id_document}`,
+            label: id === "bpmn" ? "BPMN" : document.nom_fichier || `Document ${document.id_document}`,
             value: [document.type_document, document.description || document.chemin_stockage]
               .filter(Boolean)
               .join(" - ") || "Document lie a la fiche",

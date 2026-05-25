@@ -15,6 +15,7 @@ const actionPriorities = ["Basse", "Moyenne", "Haute", "Critique"];
 export default function RequirementsPanel({
   section,
   evaluations,
+  sectionScore,
   nonConformities = [],
   onChange,
   onAddNonConformity,
@@ -24,15 +25,17 @@ export default function RequirementsPanel({
     [section.requirements]
   );
 
-  const autoTotal = section.completionTotal ?? section.processFields.length;
+  const autoTotal = sectionScore?.completionTotal ?? section.completionTotal ?? section.processFields.length;
   const autoCompleted =
-    section.completionDone ?? section.processFields.filter((field) => isFieldValid(field.value)).length;
+    sectionScore?.completionDone ?? section.completionDone ?? section.processFields.filter((field) => isFieldValid(field.value)).length;
   const autoRate =
-    typeof section.completionRate === "number"
-      ? section.completionRate
-      : autoTotal === 0
-        ? 0
-        : Math.round((autoCompleted / autoTotal) * 100);
+    typeof sectionScore?.completionRate === "number"
+      ? sectionScore.completionRate
+      : typeof section.completionRate === "number"
+        ? section.completionRate
+        : autoTotal === 0
+          ? 0
+          : Math.round((autoCompleted / autoTotal) * 100);
 
   const [ncOpen, setNcOpen] = useState(false);
   const [ncForm, setNcForm] = useState(createNcForm(section, manualRequirements[0]?.id || ""));
@@ -102,8 +105,8 @@ export default function RequirementsPanel({
   };
 
   return (
-    <section className="min-h-[520px] rounded-xl border border-gray-200 bg-white shadow-sm">
-      <div className="flex items-center justify-between gap-3 border-b border-gray-100 bg-gray-50 px-5 py-3.5">
+    <section className="min-h-[480px] rounded-xl border border-gray-200 bg-white shadow-sm">
+      <div className="flex items-center justify-between gap-2.5 border-b border-gray-100 bg-gray-50 px-4 py-3">
         <div className="flex items-center gap-2">
           <ClipboardCheck className="h-4 w-4 text-slate-400" />
           <div className="text-sm font-bold text-gray-950">Critères de conformité ISO 9001</div>
@@ -118,7 +121,7 @@ export default function RequirementsPanel({
         </button>
       </div>
 
-      <div className="space-y-4 p-4">
+      <div className="space-y-3 p-3.5">
         {!section.isDocumentStep && (
         <section className="rounded-xl border border-[#E8E1F5] bg-[#FBFAFE] p-3.5">
           <div className="flex items-start justify-between gap-3">
@@ -131,7 +134,7 @@ export default function RequirementsPanel({
             <div className="text-right">
               <div className="text-sm font-bold text-[#5b1fa8]">{autoRate}%</div>
               <div className="text-[11px] font-medium text-slate-500">
-                {autoCompleted}/{autoTotal} auto-vérifiés
+                {autoCompleted}/{autoTotal} champs remplis
               </div>
             </div>
           </div>
@@ -142,6 +145,7 @@ export default function RequirementsPanel({
               style={{ width: `${autoRate}%` }}
             />
           </div>
+          {sectionScore && <ScoreTransparency score={sectionScore} />}
         </section>
         )}
 
@@ -514,6 +518,35 @@ export default function RequirementsPanel({
         </div>
       )}
     </section>
+  );
+}
+
+function ScoreTransparency({ score }) {
+  const counts = score.criteriaCounts || {};
+  const criteriaText = score.criteriaApplicable === 0
+    ? "Non applicable"
+    : `${score.criteriaRate}%`;
+  const formula = score.criteriaApplicable === 0
+    ? `Score section = ${score.completionRate}%`
+    : `Score section = 0.6 x ${score.completionRate} + 0.4 x ${score.criteriaRate} = ${score.score}%`;
+
+  return (
+    <details className="mt-3 rounded-lg border border-purple-100 bg-white/80 px-3 py-2 text-[11px] text-slate-600">
+      <summary className="cursor-pointer font-bold text-slate-800">
+        Transparence du calcul
+      </summary>
+      <div className="mt-2 space-y-1.5 leading-5">
+        <p>
+          Complétude : {score.completionDone}/{score.completionTotal} champs remplis - {score.completionRate}%
+        </p>
+        <p>
+          Critères : {counts.conforme || 0} conformes, {counts.partiel || 0} partiels,{" "}
+          {counts.nonConforme || 0} non conformes, {counts.nonApplicable || 0} NA - {criteriaText}
+        </p>
+        <p>Formule critères : ((Conformes + 0.5 x Partiels) / (Total - NA)) x 100</p>
+        <p className="font-semibold text-purple-700">{formula}</p>
+      </div>
+    </details>
   );
 }
 

@@ -82,11 +82,15 @@ CONFORMITY_WEIGHTS = {
 SECTION_WEIGHTS = {
     "contexte de lorganisation": 15,
     "contexte de lorganisme": 15,
+    "contexte et processus": 15,
     "leadership": 10,
+    "leadership et responsabilites": 10,
     "planification": 15,
     "support": 10,
+    "ressources et competences": 10,
     "realisation des activites operationnelles": 25,
     "realisation des activites": 25,
+    "realisation operationnelle": 25,
     "evaluation des performances": 10,
     "amelioration": 10,
     "ameliorations": 10,
@@ -1164,10 +1168,12 @@ def load_fiche_audit_detail(id_version):
 
         non_conformites = []
         if table_exists(cursor, "nc"):
+            nc_has_section = table_has_column(cursor, "nc", "id_section_template")
             if table_has_column(cursor, "nc", "id_exigence"):
+                section_select = "id_section_template" if nc_has_section else "NULL::integer AS id_section_template"
                 cursor.execute(
-                    """
-                    SELECT id_nc, id_exigence, titre, description, date_detection, date_cloture
+                    f"""
+                    SELECT id_nc, id_exigence, {section_select}, titre, description, date_detection, date_cloture
                     FROM nc
                     WHERE id_version = %s
                     ORDER BY date_detection DESC NULLS LAST, id_nc DESC
@@ -1214,8 +1220,35 @@ def load_fiche_audit_detail(id_version):
         )
         actions = dictfetchall(cursor)
 
+        processus_amont = []
+        processus_aval = []
+        if table_exists(cursor, "processus_liaison"):
+            cursor.execute(
+                """
+                SELECT p.code_process, p.nom
+                FROM processus_liaison pl
+                JOIN processus p ON p.id_processus = pl.id_processus_amont
+                WHERE pl.id_processus_aval = %s
+                ORDER BY p.nom
+                """,
+                [fiche["id_processus"]],
+            )
+            processus_amont = dictfetchall(cursor)
+
+            cursor.execute(
+                """
+                SELECT p.code_process, p.nom
+                FROM processus_liaison pl
+                JOIN processus p ON p.id_processus = pl.id_processus_aval
+                WHERE pl.id_processus_amont = %s
+                ORDER BY p.nom
+                """,
+                [fiche["id_processus"]],
+            )
+            processus_aval = dictfetchall(cursor)
+
     sections = build_sections(champ_rows, template_sections)
-    apply_section_completion_rates(sections)
+    apply_section_completion_rates(sections, fiche, processus_amont, processus_aval)
     section_requirements = distribute_requirements_by_section(exigences, sections)
     requirement_to_section = {}
     for section in section_requirements:
@@ -1260,7 +1293,7 @@ def load_fiche_audit_detail(id_version):
                 "date_detection": item["date_detection"],
                 "date_cloture": item["date_cloture"],
                 "gravite": severity or "Non renseignée",
-                "section": requirement_to_section.get(str(item["id_exigence"])) or "Section non liée",
+                "section": linked_section,
                 "actions_correctives": actions_by_nc.get(item["id_nc"], []),
             }
         )
@@ -1285,6 +1318,9 @@ def load_fiche_audit_detail(id_version):
             "code_process": fiche["code_process"],
             "nom": fiche["processus_nom"],
             "type_process": fiche["type_process"],
+            "processus_amont": format_process_links(processus_amont),
+            "processus_aval": format_process_links(processus_aval),
+            "statut": fiche["statut"],
             "departement": fiche.get("departement_nom"),
             "pilote": format_user(fiche.get("pilote_prenom"), fiche.get("pilote_nom")),
             "pilote_role": "Pilote de processus",
@@ -1473,27 +1509,43 @@ def distribute_requirements_by_section(exigences, sections):
     return buckets
 
 
-def apply_section_completion_rates(sections):
-    for section in sections:
-        required_fields = [champ for champ in section.get("champs") or [] if champ.get("est_obligatoire")]
-        if not required_fields:
-            section["completion_rate"] = 100
+def apply_section_completion_rates(sections, fiche=None, processus_amont=None, processus_aval=None):
+    for index, section in enumerate(sections):
+        fields = list(section.get("champs") or [])
+        if index == 0 and fiche:
+            fields.extend(
+                [
+                    {"valeur": fiche.get("code_process")},
+                    {"valeur": format_process_links(processus_amont or [])},
+                    {"valeur": format_process_links(processus_aval or [])},
+                    {"valeur": fiche.get("statut")},
+                ]
+            )
+        if not fields:
+            section["completion_rate"] = 0
             section["completion_done"] = 0
             section["completion_total"] = 0
             continue
 
-        completed = sum(1 for champ in required_fields if is_value_filled(champ.get("valeur")))
-        section["completion_rate"] = round((completed / len(required_fields)) * 100)
+        completed = sum(1 for champ in fields if is_value_filled(champ.get("valeur")))
+        section["completion_rate"] = round((completed / len(fields)) * 100)
         section["completion_done"] = completed
-        section["completion_total"] = len(required_fields)
+        section["completion_total"] = len(fields)
 
 
 def is_value_filled(value):
     if value is None:
         return False
-    if isinstance(value, (list, tuple, dict)):
-        return len(value) > 0
-    return str(value).strip() != ""
+    if isinstance(value, bool):
+        return True
+    if isinstance(value, (int, float)):
+        return True
+    if isinstance(value, (list, tuple, set)):
+        return any(is_value_filled(item) for item in value)
+    if isinstance(value, dict):
+        return any(is_value_filled(item) for item in value.values())
+    normalized = normalize_section_name(value)
+    return bool(normalized) and normalized not in {"non renseigne", "non applicable"}
 
 
 def group_audit_documents(documents):
@@ -1524,6 +1576,18 @@ def calculate_audit_metrics(sections, evaluations, documents_grouped, section_re
     checklist = average_numbers([item["taux_criteres"] for item in section_scores])
     bpmn = score_db_results(document.get("evaluation") for document in documents_grouped.get("bpmn", []))
     proofs = score_db_results(document.get("evaluation") for document in documents_grouped.get("preuves", []))
+    document_score = average_numbers([bpmn, proofs])
+    if document_score is not None:
+        section_scores.append(
+            {
+                "id_section_template": "documents-preuves",
+                "nom": "BPMN et preuves documentaires",
+                "taux_completude": 100,
+                "taux_criteres": round(document_score),
+                "score": round(document_score),
+                "poids": 5,
+            }
+        )
 
     weighted_sections = [item for item in section_scores if item["poids"] > 0]
     weight_total = sum(item["poids"] for item in weighted_sections)
@@ -1565,9 +1629,9 @@ def calculate_section_scores(sections, evaluations, section_requirements=None):
         section_evaluations = evaluations_by_section.get(str(section_id), [])
         taux_completude = section.get("completion_rate")
         if taux_completude is None:
-            taux_completude = 100
+            taux_completude = 0
         taux_criteres = calculate_section_criteria_rate(section_evaluations)
-        score = round((0.6 * taux_completude) + (0.4 * taux_criteres))
+        score = round(taux_completude if taux_criteres is None else (0.6 * taux_completude) + (0.4 * taux_criteres))
         poids = get_section_weight(section.get("nom"))
         section["criteria_rate"] = taux_criteres
         section["score_section"] = score
@@ -1577,7 +1641,7 @@ def calculate_section_scores(sections, evaluations, section_requirements=None):
                 "id_section_template": section_id,
                 "nom": section.get("nom"),
                 "taux_completude": round(taux_completude),
-                "taux_criteres": round(taux_criteres),
+                "taux_criteres": round(taux_criteres) if taux_criteres is not None else None,
                 "score": score,
                 "poids": poids,
             }
@@ -1587,7 +1651,7 @@ def calculate_section_scores(sections, evaluations, section_requirements=None):
 
 def calculate_section_criteria_rate(section_evaluations):
     if not section_evaluations:
-        return 0
+        return None
 
     applicable_scores = [
         EVALUATION_SCORE[evaluation["resultat"]]
@@ -1595,7 +1659,7 @@ def calculate_section_criteria_rate(section_evaluations):
         if evaluation.get("resultat") in EVALUATION_SCORE
     ]
     if not applicable_scores:
-        return 100
+        return None
     return sum(applicable_scores) / len(applicable_scores)
 
 
@@ -1607,6 +1671,11 @@ def normalize_section_name(value):
     text = unicodedata.normalize("NFKD", str(value or ""))
     text = "".join(char for char in text if not unicodedata.combining(char))
     text = text.lower().replace("’", "").replace("'", "")
+    text = "".join(char if char.isalnum() or char.isspace() else " " for char in text)
+    parts = text.split()
+    if parts and parts[0].isdigit():
+        parts = parts[1:]
+    text = " ".join(parts)
     return " ".join("".join(char if char.isalnum() else " " for char in text).split())
 
 
@@ -1983,9 +2052,9 @@ def replace_non_conformities(cursor, id_version, auditeur_id, non_conformities, 
         if has_id_exigence:
             insert_columns.insert(2, "id_exigence")
             values.insert(2, id_exigence)
-        elif has_id_section_template:
-            insert_columns.insert(2, "id_section_template")
-            values.insert(2, id_section_template)
+        if has_id_section_template:
+            insert_columns.insert(3 if has_id_exigence else 2, "id_section_template")
+            values.insert(3 if has_id_exigence else 2, id_section_template)
 
         placeholders = ", ".join(["%s"] * len(values))
         cursor.execute(
@@ -2201,3 +2270,10 @@ def empty_to_none(value):
 
 def format_user(prenom, nom):
     return " ".join(part for part in [prenom, nom] if part)
+
+
+def format_process_links(rows):
+    return ", ".join(
+        " - ".join(part for part in [row.get("code_process"), row.get("nom")] if part)
+        for row in rows
+    )

@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { Save } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Save, Sparkles } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import AuditHeader from "../../components/audit/AuditHeader";
 import AuditStepper from "../../components/audit/AuditStepper";
@@ -14,11 +14,15 @@ import { useAuth } from "../../hooks/useAuth";
 const SECTION_WEIGHTS = {
   "contexte de lorganisation": 15,
   "contexte de lorganisme": 15,
+  "contexte et processus": 15,
   leadership: 10,
+  "leadership et responsabilites": 10,
   planification: 15,
   support: 10,
+  "ressources et competences": 10,
   "realisation des activites operationnelles": 25,
   "realisation des activites": 25,
+  "realisation operationnelle": 25,
   "evaluation des performances": 10,
   amelioration: 10,
   ameliorations: 10,
@@ -36,10 +40,15 @@ export default function AuditExecution() {
   const [recommendations, setRecommendations] = useState("");
   const [correctiveActions, setCorrectiveActions] = useState([]);
   const [saving, setSaving] = useState(false);
+  const [autoSaving, setAutoSaving] = useState(false);
+  const [autoSaveLabel, setAutoSaveLabel] = useState("");
+  const [isDirty, setIsDirty] = useState(false);
   const [auditStatus, setAuditStatus] = useState("");
   const [reportMeta, setReportMeta] = useState(null);
   const [feedback, setFeedback] = useState(null);
   const [loadingError, setLoadingError] = useState("");
+  const payloadRef = useRef(null);
+  const dirtyRef = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -99,6 +108,7 @@ export default function AuditExecution() {
 
   const auditMetrics = useMemo(() => calculateAuditMetrics(data, evaluations), [data, evaluations]);
   const complianceRate = auditMetrics.tauxGlobal;
+  const currentSectionScore = currentSection ? auditMetrics.sectionScoresById[currentSection.id] : null;
 
   const completedSectionIds = useMemo(() => {
     if (!data) return new Set();
@@ -113,6 +123,76 @@ export default function AuditExecution() {
         .map((section) => section.id)
     );
   }, [data, evaluations, isPublished]);
+
+  const buildPayload = useCallback(() => ({
+    auditId: audit?.id,
+    currentSectionId: currentSection?.id,
+    currentIndex,
+    evaluations,
+    recommendations,
+    correctiveActions,
+    nonConformities,
+    complianceRate,
+    metrics: auditMetrics,
+  }), [
+    audit,
+    auditMetrics,
+    complianceRate,
+    correctiveActions,
+    currentIndex,
+    currentSection,
+    evaluations,
+    nonConformities,
+    recommendations,
+  ]);
+
+  useEffect(() => {
+    dirtyRef.current = isDirty;
+  }, [isDirty]);
+
+  useEffect(() => {
+    if (data && audit && currentSection) {
+      payloadRef.current = buildPayload();
+    }
+  }, [audit, buildPayload, currentSection, data]);
+
+  const saveDraftSilently = useCallback(async (payload = buildPayload()) => {
+    if (!payload?.auditId || isPublished) return;
+    setAutoSaving(true);
+    setAutoSaveLabel("Sauvegarde en cours...");
+    try {
+      await auditApi.saveDraft(payload);
+      setAuditStatus("En révision");
+      dirtyRef.current = false;
+      setIsDirty(false);
+      setAutoSaveLabel("Brouillon sauvegardé");
+    } catch {
+      setAutoSaveLabel("Sauvegarde non confirmée");
+    } finally {
+      setAutoSaving(false);
+    }
+  }, [buildPayload, isPublished]);
+
+  useEffect(() => {
+    if (!isDirty || !data || isPublished) return undefined;
+    const timer = window.setTimeout(() => {
+      saveDraftSilently();
+    }, 1200);
+    return () => window.clearTimeout(timer);
+  }, [data, isDirty, isPublished, saveDraftSilently]);
+
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (!dirtyRef.current || !payloadRef.current || isPublished) return;
+      auditApi.saveDraftOnUnload(payloadRef.current);
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      handleBeforeUnload();
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [isPublished]);
 
   if (loadingError) {
     return (
@@ -130,18 +210,6 @@ export default function AuditExecution() {
     );
   }
 
-  const buildPayload = () => ({
-    auditId: audit.id,
-    currentSectionId: currentSection.id,
-    currentIndex,
-    evaluations,
-    recommendations,
-    correctiveActions,
-    nonConformities,
-    complianceRate,
-    metrics: auditMetrics,
-  });
-
   const redirectToKanban = (message) => {
     navigate("/audit/mes-audits", {
       replace: true,
@@ -152,6 +220,11 @@ export default function AuditExecution() {
         },
       },
     });
+  };
+
+  const markDirty = () => {
+    dirtyRef.current = true;
+    setIsDirty(true);
   };
 
   const updateEvaluation = (requirementId, patch) => {
@@ -167,6 +240,22 @@ export default function AuditExecution() {
         ...patch,
       },
     }));
+    markDirty();
+  };
+
+  const goToSection = (nextIndex) => {
+    const safeIndex = Math.max(0, Math.min(nextIndex, data.sections.length - 1));
+    if (safeIndex === currentIndex) return;
+    const nextSection = data.sections[safeIndex];
+    if (isDirty) {
+      saveDraftSilently({
+        ...buildPayload(),
+        currentIndex: safeIndex,
+        currentSectionId: nextSection?.id,
+      });
+    }
+    setCurrentIndex(safeIndex);
+    markDirty();
   };
 
   const saveDraft = async () => {
@@ -175,13 +264,15 @@ export default function AuditExecution() {
     try {
       await auditApi.saveDraft(buildPayload());
       setAuditStatus("En révision");
+      dirtyRef.current = false;
+      setIsDirty(false);
       redirectToKanban("Le brouillon a bien été enregistré et la fiche est maintenant en révision.");
     } catch (error) {
       setFeedback({
         type: "error",
         message: extractApiError(
           error,
-          "Le brouillon n'a pas pu ?tre enregistr?. V?rifions le backend ou l'identifiant de la fiche."
+          "Le brouillon n'a pas pu être enregistré. Vérifions le backend ou l'identifiant de la fiche."
         ),
       });
       throw error;
@@ -196,6 +287,8 @@ export default function AuditExecution() {
     try {
       await auditApi.completeExecution(buildPayload(), "send_back");
       setAuditStatus("Brouillon");
+      dirtyRef.current = false;
+      setIsDirty(false);
       redirectToKanban("La fiche a bien été renvoyée au pilote pour correction.");
     } catch (error) {
       setFeedback({
@@ -217,6 +310,8 @@ export default function AuditExecution() {
     try {
       const response = await auditApi.completeExecution(buildPayload(), "publish");
       setAuditStatus(mapAuditStatus(response?.status) || "Publié");
+      dirtyRef.current = false;
+      setIsDirty(false);
       if (response?.rapport_pdf) {
         setReportMeta((current) => ({
           ...(current || {}),
@@ -251,6 +346,7 @@ export default function AuditExecution() {
         nc.id === ncId ? { ...nc, actions: [...(nc.actions || []), action] } : nc
       )
     );
+    markDirty();
   };
 
   const updateAction = (id, patch) => {
@@ -265,6 +361,7 @@ export default function AuditExecution() {
         ),
       }))
     );
+    markDirty();
   };
 
   const removeAction = (id) => {
@@ -275,6 +372,7 @@ export default function AuditExecution() {
         actions: (nc.actions || []).filter((action) => action.id !== id),
       }))
     );
+    markDirty();
   };
 
   const addNonConformity = (payload) => {
@@ -299,6 +397,12 @@ export default function AuditExecution() {
     if (actions.length > 0) {
       setCorrectiveActions((current) => [...current, ...actions]);
     }
+    markDirty();
+  };
+
+  const updateRecommendations = (value) => {
+    setRecommendations(value);
+    markDirty();
   };
 
   const generateReport = async () => {
@@ -323,9 +427,16 @@ export default function AuditExecution() {
       pageTitle="Execution de l'audit interne"
       userName={userName || audit.auditor}
       userRole="Auditeur"
-      contentClassName="bg-gray-50 px-4 py-4 pb-6"
+      contentClassName="bg-gray-50 px-4 py-3 pb-5"
     >
       <AuditHeader audit={audit} complianceRate={complianceRate} />
+
+      {autoSaveLabel && !isPublished && (
+        <div className="mt-3 inline-flex items-center gap-2 rounded-md border border-purple-100 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-500 shadow-sm">
+          <Sparkles className={`h-3.5 w-3.5 text-purple-500 ${autoSaving ? "animate-pulse" : ""}`} />
+          {autoSaveLabel}
+        </div>
+      )}
 
       {feedback && (
         <div
@@ -339,26 +450,27 @@ export default function AuditExecution() {
         </div>
       )}
 
-      <div className="mt-4">
+      <div className="mt-3">
         <AuditStepper
           sections={data.sections}
           currentIndex={currentIndex}
           completedSectionIds={completedSectionIds}
-          onSelect={setCurrentIndex}
+          onSelect={goToSection}
         />
       </div>
 
-      <div className="mt-4">
+      <div className="mt-3">
         {isSummary ? (
           <AuditSummaryStep
             sections={data.sections}
             evaluations={evaluations}
             complianceRate={complianceRate}
             auditMetrics={auditMetrics}
+            sectionScores={auditMetrics.sectionScores}
             recommendations={recommendations}
             correctiveActions={correctiveActions}
             nonConformities={nonConformities}
-            onRecommendationsChange={setRecommendations}
+            onRecommendationsChange={updateRecommendations}
             onAddAction={addAction}
             onUpdateAction={updateAction}
             onRemoveAction={removeAction}
@@ -370,15 +482,17 @@ export default function AuditExecution() {
             currentStatus={auditStatus}
           />
         ) : (
-          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:[grid-template-columns:minmax(0,1fr)_minmax(0,1fr)]">
+          <div className="grid grid-cols-1 gap-4 lg:[grid-template-columns:minmax(0,1.08fr)_minmax(0,0.92fr)]">
             <ProcessSectionPanel
               section={currentSection}
               sectionIndex={currentIndex}
+              sectionScore={currentSectionScore}
               onOpenDocument={openDocument}
             />
             <RequirementsPanel
               section={currentSection}
               evaluations={evaluations}
+              sectionScore={currentSectionScore}
               nonConformities={nonConformities.filter((nc) => nc.sectionId === currentSection.id)}
               onChange={updateEvaluation}
               onAddNonConformity={addNonConformity}
@@ -387,7 +501,7 @@ export default function AuditExecution() {
         )}
       </div>
 
-      <footer className="mt-4 flex items-center justify-between border-t border-gray-200 bg-gray-50 py-3">
+      <footer className="mt-3 flex items-center justify-between border-t border-gray-200 bg-gray-50 py-2.5">
         <button
           type="button"
           onClick={saveDraft}
@@ -401,7 +515,7 @@ export default function AuditExecution() {
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={() => setCurrentIndex((index) => Math.max(index - 1, 0))}
+            onClick={() => goToSection(currentIndex - 1)}
             disabled={currentIndex === 0}
             className="rounded-md border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
@@ -409,9 +523,7 @@ export default function AuditExecution() {
           </button>
           <button
             type="button"
-            onClick={() =>
-              setCurrentIndex((index) => Math.min(index + 1, data.sections.length - 1))
-            }
+            onClick={() => goToSection(currentIndex + 1)}
             disabled={currentIndex === data.sections.length - 1}
             className="rounded-md bg-purple-700 px-3 py-2 text-xs font-semibold text-white hover:bg-purple-800 disabled:cursor-not-allowed disabled:opacity-50"
           >
@@ -449,6 +561,8 @@ function calculateAuditMetrics(data, evaluations) {
       scoreBpmn: 0,
       scorePreuves: 0,
       tauxGlobal: 0,
+      sectionScores: [],
+      sectionScoresById: {},
     };
   }
 
@@ -458,19 +572,34 @@ function calculateAuditMetrics(data, evaluations) {
   const bpmnSections = sections.filter((section) => section.id === "bpmn");
   const proofSections = sections.filter((section) => section.id === "preuves");
 
-  const sectionScores = ficheSections.map((section) => {
-    const completionRate = typeof section.completionRate === "number" ? section.completionRate : 100;
-    const criteriaRate = scoreSectionRequirements(section.requirements, evaluations, scoreMap);
-    const score = Math.round(completionRate * 0.6 + criteriaRate * 0.4);
+  const sectionScores = ficheSections.map((section, index) => {
+    const completion = calculateSectionCompletion(data, section, index);
+    const criteria = scoreSectionRequirements(section.requirements, evaluations);
+    const score = criteria.applicableTotal === 0
+      ? completion.rate
+      : Math.round(completion.rate * 0.6 + criteria.rate * 0.4);
     return {
+      id: section.id,
+      title: section.title,
       score,
-      completionRate,
-      criteriaRate,
+      completionRate: completion.rate,
+      completionDone: completion.done,
+      completionTotal: completion.total,
+      completionFields: completion.fields,
+      criteriaRate: criteria.rate,
+      criteriaApplicable: criteria.applicableTotal,
+      criteriaTotal: criteria.total,
+      criteriaCounts: criteria.counts,
+      criteriaLabel: criteria.applicableTotal === 0 ? "Non applicable" : `${criteria.rate}%`,
       weight: getSectionWeight(section.title),
     };
   });
   const completionScore = average(sectionScores.map((section) => section.completionRate));
-  const checklistScore = average(sectionScores.map((section) => section.criteriaRate));
+  const checklistScore = average(
+    sectionScores
+      .filter((section) => section.criteriaApplicable > 0)
+      .map((section) => section.criteriaRate)
+  );
   const bpmnScore = scoreRequirements(
     bpmnSections.flatMap((section) => section.requirements),
     evaluations,
@@ -481,8 +610,38 @@ function calculateAuditMetrics(data, evaluations) {
     evaluations,
     scoreMap
   );
+  const documentScore = average([bpmnScore, proofScore].filter((score) => typeof score === "number"));
+
+  if (typeof documentScore === "number") {
+    sectionScores.push({
+      id: "documents-preuves",
+      title: "BPMN et preuves documentaires",
+      score: Math.round(documentScore),
+      completionRate: 100,
+      completionDone: [...bpmnSections, ...proofSections].filter((section) =>
+        section.processFields?.some((field) => isMeaningfullyFilled(field.value))
+      ).length,
+      completionTotal: bpmnSections.length + proofSections.length,
+      completionFields: [...bpmnSections, ...proofSections].flatMap((section) => section.processFields || []),
+      criteriaRate: Math.round(documentScore),
+      criteriaApplicable: [...bpmnSections, ...proofSections].flatMap((section) => section.requirements || []).length,
+      criteriaTotal: [...bpmnSections, ...proofSections].flatMap((section) => section.requirements || []).length,
+      criteriaCounts: {
+        conforme: 0,
+        partiel: 0,
+        nonConforme: 0,
+        nonApplicable: 0,
+      },
+      criteriaLabel: `${Math.round(documentScore)}%`,
+      weight: 5,
+    });
+  }
 
   const weighted = sectionScores.filter((item) => item.weight > 0);
+  const sectionScoresById = sectionScores.reduce((acc, item) => {
+    acc[item.id] = item;
+    return acc;
+  }, {});
   const weightTotal = weighted.reduce((total, item) => total + item.weight, 0);
   const tauxGlobal =
     weightTotal === 0
@@ -495,24 +654,33 @@ function calculateAuditMetrics(data, evaluations) {
     scoreBpmn: Math.round(bpmnScore ?? data.metrics?.score_bpmn ?? 0),
     scorePreuves: Math.round(proofScore ?? data.metrics?.score_preuves ?? 0),
     tauxGlobal,
+    sectionScores,
+    sectionScoresById,
   };
 }
 
-function scoreSectionRequirements(requirements, evaluations, scoreMap) {
+function scoreSectionRequirements(requirements, evaluations) {
   const statuses = requirements
     .map((requirement) => evaluations[requirement.id]?.status)
     .filter(Boolean);
 
-  if (!statuses.length) return 0;
+  const counts = {
+    conforme: statuses.filter((statusValue) => statusValue === "conforme").length,
+    partiel: statuses.filter((statusValue) => statusValue === "partiel").length,
+    nonConforme: statuses.filter((statusValue) => statusValue === "non_conforme").length,
+    nonApplicable: statuses.filter((statusValue) => statusValue === "non_applicable").length,
+  };
+  const applicableTotal = statuses.length - counts.nonApplicable;
+  const rate = applicableTotal === 0
+    ? 0
+    : Math.round(((counts.conforme + counts.partiel * 0.5) / applicableTotal) * 100);
 
-  const scores = statuses
-    .filter((statusValue) => statusValue !== "non_applicable")
-    .map((statusValue) => scoreMap.get(statusValue))
-    .filter((score) => typeof score === "number")
-    .map((score) => score * 100);
-
-  if (!scores.length) return 100;
-  return average(scores) ?? 0;
+  return {
+    rate,
+    total: statuses.length,
+    applicableTotal,
+    counts,
+  };
 }
 
 function scoreRequirements(requirements, evaluations, scoreMap) {
@@ -526,6 +694,62 @@ function scoreRequirements(requirements, evaluations, scoreMap) {
   return average(scores);
 }
 
+function calculateSectionCompletion(data, section, sectionIndex) {
+  const fields = [...(section.processFields || [])];
+
+  if (sectionIndex === 0) {
+    const processMeta = data.processMeta || {};
+    fields.push(
+      { label: "Code du processus", value: processMeta.codeProcess || data.audit?.processCode },
+      { label: "Processus amont", value: processMeta.processusAmont },
+      { label: "Processus aval", value: processMeta.processusAval },
+      { label: "Statut / etat du processus", value: processMeta.statutProcessus || data.audit?.status }
+    );
+  }
+
+  const total = fields.length;
+  const done = fields.filter((field) => isMeaningfullyFilled(field.value)).length;
+  const rate = total === 0 ? 0 : Math.round((done / total) * 100);
+
+  return {
+    done,
+    total,
+    rate,
+    fields,
+  };
+}
+
+function isMeaningfullyFilled(value) {
+  if (value === null || value === undefined) return false;
+  if (typeof value === "number" || typeof value === "boolean") return true;
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    const normalized = normalizeSectionName(trimmed);
+    if (!trimmed || normalized === "non renseigne" || normalized === "non applicable") {
+      return false;
+    }
+    if (["[", "{"].includes(trimmed[0])) {
+      try {
+        return isMeaningfullyFilled(JSON.parse(trimmed));
+      } catch {
+        return true;
+      }
+    }
+    return true;
+  }
+
+  if (Array.isArray(value)) {
+    return value.some((item) => isMeaningfullyFilled(item));
+  }
+
+  if (typeof value === "object") {
+    return Object.values(value).some((item) => isMeaningfullyFilled(item));
+  }
+
+  return Boolean(value);
+}
+
 function getSectionWeight(sectionName) {
   return SECTION_WEIGHTS[normalizeSectionName(sectionName)] || 0;
 }
@@ -536,6 +760,7 @@ function normalizeSectionName(value) {
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/[’']/g, "")
+    .replace(/^\s*\d+\s*[§.-]?\s*/, "")
     .replace(/[^a-z0-9]+/g, " ")
     .trim()
     .replace(/\s+/g, " ");
@@ -554,7 +779,7 @@ function mapInitialNonConformities(payload) {
     title: nc.titre || nc.title,
     description: nc.description || "",
     severity: nc.gravite || nc.severity || "Non renseignée",
-    sectionId: "",
+    sectionId: nc.id_section_template ? String(nc.id_section_template) : nc.sectionId || "",
     sectionTitle: nc.section || nc.sectionTitle || "Section non liée",
     actions: nc.actions_correctives || nc.actions || [],
   }));
