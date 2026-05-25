@@ -74,6 +74,12 @@ export default function PreAuditPage() {
 
   const userName = `${user?.prenom || ""} ${user?.nom || ""}`.trim() || user?.email || "Utilisateur";
   const userRole = user?.roles?.[0] || "Auditeur";
+  const normalizedRoles = useMemo(
+    () => (user?.roles || []).map((role) => String(role).trim().toUpperCase()),
+    [user?.roles],
+  );
+  const isPilote = normalizedRoles.includes("PILOTE") || normalizedRoles.includes("PILOTE DE PROCESSUS");
+  const pageTitle = isPilote ? "Ajouter processus" : "Pre-audit";
 
   const loadProcesses = useCallback(async () => {
     setLoading(true);
@@ -159,10 +165,10 @@ export default function PreAuditPage() {
   };
 
   return (
-    <AppLayout pageTitle="Pre-audit" userName={userName} userRole={userRole}>
+    <AppLayout pageTitle={pageTitle} userName={userName} userRole={userRole}>
       <div className="mx-auto flex min-h-full max-w-[1180px] flex-col gap-2.5">
     
-        <PreAuditSteps />
+        {!isPilote && <PreAuditSteps />}
 
         {error && (
           <div className="rounded-[8px] border border-red-100 bg-red-50 px-4 py-2.5 text-[11.5px] font-medium text-red-500">
