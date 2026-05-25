@@ -35,9 +35,9 @@ const chefProjetItems = [
     ],
   },
   { label: "Support documentaire", icon: FolderOpen, to: "/documents" },
-  { label: "Niveau de maturit\u00e9", icon: BarChart3, to: "/niveau-maturite" },
+  { label: "Niveau de maturité", icon: BarChart3, to: "/niveau-maturite" },
   { label: "Gestion des users", icon: Users, to: "/gestion-utilisateurs" },
-  { label: "Param\u00e8tres", icon: Settings, to: "/parametres" },
+  { label: "Paramètres", icon: Settings, to: "/parametres" },
 ];
 
 const piloteItems = [
@@ -60,8 +60,8 @@ const piloteItems = [
     ],
   },
   { label: "Support documentaire", icon: FolderOpen, to: "/documents" },
-  { label: "Niveau de maturit\u00e9", icon: BarChart3, to: "/niveau-maturite" },
-  { label: "Param\u00e8tres", icon: Settings, to: "/parametres" },
+  { label: "Niveau de maturité", icon: BarChart3, to: "/niveau-maturite" },
+  { label: "Paramètres", icon: Settings, to: "/parametres" },
 ];
 
 const auditeurItems = [
@@ -79,7 +79,7 @@ const auditeurItems = [
     label: "Audit",
     icon: ClipboardCheck,
     children: [
-      { label: "Pr\u00e9-audit", icon: FileText, to: "/audit/preaudit" },
+      { label: "Pré-audit", icon: FileText, to: "/audit/preaudit" },
       { label: "Mes audits", icon: ClipboardList, to: "/audit/mes-audits" },
       { label: "Audits terrain", icon: Map, to: "/audit/audits-terrain" },
     ],
@@ -93,8 +93,8 @@ const auditeurItems = [
     ],
   },
   { label: "Support documentaire", icon: FolderOpen, to: "/documents" },
-  { label: "Niveau de maturit\u00e9", icon: BarChart3, to: "/niveau-maturite" },
-  { label: "Param\u00e8tres", icon: Settings, to: "/parametres" },
+  { label: "Niveau de maturité", icon: BarChart3, to: "/niveau-maturite" },
+  { label: "Paramètres", icon: Settings, to: "/parametres" },
 ];
 
 const auditeurExterneItems = [
@@ -114,11 +114,11 @@ const auditeurExterneItems = [
     icon: ClipboardCheck,
     children: [
       { label: "Audits terrain", icon: Map, to: "/audit/audits-terrain" },
-      { label: "R\u00e9sultats d'audit", icon: ClipboardListIcon, to: "/audit/mes-audits" },
+      { label: "Résultats d'audit", icon: ClipboardListIcon, to: "/audit/mes-audits" },
     ],
   },
-  { label: "Niveau de maturit\u00e9", icon: BarChart3, to: "/niveau-maturite" },
-  { label: "Param\u00e8tres", icon: Settings, to: "/parametres" },
+  { label: "Niveau de maturité", icon: BarChart3, to: "/niveau-maturite" },
+  { label: "Paramètres", icon: Settings, to: "/parametres" },
 ];
 
 const dgItems = [
@@ -138,7 +138,7 @@ const dgItems = [
     ],
   },
   { label: "Support documentaire", icon: FolderOpen, to: "/documents" },
-  { label: "Param\u00e8tres", icon: Settings, to: "/parametres" },
+  { label: "Paramètres", icon: Settings, to: "/parametres" },
 ];
 
 function normalizeRoles(roles = []) {
@@ -184,6 +184,6 @@ export function getSidebarItemsByRole(roles = []) {
   return [
     { label: "Tableau de bord", icon: LayoutDashboard, to: "/dashboard" },
     { label: "Support documentaire", icon: FolderOpen, to: "/documents" },
-    { label: "Param\u00e8tres", icon: Settings, to: "/parametres" },
+    { label: "Paramètres", icon: Settings, to: "/parametres" },
   ];
 }

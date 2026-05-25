@@ -1,32 +1,32 @@
+from django.contrib.auth import get_user_model
 from django.db import models
 from django.utils import timezone
-from django.contrib.auth import get_user_model
-from apps.accounts.models import Utilisateur
+
 
 User = get_user_model()
 
 
 class PVParticipant(models.Model):
     pv = models.ForeignKey(
-        'PV',
+        "PV",
         on_delete=models.CASCADE,
-        db_column='pv_id',
+        db_column="pv_id",
     )
     utilisateur = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
-        db_column='user_id',        # ← FK vers accounts_user.id
+        db_column="user_id",
     )
 
     class Meta:
         managed = False
-        db_table = 'pv_participants'
+        db_table = "pv_participants"
 
 
 class PV(models.Model):
     PV_TYPES = [
-        ('SUIVI', 'Reunion de suivi'),
-        ('REVUE_DG', 'Revue avec DG'),    # ← underscore, pas espace
+        ("SUIVI", "Reunion de suivi"),
+        ("REVUE_DG", "Revue avec DG"),
     ]
 
     id = models.AutoField(primary_key=True)
@@ -34,32 +34,44 @@ class PV(models.Model):
         max_length=50,
         unique=True,
         db_index=True,
-        verbose_name='PV Code'
+        verbose_name="PV Code",
     )
+    # Keep exposing `type` to the app while reading/writing the real DB column.
     type = models.CharField(
+        db_column="sous_type",
         max_length=20,
         choices=PV_TYPES,
-        verbose_name='PV Type'
+        verbose_name="PV Type",
     )
-    date = models.DateField(verbose_name='PV Date')
+    categorie = models.CharField(
+        max_length=50,
+        default="PV",
+        verbose_name="PV Category",
+    )
+    statut = models.CharField(
+        max_length=50,
+        default="BROUILLON",
+        verbose_name="PV Status",
+    )
+    date = models.DateField(verbose_name="PV Date")
     participants = models.ManyToManyField(
         User,
-        through='PVParticipant',    # ← via User (accounts_user)
-        related_name='pv_participations',
-        verbose_name='Participants'
+        through="PVParticipant",
+        related_name="pv_participations",
+        verbose_name="Participants",
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         managed = False
-        db_table = 'pv'
-        ordering = ['-date', '-created_at']
-        verbose_name = 'PV'
-        verbose_name_plural = 'PVs'
+        db_table = "pv"
+        ordering = ["-date", "-created_at"]
+        verbose_name = "PV"
+        verbose_name_plural = "PVs"
         indexes = [
-            models.Index(fields=['-date']),
-            models.Index(fields=['type', '-date']),
+            models.Index(fields=["-date"]),
+            models.Index(fields=["type", "-date"]),
         ]
 
     def __str__(self):
@@ -67,7 +79,7 @@ class PV(models.Model):
 
     @staticmethod
     def generate_code(pv_type):
-        today = timezone.now().strftime('%Y%m%d')
+        today = timezone.now().strftime("%Y%m%d")
         base_code = f"PV_{pv_type}_{today}"
         counter = 1
         code = base_code
@@ -77,6 +89,8 @@ class PV(models.Model):
         return code
 
     def save(self, *args, **kwargs):
+        if not self.categorie:
+            self.categorie = "PV"
         if not self.code:
             self.code = self.generate_code(self.type)
         super().save(*args, **kwargs)

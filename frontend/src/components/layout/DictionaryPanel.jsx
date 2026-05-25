@@ -16,7 +16,7 @@ import { useAuth } from "../../hooks/useAuth";
 import { TOPBAR_HEIGHT } from "./layout.constants";
 
 const MANAGER_ROLES = [
-  "Chef cellule qualit\u00e9",
+  "Chef cellule qualité",
   "CAQ",
   "Auditeur interne",
   "Auditeur",
@@ -25,7 +25,7 @@ const MANAGER_ROLES = [
 ];
 
 const CATEGORY_OPTIONS = [
-  { value: "Qualite", label: "Qualit\u00e9" },
+  { value: "Qualite", label: "Qualité" },
   { value: "Audit", label: "Audit" },
   { value: "Processus", label: "Processus" },
   { value: "ISO 9001", label: "ISO 9001" },
@@ -223,7 +223,7 @@ export default function DictionaryPanel({ open, onClose }) {
       }}
       role="dialog"
       aria-modal="false"
-      aria-label="Dictionnaire qualit\u00e9"
+      aria-label="Dictionnaire qualité"
     >
       <div className="border-b border-[#EEE7FA] bg-[linear-gradient(135deg,#FCFAFF_0%,#FFFFFF_100%)] px-4 py-3">
         <div className="flex items-start justify-between gap-3">
@@ -234,11 +234,11 @@ export default function DictionaryPanel({ open, onClose }) {
 
             <div className="min-w-0">
               <p className="text-[14px] font-semibold text-slate-900">
-                Dictionnaire qualit\u00e9
+                Dictionnaire qualité
               </p>
               <div className="mt-1 h-[3px] w-16 rounded-full bg-[#D4A017]" />
               <p className="mt-2 text-[11px] leading-5 text-slate-500">
-                Recherchez un terme qualit\u00e9, audit ou processus.
+                Recherchez un terme qualité, audit ou processus.
               </p>
             </div>
           </div>
@@ -247,7 +247,7 @@ export default function DictionaryPanel({ open, onClose }) {
             type="button"
             onClick={onClose}
             className="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
-            aria-label="Fermer le dictionnaire qualit\u00e9"
+            aria-label="Fermer le dictionnaire qualité"
           >
             <X className="h-4 w-4" />
           </button>
@@ -293,7 +293,7 @@ export default function DictionaryPanel({ open, onClose }) {
                   {editingEntry ? "Modifier le terme" : "Ajouter un terme"}
                 </p>
                 <p className="mt-1 text-[11px] text-slate-500">
-                  Renseignez une d\u00e9finition claire et concise.
+                  Renseignez une définition claire et concise.
                 </p>
               </div>
             </div>
@@ -325,7 +325,7 @@ export default function DictionaryPanel({ open, onClose }) {
 
               <label className="block">
                 <span className="mb-1.5 block text-[11px] font-medium text-slate-600">
-                  Cat\u00e9gorie
+                  Catégorie
                 </span>
                 <select
                   value={formValues.category}
@@ -347,7 +347,7 @@ export default function DictionaryPanel({ open, onClose }) {
 
               <label className="block">
                 <span className="mb-1.5 block text-[11px] font-medium text-slate-600">
-                  D\u00e9finition
+                  Définition
                 </span>
                 <textarea
                   rows={4}
@@ -393,7 +393,7 @@ export default function DictionaryPanel({ open, onClose }) {
                       synonyms: event.target.value,
                     }))
                   }
-                  placeholder="Ex: NC, \u00e9cart, anomalie"
+                  placeholder="Ex: NC, écart, anomalie"
                   className="h-10 w-full rounded-[12px] border border-[#E4D8F6] bg-white px-3 text-[12px] text-slate-700 outline-none transition focus:border-[#58148E]"
                 />
               </label>
@@ -430,7 +430,7 @@ export default function DictionaryPanel({ open, onClose }) {
           </div>
         ) : terms.length === 0 ? (
           <div className="rounded-[14px] border border-dashed border-[#DCCBFA] bg-white px-4 py-6 text-center text-[12px] text-slate-500">
-            Aucun terme trouv\u00e9.
+            Aucun terme trouvé.
           </div>
         ) : (
           <div className="space-y-3">
@@ -487,7 +487,7 @@ export default function DictionaryPanel({ open, onClose }) {
 
                 <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] uppercase tracking-[0.08em] text-slate-400">
                   {entry.created_by_name ? <span>Par {entry.created_by_name}</span> : null}
-                  {entry.updated_at ? <span>Mis \u00e0 jour le {formatDate(entry.updated_at)}</span> : null}
+                  {entry.updated_at ? <span>Mis à jour le {formatDate(entry.updated_at)}</span> : null}
                 </div>
               </article>
             ))}

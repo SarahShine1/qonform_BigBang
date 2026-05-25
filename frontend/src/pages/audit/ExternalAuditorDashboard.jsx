@@ -23,10 +23,10 @@ const PRIMARY = "#6B21D9";
 const GOLD = "#F4B740";
 
 const kpiCards = [
-  { key: "processusDocumentes", label: "Processus document\u00e9s", icon: Network },
-  { key: "fichesPubliees", label: "Fiches publi\u00e9es", icon: FileText },
+  { key: "processusDocumentes", label: "Processus documentés", icon: Network },
+  { key: "fichesPubliees", label: "Fiches publiées", icon: FileText },
   { key: "auditsConsultables", label: "Audits consultables", icon: ClipboardCheck },
-  { key: "actionsAmelioration", label: "Actions d'am\u00e9lioration", icon: BarChart3 },
+  { key: "actionsAmelioration", label: "Actions d'amélioration", icon: BarChart3 },
   { key: "documentsDisponibles", label: "Documents disponibles", icon: FolderOpen },
 ];
 
@@ -41,7 +41,7 @@ const reviewItems = [
   { label: "Fiches processus publiees", to: "/cartographie/processus" },
   { label: "Audits terrain", to: "/audit/audits-terrain" },
   { label: "Actions correctives", to: "/actions" },
-  { label: "Niveau de maturit\u00e9", to: "/niveau-maturite" },
+  { label: "Niveau de maturité", to: "/niveau-maturite" },
 ];
 
 export default function ExternalAuditorDashboard() {
@@ -119,7 +119,7 @@ export default function ExternalAuditorDashboard() {
                 Espace auditeur externe
               </h1>
               <p className="mt-1 text-[13px] text-slate-500">
-                Vue de consultation d\u00e9di\u00e9e a l'audit de certification.
+                Vue de consultation dédiée à l'audit de certification.
               </p>
             </div>
 
@@ -129,7 +129,7 @@ export default function ExternalAuditorDashboard() {
               style={{ borderColor: CARD_BORDER }}
             >
               <Settings className="h-4 w-4" />
-              Param\u00e8tres
+              Paramètres
             </Link>
           </div>
 
@@ -167,7 +167,7 @@ export default function ExternalAuditorDashboard() {
           <section className="rounded-[18px] border bg-white px-5 py-5 shadow-sm" style={{ borderColor: CARD_BORDER }}>
             <h2 className="text-[16px] font-semibold text-slate-900">Dossier de certification</h2>
             <p className="mt-1 text-[12px] text-slate-500">
-              Acc\u00e8s direct aux \u00e9l\u00e9ments structurants du syst\u00e8me de management de la qualit\u00e9.
+              Accès direct aux éléments structurants du système de management de la qualité.
             </p>
 
             <div className="mt-4 grid gap-3 md:grid-cols-2">
@@ -192,9 +192,9 @@ export default function ExternalAuditorDashboard() {
           </section>
 
           <section className="rounded-[18px] border bg-white px-5 py-5 shadow-sm" style={{ borderColor: CARD_BORDER }}>
-            <h2 className="text-[16px] font-semibold text-slate-900">El\u00e9ments a examiner</h2>
+            <h2 className="text-[16px] font-semibold text-slate-900">Éléments à examiner</h2>
             <p className="mt-1 text-[12px] text-slate-500">
-              Parcours cible pour la revue des preuves, audits et indicateurs de maturit\u00e9.
+              Parcours cible pour la revue des preuves, audits et indicateurs de maturité.
             </p>
 
             <div className="mt-4 space-y-3">
@@ -223,8 +223,8 @@ export default function ExternalAuditorDashboard() {
         <section className="rounded-[18px] border bg-white px-5 py-5 shadow-sm" style={{ borderColor: CARD_BORDER }}>
           <h2 className="text-[16px] font-semibold text-slate-900">Mode consultation</h2>
           <p className="mt-2 max-w-3xl text-[13px] leading-6 text-slate-600">
-            Ce profil est strictement r\u00e9serv\u00e9 a la consultation des preuves, documents et r\u00e9sultats utiles a l'audit de certification.
-            Les fonctions de cr\u00e9ation, modification et suppression des donn\u00e9es internes restent d\u00e9sactiv\u00e9es.
+            Ce profil est strictement réservé à la consultation des preuves, documents et résultats utiles à l'audit de certification.
+            Les fonctions de création, modification et suppression des données internes restent désactivées.
           </p>
         </section>
       </div>
