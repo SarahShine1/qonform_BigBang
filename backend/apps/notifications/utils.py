@@ -116,3 +116,140 @@ def notifier_fiche_publiee(fiche):
         "Fiche publiée",
         "La fiche {code_fiche} a été auditée et publiée.",
     )
+def notifier_participants_pv_creation(pv):
+    """Notifie les participants à la création du PV/CR (brouillon)."""
+    from apps.accounts.models import Utilisateur
+    from .models import Notification
+
+    label = dict(pv.SOUS_TYPE_CHOICES).get(pv.sous_type, pv.sous_type)
+    date_formatee = pv.date.strftime('%d/%m/%Y')
+    categorie_label = "Procès-Verbal" if pv.categorie == 'PV' else "Compte Rendu"
+
+    for user in pv.participants.all():
+        profil = Utilisateur.objects.filter(auth_id=user.id).first()
+        if not profil:
+            continue
+        Notification.objects.create(
+            destinataire=profil,
+            type_notification="PV_CREE",
+            titre=f"Nouveau {categorie_label} : {pv.code}",
+            message=(
+                f"Vous êtes inscrit comme participant au {categorie_label} "
+                f"« {label} » du {date_formatee}."
+            ),
+            lien=f"/suivi",
+        )
+
+
+def notifier_participants_pv_soumission(pv):
+    """Notifie les participants que le PV est soumis et attend leur validation."""
+    from apps.accounts.models import Utilisateur
+    from .models import Notification
+
+    label = dict(pv.SOUS_TYPE_CHOICES).get(pv.sous_type, pv.sous_type)
+    date_formatee = pv.date.strftime('%d/%m/%Y')
+
+    for user in pv.participants.all():
+        profil = Utilisateur.objects.filter(auth_id=user.id).first()
+        if not profil:
+            continue
+        Notification.objects.create(
+            destinataire=profil,
+            type_notification="PV_SOUMIS",
+            titre=f"Validation requise : {pv.code}",
+            message=(
+                f"Le Procès-Verbal « {label} » du {date_formatee} "
+                f"est en attente de votre validation."
+            ),
+            lien=f"/suivi",
+        )
+
+
+
+def notifier_participants_pv_rejet(pv, user_rejeteur):
+    """Notifie tous les participants (sauf le rejeteur) qu'un PV a été rejeté."""
+    from apps.accounts.models import Utilisateur
+    from .models import Notification
+
+    rejeteur_profil = Utilisateur.objects.filter(auth_id=user_rejeteur.id).first()
+    rejeteur_nom = f"{rejeteur_profil.prenom} {rejeteur_profil.nom}" if rejeteur_profil else "Un participant"
+
+    # Retrouver le motif depuis la validation
+    from apps.pv.models import PVValidation
+    validation = PVValidation.objects.filter(pv=pv, utilisateur=user_rejeteur).first()
+    motif = validation.motif if validation else ""
+
+    for user in pv.participants.exclude(id=user_rejeteur.id):
+        profil = Utilisateur.objects.filter(auth_id=user.id).first()
+        if not profil:
+            continue
+        Notification.objects.create(
+            destinataire=profil,
+            type_notification="PV_REJETE",
+            titre=f"PV rejeté : {pv.code}",
+            message=(
+                f"{rejeteur_nom} a rejeté le PV « {pv.code} »."
+                + (f"\nMotif : {motif}" if motif else "")
+            ),
+            lien=f"/suivi",
+        )
+
+
+def notifier_createur_pv_rejet(pv, user_rejeteur, motif):
+    from apps.accounts.models import Utilisateur
+    from .models import Notification
+
+    if not pv.createur:
+        return
+
+    createur = Utilisateur.objects.filter(auth_id=pv.createur_id).first()
+    if not createur:
+        return
+
+    rejeteur_profil = Utilisateur.objects.filter(auth_id=user_rejeteur.id).first()
+    rejeteur_nom = f"{rejeteur_profil.prenom} {rejeteur_profil.nom}" if rejeteur_profil else "Un participant"
+
+    Notification.objects.create(
+        destinataire=createur,
+        type_notification="PV_REJETE",
+        titre=f"PV rejeté : {pv.code}",
+        message=f"{rejeteur_nom} a rejeté le PV « {pv.code} ».\nMotif : {motif}",
+        lien="/suivi",
+    )
+
+
+def notifier_createur_pv_valide(pv):
+    from apps.accounts.models import Utilisateur
+    from .models import Notification
+
+    if not pv.createur:
+        return
+
+    createur = Utilisateur.objects.filter(auth_id=pv.createur_id).first()
+    if not createur:
+        return
+
+    Notification.objects.create(
+        destinataire=createur,
+        type_notification="PV_VALIDE",
+        titre=f"PV validé : {pv.code}",
+        message=f"Le Procès-Verbal « {pv.code} » a été approuvé par tous les participants.",
+        lien="/suivi",
+    )
+
+def notifier_participants_pv_valide(pv):
+    """Notifie tous les participants que le PV a été validé par tous."""
+    from apps.accounts.models import Utilisateur
+    from .models import Notification
+
+    for user in pv.participants.all():
+        profil = Utilisateur.objects.filter(auth_id=user.id).first()
+        if not profil:
+            continue
+        Notification.objects.create(
+            destinataire=profil,
+            type_notification="PV_VALIDE",
+            titre=f"PV validé : {pv.code}",
+            message=f"Le Procès-Verbal « {pv.code} » a été approuvé par tous les participants.",
+            lien="/suivi",
+        )
