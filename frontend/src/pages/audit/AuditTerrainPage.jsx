@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   Plus,
   Loader2,
@@ -122,6 +123,7 @@ export default function AuditTerrainPage() {
   const [downloading, setDownloading] = useState(false);
   const [search, setSearch] = useState("");
   const [filterDep, setFilterDep] = useState("");
+  const [searchParams] = useSearchParams();
 
   const load = async () => {
     setLoading(true);
@@ -166,16 +168,20 @@ export default function AuditTerrainPage() {
     }
   };
 
+  const auditStatutFilter = (searchParams.get("statut") || "").toLowerCase();
   const filtered = audits.filter((a) => {
     const matchSearch = !search ||
       a.departement_nom?.toLowerCase().includes(search.toLowerCase()) ||
       a.auditeur_nom?.toLowerCase().includes(search.toLowerCase()) ||
       a.observation?.toLowerCase().includes(search.toLowerCase());
     const matchDep = !filterDep || a.departement_nom === filterDep;
-    return matchSearch && matchDep;
+    const matchStatut = !auditStatutFilter ||
+      (auditStatutFilter === "cloture" && a.documents?.length > 0) ||
+      String(a.statut || a.status || "").toLowerCase() === auditStatutFilter;
+    return matchSearch && matchDep && matchStatut;
   });
 
-  const hasFilters = search || filterDep;
+  const hasFilters = search || filterDep || !!auditStatutFilter;
 
   const totalAvecRapport = audits.filter((a) => a.documents?.length > 0).length;
   const depsUniques = new Set(audits.map((a) => a.departement_nom)).size;

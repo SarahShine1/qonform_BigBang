@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Building2,
   CalendarDays,
@@ -384,6 +385,7 @@ export function OrgChart({
   onEdit,
   onDelete,
 }) {
+  const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [zoom, setZoom] = useState(100);
   const [selectedId, setSelectedId] = useState(null);
@@ -608,9 +610,11 @@ export function OrgChart({
                       {selectedProcesses.length > 0 ? (
                         <div className="max-h-48 space-y-1.5 overflow-y-auto pr-1">
                           {selectedProcesses.map((process) => (
-                            <div
+                            <button
                               key={process.id_processus}
-                              className="rounded-[9px] border border-slate-100 bg-slate-50 px-2.5 py-2"
+                              type="button"
+                              onClick={() => navigate(`/gestion-processus/dossier/${process.id_processus}`)}
+                              className="w-full rounded-[9px] border border-slate-100 bg-slate-50 px-2.5 py-2 text-left transition hover:bg-slate-100 hover:border-slate-200 cursor-pointer"
                             >
                               <div className="flex items-center justify-between gap-2">
                                 <p className="truncate text-[11px] font-semibold text-slate-800">{process.nom}</p>
@@ -621,7 +625,7 @@ export function OrgChart({
                               <p className="mt-1 text-[9px] font-semibold uppercase tracking-[0.06em] text-slate-400">
                                 {process.code_process}
                               </p>
-                            </div>
+                            </button>
                           ))}
                         </div>
                       ) : (

@@ -48,6 +48,7 @@ const piloteItems = [
     icon: Map,
     children: [
       { label: "Processus", icon: Network, to: "/cartographie/processus" },
+      { label: "Ajouter processus", icon: FileText, to: "/audit/preaudit" },
       { label: "Interactions", icon: GitBranch, to: "/cartographie/interactions" },
     ],
   },
@@ -138,6 +139,7 @@ const dgItems = [
     ],
   },
   { label: "Support documentaire", icon: FolderOpen, to: "/documents" },
+  { label: "Audits clôturés", icon: ClipboardCheck, to: "/audit/audits-terrain?statut=cloture" },
   { label: "Paramètres", icon: Settings, to: "/parametres" },
 ];
 
