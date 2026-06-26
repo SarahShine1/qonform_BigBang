@@ -396,6 +396,23 @@ class MeEndpointTests(APITestCase):
         self.assertIn("roles", response.data)
         self.assertIn("id_user", response.data)
 
+    def test_me_returns_current_database_department(self):
+        """Department changes after login are reflected by /me/."""
+        access = self._get_access_token()
+        departement = Departement.objects.create(
+            id_departement=77,
+            nom="Qualite",
+            code="QLT",
+        )
+        self.utilisateur.id_departement = departement.id_departement
+        self.utilisateur.save(update_fields=["id_departement"])
+
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {access}")
+        response = self.client.get(self.me_url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["departement"], departement.id_departement)
+
     def test_valid_token_returns_correct_roles(self):
         """The roles list in /me/ response matches the user's assigned roles."""
         access = self._get_access_token()

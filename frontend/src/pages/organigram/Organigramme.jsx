@@ -179,7 +179,7 @@ export default function Organigramme() {
         await organigramApi.createUnit(payload);
       }
       setModal((current) => ({ ...current, open: false }));
-      await loadTree();
+      await Promise.all([loadTree(), loadEmployees()]);
     } catch (error) {
       setFormError(apiErrorMessage(error));
     } finally {
@@ -203,7 +203,7 @@ export default function Organigramme() {
       }
 
       setBuilderOpen(false);
-      await loadTree();
+      await Promise.all([loadTree(), loadEmployees()]);
     } catch (error) {
       setBuilderError(apiErrorMessage(error));
     } finally {
@@ -216,7 +216,7 @@ export default function Organigramme() {
     if (!confirmed) return;
     try {
       await organigramApi.deleteUnit(unit.id);
-      await loadTree();
+      await Promise.all([loadTree(), loadEmployees()]);
     } catch (error) {
       setTreeError(apiErrorMessage(error));
     }

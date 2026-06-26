@@ -1,5 +1,22 @@
 from django.db import connection, transaction
 
+from apps.accounts.models import Utilisateur
+
+
+def sync_unit_responsable_assignment(unit, previous_responsable_id=None):
+    """Keep the selected unit manager's user department in sync."""
+    if previous_responsable_id and previous_responsable_id != unit.responsable_id:
+        Utilisateur.objects.filter(
+            id_user=previous_responsable_id,
+            id_departement=unit.id,
+        ).update(id_departement=None)
+
+    if unit.responsable_id:
+        Utilisateur.objects.filter(
+            id_user=unit.responsable_id,
+            est_actif=True,
+        ).update(id_departement=unit.id)
+
 
 @transaction.atomic
 def sync_departements_from_organigramme():
