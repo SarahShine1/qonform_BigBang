@@ -14,13 +14,6 @@ from .models import Conversation, Message
 from .serializers import MessageCreateSerializer
 
 
-AUDITEUR_ROLE_KEYS = {"AUDITEUR", "AUDITEUR INTERNE"}
-
-
-def normalize_role(role):
-    return " ".join(str(role or "").strip().upper().split())
-
-
 def get_profile_for_auth_user(auth_user):
     try:
         profile = getattr(auth_user, "utilisateur", None)
@@ -46,13 +39,6 @@ def get_auth_user_for_profile(profile):
     if not profile:
         return None
     return get_auth_user_for_utilisateur(profile)
-
-
-def is_auditeur(profile):
-    return any(
-        normalize_role(role) in AUDITEUR_ROLE_KEYS
-        for role in get_roles_for_profile(profile)
-    )
 
 
 def require_profile(auth_user):
@@ -135,7 +121,6 @@ def ensure_user_is_participant(conversation, auth_user):
 
 
 def get_allowed_contacts_for_profile(profile):
-    current_user_is_auditeur = is_auditeur(profile)
     candidates = (
         Utilisateur.objects.filter(est_actif=True)
         .exclude(id_user=profile.id_user)
@@ -145,17 +130,30 @@ def get_allowed_contacts_for_profile(profile):
     results = []
     for candidate in candidates:
         candidate_auth = get_auth_user_for_profile(candidate)
-        if not candidate_auth:
+        if not candidate_auth or not candidate_auth.is_active:
             continue
 
-        candidate_is_auditeur = is_auditeur(candidate)
-        if current_user_is_auditeur and candidate_is_auditeur:
-            continue
-        if not current_user_is_auditeur and not candidate_is_auditeur:
-            continue
         results.append(candidate)
 
     return results
+
+
+def get_or_create_conversation_between(first_user, second_user):
+    conversation = Conversation.objects.filter(
+        Q(auditeur=first_user, utilisateur=second_user)
+        | Q(auditeur=second_user, utilisateur=first_user)
+    ).first()
+    if conversation:
+        return conversation
+
+    auditeur_auth, utilisateur_auth = sorted(
+        [first_user, second_user],
+        key=lambda user: user.id,
+    )
+    return Conversation.objects.create(
+        auditeur=auditeur_auth,
+        utilisateur=utilisateur_auth,
+    )
 
 
 class ContactListView(APIView):
@@ -237,27 +235,12 @@ class MessageCreateView(APIView):
         if sender_profile.id_user == recipient_profile.id_user:
             raise ValidationError("Vous ne pouvez pas vous envoyer un message.")
 
-        if not recipient_auth:
+        if not recipient_auth or not recipient_auth.is_active:
             raise ValidationError("Ce contact n'a pas de compte de connexion exploitable.")
 
-        sender_is_auditeur = is_auditeur(sender_profile)
-        recipient_is_auditeur = is_auditeur(recipient_profile)
-
-        if sender_is_auditeur == recipient_is_auditeur:
-            raise ValidationError(
-                "La messagerie est reservee aux echanges entre auditeurs et utilisateurs."
-            )
-
-        auditeur_auth = (
-            request.user if sender_is_auditeur else recipient_auth
-        )
-        utilisateur_auth = (
-            recipient_auth if sender_is_auditeur else request.user
-        )
-
-        conversation, _ = Conversation.objects.get_or_create(
-            auditeur=auditeur_auth,
-            utilisateur=utilisateur_auth,
+        conversation = get_or_create_conversation_between(
+            request.user,
+            recipient_auth,
         )
 
         message = Message.objects.create(
