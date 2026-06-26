@@ -115,7 +115,6 @@ class MeView(APIView):
         payload = request.auth.payload
         email = payload.get("email")
         roles = payload.get("roles", [])
-        departement_id = payload.get("departement_id")
 
         utilisateur = Utilisateur.objects.get(email=email)
         settings_obj = UtilisateurSettings.objects.filter(utilisateur=utilisateur).first()
@@ -127,7 +126,7 @@ class MeView(APIView):
                 "prenom": utilisateur.prenom,
                 "email": email,
                 "roles": roles,
-                "departement": departement_id,
+                "departement": utilisateur.id_departement,
                 "photo_profil": get_profile_photo_url(
                     settings_obj.photo_profil if settings_obj else None,
                     request=request,

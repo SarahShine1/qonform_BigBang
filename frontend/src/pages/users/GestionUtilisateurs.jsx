@@ -224,10 +224,49 @@ function buildDepartmentLookup(departments = []) {
   );
 }
 
+function getUserDepartmentId(entry) {
+  const department = entry.departement ?? entry.department ?? null;
+
+  if (department && typeof department === "object") {
+    return (
+      department.id ??
+      department.id_departement ??
+      department.value ??
+      entry.id_departement ??
+      entry.departement_id ??
+      null
+    );
+  }
+
+  return department ?? entry.id_departement ?? entry.departement_id ?? null;
+}
+
+function getUserDepartmentName(entry, departmentId, departmentLookup = {}) {
+  const department = entry.departement ?? entry.department ?? null;
+
+  if (department && typeof department === "object") {
+    return (
+      department.nom ??
+      department.name ??
+      department.label ??
+      department.libelle ??
+      ""
+    );
+  }
+
+  return (
+    entry.departement_name ??
+    entry.departement_nom ??
+    entry.department_name ??
+    (departmentId ? departmentLookup[String(departmentId)] : "") ??
+    ""
+  );
+}
+
 function normalizeUser(entry, departmentLookup = {}) {
   const role = getRoleDisplayLabel(entry.roles?.[0] || "Sans role");
-  const departmentId = entry.departement ?? entry.id_departement ?? null;
-  const departmentName = departmentId ? departmentLookup[String(departmentId)] : "";
+  const departmentId = getUserDepartmentId(entry);
+  const departmentName = getUserDepartmentName(entry, departmentId, departmentLookup);
 
   return {
     id: entry.id_user,

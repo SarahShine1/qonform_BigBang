@@ -15,7 +15,10 @@ from .serializers import (
     generate_unit_code,
     get_user_profile,
 )
-from .services import sync_departements_from_organigramme
+from .services import (
+    sync_departements_from_organigramme,
+    sync_unit_responsable_assignment,
+)
 
 
 class OrganizationUnitViewSet(viewsets.ModelViewSet):
@@ -55,15 +58,17 @@ class OrganizationUnitViewSet(viewsets.ModelViewSet):
         unit_type = serializer.validated_data["type"]
         profile = get_user_profile(self.request.user)
 
-        serializer.save(
+        unit = serializer.save(
             code=generate_unit_code(unit_type),
             level=(parent.level + 1) if parent else 1,
             created_by_id=profile.id_user if profile else None,
         )
 
         sync_departements_from_organigramme()
+        sync_unit_responsable_assignment(unit)
 
     def perform_update(self, serializer):
+        previous_responsable_id = serializer.instance.responsable_id
         parent_id = serializer.validated_data.get(
             "parent_id",
             getattr(serializer.instance, "parent_id", None),
@@ -75,9 +80,10 @@ class OrganizationUnitViewSet(viewsets.ModelViewSet):
             else None
         )
 
-        serializer.save(level=(parent.level + 1) if parent else 1)
+        unit = serializer.save(level=(parent.level + 1) if parent else 1)
 
         sync_departements_from_organigramme()
+        sync_unit_responsable_assignment(unit, previous_responsable_id)
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
