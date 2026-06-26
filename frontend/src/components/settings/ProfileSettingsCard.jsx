@@ -1,4 +1,5 @@
 import { Save, ShieldCheck, UserRound } from "lucide-react";
+import { getRoleDisplayLabel } from "../../utils/roles";
 
 const inputClassName =
   "h-11 w-full rounded-[12px] border border-[#E9E1F8] bg-white px-3.5 text-[13px] text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-[#A78BFA] focus:ring-4 focus:ring-[#F3ECFF] disabled:cursor-default disabled:bg-slate-50 disabled:text-slate-500";
@@ -25,7 +26,7 @@ export default function ProfileSettingsCard({
   onChange,
   onSubmit,
 }) {
-  const primaryRole = settings?.roles?.[0] || "Aucun rôle";
+  const primaryRole = getRoleDisplayLabel(settings?.roles?.[0] || "Aucun rôle");
   const departmentName = settings?.departement?.nom || "Non assigné";
 
   return (

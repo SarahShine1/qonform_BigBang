@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { messagingApi } from "../../api/messages.api";
 import { useAuth } from "../../hooks/useAuth";
 import { useTheme } from "../../hooks/useTheme";
+import { getRoleDisplayLabel } from "../../utils/roles";
 import { SIDEBAR_WIDTH, TOPBAR_HEIGHT } from "./layout.constants";
 import AssistantPanel from "./AssistantPanel";
 import DictionaryPanel from "./DictionaryPanel";
@@ -200,6 +201,7 @@ const isPvNotification = (n) =>
         .join("")
         .toUpperCase()
     : "?";
+  const displayedUserRole = getRoleDisplayLabel(userRole);
 
   const refreshUnreadCount = useCallback(async () => {
     if (!user?.id_user) return;
@@ -591,7 +593,7 @@ const isPvNotification = (n) =>
           <p className="text-[12.5px] font-semibold leading-[1.2] text-slate-900 dark:text-slate-100">
             {userName}
           </p>
-          <p className="text-[10px] leading-[1.2] text-slate-400 dark:text-slate-500">{userRole}</p>
+          <p className="text-[10px] leading-[1.2] text-slate-400 dark:text-slate-500">{displayedUserRole}</p>
         </div>
 
         <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#58148E]">

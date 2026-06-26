@@ -16,6 +16,7 @@ import AppLayout from "../../components/layout/AppLayout";
 import ConfirmationPopup from "../../components/template/ConfirmationPopup";
 import CreateUserModal from "../../components/users/CreateUserModal";
 import { useAuth } from "../../hooks/useAuth";
+import { getRoleDisplayLabel } from "../../utils/roles";
 
 const defaultStats = {
   activeUsers: 0,
@@ -34,7 +35,7 @@ const statCards = [
     accent: "from-emerald-200 via-cyan-100 to-white",
   },
   {
-    label: "PILOTES DE PROCESSUS",
+    label: "GESTIONNAIRES DE PROCESSUS",
     statKey: "pilotes",
     icon: Settings2,
     iconClassName:
@@ -80,6 +81,19 @@ function apiErrorMessage(error) {
       `${field}: ${Array.isArray(value) ? value.join(", ") : value}`,
     )
     .join(" ");
+}
+
+function normalizeFilterText(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+function escapeCsvValue(value) {
+  const normalized = String(value ?? "").replace(/"/g, "\"\"");
+  return `"${normalized}"`;
 }
 
 function getUnitId(unit) {
@@ -211,7 +225,7 @@ function buildDepartmentLookup(departments = []) {
 }
 
 function normalizeUser(entry, departmentLookup = {}) {
-  const role = entry.roles?.[0] || "Sans role";
+  const role = getRoleDisplayLabel(entry.roles?.[0] || "Sans role");
   const departmentId = entry.departement ?? entry.id_departement ?? null;
   const departmentName = departmentId ? departmentLookup[String(departmentId)] : "";
 
@@ -231,6 +245,8 @@ export default function GestionUtilisateurs() {
   const { user } = useAuth();
 
   const [search, setSearch] = useState("");
+  const [selectedRole, setSelectedRole] = useState("");
+  const [selectedService, setSelectedService] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [users, setUsers] = useState([]);
   const [roles, setRoles] = useState([]);
@@ -251,6 +267,20 @@ export default function GestionUtilisateurs() {
     "Ahmed BENALI";
 
   const userRole = user?.roles?.[0] || "Chef Cellule Qualite";
+
+  const roleOptions = useMemo(() => {
+    const source = roles.length
+      ? roles.map((role) => getRoleDisplayLabel(role?.libelle || role?.label || role?.name || ""))
+      : users.map((entry) => entry.role);
+
+    return Array.from(new Set(source.filter(Boolean))).sort((a, b) => a.localeCompare(b, "fr"));
+  }, [roles, users]);
+
+  const serviceOptions = useMemo(() => {
+    return Array.from(new Set(users.map((entry) => entry.service).filter(Boolean))).sort((a, b) =>
+      a.localeCompare(b, "fr"),
+    );
+  }, [users]);
 
   useEffect(() => {
     let active = true;
@@ -290,16 +320,21 @@ export default function GestionUtilisateurs() {
   }, []);
 
   const filteredUsers = useMemo(() => {
-    const term = search.trim().toLowerCase();
+    const term = normalizeFilterText(search);
 
-    if (!term) return users;
+    return users.filter((entry) => {
+      const matchesSearch =
+        !term ||
+        [entry.nom, entry.email, entry.role, entry.service].some((value) =>
+          normalizeFilterText(value).includes(term),
+        );
 
-    return users.filter((entry) =>
-      [entry.nom, entry.email, entry.role, entry.service].some((value) =>
-        String(value || "").toLowerCase().includes(term),
-      ),
-    );
-  }, [search, users]);
+      const matchesRole = !selectedRole || entry.role === selectedRole;
+      const matchesService = !selectedService || entry.service === selectedService;
+
+      return matchesSearch && matchesRole && matchesService;
+    });
+  }, [search, selectedRole, selectedService, users]);
 
   const handleCreateUser = async (payload) => {
     setSubmitting(true);
@@ -373,6 +408,42 @@ export default function GestionUtilisateurs() {
     }
   };
 
+  const handleExportUsers = () => {
+    const headers = [
+      "Utilisateur",
+      "Email",
+      "Role",
+      "Service",
+      "Telephone",
+      "Statut",
+      "Derniere connexion",
+    ];
+
+    const rows = filteredUsers.map((entry) => [
+      entry.nom,
+      entry.email,
+      entry.role,
+      entry.service,
+      entry.telephone,
+      entry.statut,
+      entry.derniereConnexion,
+    ]);
+
+    const csv = [headers, ...rows]
+      .map((row) => row.map((value) => escapeCsvValue(value)).join(";"))
+      .join("\n");
+
+    const blob = new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const stamp = new Date().toISOString().slice(0, 10);
+
+    link.href = url;
+    link.download = `utilisateurs-${stamp}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <AppLayout
       pageTitle="Gestion utilisateurs"
@@ -427,24 +498,39 @@ export default function GestionUtilisateurs() {
                 />
               </label>
 
-              <button
-                type="button"
-                className="rounded-xl border border-slate-200 px-3.5 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+              <select
+                value={selectedRole}
+                onChange={(event) => setSelectedRole(event.target.value)}
+                className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-600 outline-none transition focus:border-[#58148E] focus:ring-4 focus:ring-[#ede9fe] dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"
+                aria-label="Filtrer par role"
               >
-                Tous les roles
-              </button>
+                <option value="">Tous les roles</option>
+                {roleOptions.map((role) => (
+                  <option key={role} value={role}>
+                    {role}
+                  </option>
+                ))}
+              </select>
 
-              <button
-                type="button"
-                className="rounded-xl border border-slate-200 px-3.5 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+              <select
+                value={selectedService}
+                onChange={(event) => setSelectedService(event.target.value)}
+                className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-600 outline-none transition focus:border-[#58148E] focus:ring-4 focus:ring-[#ede9fe] dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"
+                aria-label="Filtrer par service"
               >
-                Tous les services
-              </button>
+                <option value="">Tous les services</option>
+                {serviceOptions.map((service) => (
+                  <option key={service} value={service}>
+                    {service}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row">
               <button
                 type="button"
+                onClick={handleExportUsers}
                 className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-3.5 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
               >
                 <Download className="h-4 w-4" />

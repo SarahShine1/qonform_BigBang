@@ -59,11 +59,166 @@ function getTypeStyle(type) {
 }
 
 function GoldUnderline({ className = "" }) {
+  /*
+  const handleExportCartography = () => {
+    const exportedProcesses = filteredProcesses.length > 0 ? filteredProcesses : processes;
+    const generatedAt = new Date().toLocaleString("fr-FR");
+
+    const cardsMarkup = exportedProcesses
+      .map((process) => {
+        const upstream = (process.upstream ?? [])
+          .map(
+            (item) =>
+              `<li>${escapeHtml(item.name)}${
+                item.code ? ` <span class="meta">(${escapeHtml(item.code)})</span>` : ""
+              }</li>`,
+          )
+          .join("");
+        const downstream = (process.downstream ?? [])
+          .map(
+            (item) =>
+              `<li>${escapeHtml(item.name)}${
+                item.code ? ` <span class="meta">(${escapeHtml(item.code)})</span>` : ""
+              }</li>`,
+          )
+          .join("");
+
+        return `
+          <article class="card">
+            <div class="card-header">
+              <div>
+                <h2>${escapeHtml(process.name || "Processus")}</h2>
+                <p>${escapeHtml(process.code || "")}${
+                  process.typeLabel ? ` • ${escapeHtml(process.typeLabel)}` : ""
+                }</p>
+              </div>
+              <span class="responsable">${escapeHtml(
+                process.responsable || "Responsable non renseigné",
+              )}</span>
+            </div>
+            <div class="columns">
+              <section>
+                <h3>En amont</h3>
+                ${
+                  upstream
+                    ? `<ul>${upstream}</ul>`
+                    : `<p class="empty">Aucun processus en amont</p>`
+                }
+              </section>
+              <section>
+                <h3>En aval</h3>
+                ${
+                  downstream
+                    ? `<ul>${downstream}</ul>`
+                    : `<p class="empty">Aucun processus en aval</p>`
+                }
+              </section>
+            </div>
+          </article>
+        `;
+      })
+      .join("");
+
+    const selectedSection = selectedProcess
+      ? `
+        <section class="focus-card">
+          <h2>Processus sélectionné</h2>
+          <p class="focus-name">${escapeHtml(selectedProcess.name)}</p>
+          <p class="focus-meta">${escapeHtml(selectedProcess.code || "")}${
+            selectedProcess.typeLabel ? ` • ${escapeHtml(selectedProcess.typeLabel)}` : ""
+          }</p>
+          <div class="focus-columns">
+            <section>
+              <h3>Entrées principales</h3>
+              ${
+                displayedInputs.length
+                  ? `<ul>${displayedInputs
+                      .map((item) => `<li>${escapeHtml(item)}</li>`)
+                      .join("")}</ul>`
+                  : `<p class="empty">Aucune entrée renseignée</p>`
+              }
+            </section>
+            <section>
+              <h3>Sorties principales</h3>
+              ${
+                displayedOutputs.length
+                  ? `<ul>${displayedOutputs
+                      .map((item) => `<li>${escapeHtml(item)}</li>`)
+                      .join("")}</ul>`
+                  : `<p class="empty">Aucune sortie renseignée</p>`
+              }
+            </section>
+          </div>
+        </section>
+      `
+      : "";
+
+    const html = `<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cartographie des interactions</title>
+    <style>
+      body { font-family: Arial, sans-serif; background: #f8f7fb; color: #1e293b; margin: 0; padding: 32px; }
+      .page { max-width: 1100px; margin: 0 auto; }
+      .hero, .focus-card, .card { background: #fff; border: 1px solid #e9e1f8; border-radius: 18px; box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05); }
+      .hero { padding: 24px; margin-bottom: 20px; }
+      .hero h1 { margin: 0; color: #58148e; font-size: 28px; }
+      .hero p { margin: 8px 0 0; color: #64748b; }
+      .stamp { margin-top: 10px; font-size: 13px; color: #64748b; }
+      .focus-card, .card { padding: 20px; margin-bottom: 16px; }
+      .focus-name { margin: 0; font-size: 20px; font-weight: 700; }
+      .focus-meta, .card-header p { margin: 6px 0 0; color: #64748b; }
+      .focus-columns, .columns { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+      .card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+      .card-header h2, h3 { margin: 0; }
+      .responsable { color: #6b21d9; font-size: 13px; font-weight: 600; }
+      ul { margin: 12px 0 0; padding-left: 18px; }
+      li { margin-bottom: 8px; }
+      .empty, .meta { color: #64748b; }
+      @media print { body { background: #fff; padding: 16px; } .hero, .focus-card, .card { box-shadow: none; } }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero">
+        <h1>Cartographie des interactions</h1>
+        <p>Export de la vue courante des interactions entre processus.</p>
+        <p class="stamp">Généré le ${escapeHtml(generatedAt)} • ${exportedProcesses.length} processus</p>
+      </section>
+      ${selectedSection}
+      ${cardsMarkup || '<section class="card"><p class="empty">Aucune donnée à exporter.</p></section>'}
+    </main>
+  </body>
+</html>`;
+
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const stamp = new Date().toISOString().slice(0, 10);
+
+    link.href = url;
+    link.download = `cartographie-interactions-${stamp}.html`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+  */
+
   return (
     <span
       className={`mt-1.5 block h-[2px] w-8 rounded-full bg-[#F4B740] ${className}`}
     />
   );
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 function SectionAccent({ color, className = "" }) {
@@ -128,7 +283,7 @@ function CounterBadge({ icon: Icon, value, color, bg }) {
   );
 }
 
-function HeroSection() {
+function HeroSection({ onExport }) {
   return (
     <section className={`${SURFACE_CLASS} px-5 py-3.5`}>
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -146,6 +301,7 @@ function HeroSection() {
 
         <button
           type="button"
+          onClick={onExport}
           className="inline-flex h-9 items-center justify-center gap-2 rounded-[11px] border border-[#A78BFA] px-3.5 text-[12px] font-semibold text-[#6B21D9] transition hover:bg-[#FAF7FF]"
         >
           <Download size={14} strokeWidth={2} />
@@ -706,10 +862,128 @@ export default function InteractionMapPage() {
         )
     : [];
 
+  const handleExportCartography = () => {
+    const exportedProcesses = filteredProcesses.length > 0 ? filteredProcesses : processes;
+    const generatedAt = new Date().toLocaleString("fr-FR");
+
+    const cardsMarkup = exportedProcesses
+      .map((process) => {
+        const upstream = (process.upstream ?? [])
+          .map(
+            (item) =>
+              `<li>${escapeHtml(item.name)}${
+                item.code ? ` <span class="meta">(${escapeHtml(item.code)})</span>` : ""
+              }</li>`,
+          )
+          .join("");
+        const downstream = (process.downstream ?? [])
+          .map(
+            (item) =>
+              `<li>${escapeHtml(item.name)}${
+                item.code ? ` <span class="meta">(${escapeHtml(item.code)})</span>` : ""
+              }</li>`,
+          )
+          .join("");
+
+        return `
+          <article class="card">
+            <div class="card-header">
+              <div>
+                <h2>${escapeHtml(process.name || "Processus")}</h2>
+                <p>${escapeHtml(process.code || "")}${process.typeLabel ? ` • ${escapeHtml(process.typeLabel)}` : ""}</p>
+              </div>
+              <span class="responsable">${escapeHtml(process.responsable || "Responsable non renseigné")}</span>
+            </div>
+            <div class="columns">
+              <section>
+                <h3>En amont</h3>
+                ${upstream ? `<ul>${upstream}</ul>` : `<p class="empty">Aucun processus en amont</p>`}
+              </section>
+              <section>
+                <h3>En aval</h3>
+                ${downstream ? `<ul>${downstream}</ul>` : `<p class="empty">Aucun processus en aval</p>`}
+              </section>
+            </div>
+          </article>
+        `;
+      })
+      .join("");
+
+    const selectedSection = selectedProcess
+      ? `
+        <section class="focus-card">
+          <h2>Processus sélectionné</h2>
+          <p class="focus-name">${escapeHtml(selectedProcess.name)}</p>
+          <p class="focus-meta">${escapeHtml(selectedProcess.code || "")}${selectedProcess.typeLabel ? ` • ${escapeHtml(selectedProcess.typeLabel)}` : ""}</p>
+          <div class="focus-columns">
+            <section>
+              <h3>Entrées principales</h3>
+              ${displayedInputs.length ? `<ul>${displayedInputs.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>` : `<p class="empty">Aucune entrée renseignée</p>`}
+            </section>
+            <section>
+              <h3>Sorties principales</h3>
+              ${displayedOutputs.length ? `<ul>${displayedOutputs.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>` : `<p class="empty">Aucune sortie renseignée</p>`}
+            </section>
+          </div>
+        </section>
+      `
+      : "";
+
+    const html = `<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cartographie des interactions</title>
+    <style>
+      body { font-family: Arial, sans-serif; background: #f8f7fb; color: #1e293b; margin: 0; padding: 32px; }
+      .page { max-width: 1100px; margin: 0 auto; }
+      .hero, .focus-card, .card { background: #fff; border: 1px solid #e9e1f8; border-radius: 18px; box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05); }
+      .hero { padding: 24px; margin-bottom: 20px; }
+      .hero h1 { margin: 0; color: #58148e; font-size: 28px; }
+      .hero p { margin: 8px 0 0; color: #64748b; }
+      .stamp { margin-top: 10px; font-size: 13px; color: #64748b; }
+      .focus-card, .card { padding: 20px; margin-bottom: 16px; }
+      .focus-name { margin: 0; font-size: 20px; font-weight: 700; }
+      .focus-meta, .card-header p { margin: 6px 0 0; color: #64748b; }
+      .focus-columns, .columns { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+      .card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+      .card-header h2, h3 { margin: 0; }
+      .responsable { color: #6b21d9; font-size: 13px; font-weight: 600; }
+      ul { margin: 12px 0 0; padding-left: 18px; }
+      li { margin-bottom: 8px; }
+      .empty, .meta { color: #64748b; }
+      @media print { body { background: #fff; padding: 16px; } .hero, .focus-card, .card { box-shadow: none; } }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero">
+        <h1>Cartographie des interactions</h1>
+        <p>Export de la vue courante des interactions entre processus.</p>
+        <p class="stamp">Généré le ${escapeHtml(generatedAt)} • ${exportedProcesses.length} processus</p>
+      </section>
+      ${selectedSection}
+      ${cardsMarkup || '<section class="card"><p class="empty">Aucune donnée à exporter.</p></section>'}
+    </main>
+  </body>
+</html>`;
+
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const stamp = new Date().toISOString().slice(0, 10);
+
+    link.href = url;
+    link.download = `cartographie-interactions-${stamp}.html`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <AppLayout pageTitle="Interactions" userName={userName} userRole={userRole}>
       <div className="mx-auto max-w-[1440px] space-y-3">
-        <HeroSection />
+        <HeroSection onExport={handleExportCartography} />
 
         {loading ? (
           <section className={`${SURFACE_CLASS} px-6 py-10 text-center`}>

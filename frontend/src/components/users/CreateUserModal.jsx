@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Check, ChevronDown, Eye, EyeOff, X } from "lucide-react";
+import { getRoleDisplayLabel } from "../../utils/roles";
 
 const fieldClassName =
   "w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-700 outline-none transition focus:border-[#58148E] focus:ring-4 focus:ring-[#ede9fe] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:placeholder:text-slate-500";
@@ -218,7 +219,7 @@ export default function CreateUserModal({
                   ) : (
                     roles.map((role) => (
                       <option key={role.id_role ?? role.libelle} value={role.libelle}>
-                        {role.libelle}
+                        {getRoleDisplayLabel(role.libelle)}
                       </option>
                     ))
                   )}

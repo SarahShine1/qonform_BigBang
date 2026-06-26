@@ -4,7 +4,7 @@ const STEPS = [
   "Observer les activites de l'organisation",
   "Identifier les processus constates",
   "Attribuer une codification et un departement",
-  "Publier le processus pour le pilote",
+  "Publier le processus pour le gestionnaire de processus",
 ];
 
 export default function PreAuditSteps() {

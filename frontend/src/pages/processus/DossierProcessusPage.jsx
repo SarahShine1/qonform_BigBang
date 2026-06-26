@@ -956,7 +956,7 @@ function VersionsTab({ versions, loading, processus, normes = [], onConsulterCur
                   </div>
                   <p className="text-[11px] text-slate-400 mt-0.5">{fmtDate(version.date_creation ?? version.created_at)}</p>
                   {processus?.pilote_nom && (
-                    <p className="text-[11px] text-slate-500 mt-0.5">Pilote : {processus.pilote_nom}</p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">Gestionnaire de processus : {processus.pilote_nom}</p>
                   )}
                 </div>
                 <div className="flex items-center gap-3">
@@ -1425,7 +1425,7 @@ export default function DossierProcessusPage() {
               <div style={{ width: 1, backgroundColor: BORDER }} />
               <InfoItem label="Intitulé">{processus?.nom ?? "—"}</InfoItem>
               <div style={{ width: 1, backgroundColor: BORDER }} />
-              <InfoItem label="Pilote affecté">
+              <InfoItem label="Gestionnaire de processus affecté">
                 {processus?.pilote_nom ? (
                   <div className="flex items-center gap-2">
                     <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white"
