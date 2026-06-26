@@ -1,4 +1,5 @@
 import { Edit2, Plus, Trash2, Users } from "lucide-react";
+import { getRoleDisplayLabel } from "../utils/roles";
 import { Button } from "./ui/Button";
 import {
   Table,
@@ -14,7 +15,7 @@ function displayName(employee) {
 }
 
 function roleLabel(employee) {
-  return employee.roles?.[0] || "Employe";
+  return getRoleDisplayLabel(employee.roles?.[0] || "Employe");
 }
 
 function departmentBadge(name = "") {

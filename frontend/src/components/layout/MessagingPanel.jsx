@@ -1,6 +1,7 @@
 import { Loader2, Send, UserRound, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { messagingApi } from "../../api/messages.api";
+import { formatRoleLabels } from "../../utils/roles";
 
 const stampFormatter = new Intl.DateTimeFormat("fr-FR", {
   day: "2-digit",
@@ -334,7 +335,7 @@ export default function MessagingPanel({ open, onClose, onInboxChange }) {
                   {selectedRecipient ? getFullName(selectedRecipient) : "Aucun contact selectionne"}
                 </p>
                 <p className="truncate text-[11px] text-slate-500 dark:text-slate-400">
-                  {selectedRecipient?.roles?.join(", ") || "Selectionnez un interlocuteur pour commencer"}
+                  {formatRoleLabels(selectedRecipient?.roles || []).join(", ") || "Selectionnez un interlocuteur pour commencer"}
                 </p>
               </div>
             </div>

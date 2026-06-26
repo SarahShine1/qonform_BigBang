@@ -289,13 +289,13 @@ export default function AuditExecution() {
       setAuditStatus("Brouillon");
       dirtyRef.current = false;
       setIsDirty(false);
-      redirectToKanban("La fiche a bien été renvoyée au pilote pour correction.");
+      redirectToKanban("La fiche a bien été renvoyée au gestionnaire de processus pour correction.");
     } catch (error) {
       setFeedback({
         type: "error",
         message: extractApiError(
           error,
-          "Le renvoi au pilote a échoué. Aucun changement de statut n'a été confirmé."
+          "Le renvoi au gestionnaire de processus a échoué. Aucun changement de statut n'a été confirmé."
         ),
       });
       throw error;

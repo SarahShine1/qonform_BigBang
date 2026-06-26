@@ -11,6 +11,7 @@ import { useParams } from "react-router-dom";
 import AppLayout from "../../components/layout/AppLayout";
 import { auditApi } from "../../api/audit.api";
 import { useAuth } from "../../hooks/useAuth";
+import { getRoleDisplayLabel } from "../../utils/roles";
 
 export default function AuditPublishedDetail() {
   const { idVersion } = useParams();
@@ -101,7 +102,7 @@ export default function AuditPublishedDetail() {
             <InfoItem label="Processus" value={detail.processus?.nom} wide />
             <InfoItem label="Version" value={detail.numero_version} />
             <InfoItem label="Type" value={detail.processus?.type_process} />
-            <InfoItem label="Pilote" value={piloteName || "Non renseigné"} />
+            <InfoItem label="Gestionnaire de processus" value={piloteName || "Non renseigné"} />
             <InfoItem label="Auditeur" value={auditeurName || "Non renseigné"} />
           </div>
         </section>
@@ -110,13 +111,13 @@ export default function AuditPublishedDetail() {
           <TraceLine
             title="Remplie par"
             name={piloteName || "Non renseigné"}
-            role={detail.redacteur?.role || "Pilote de processus"}
+            role={getRoleDisplayLabel(detail.redacteur?.role || "Pilote de processus")}
             date={detail.date_validation || detail.date_creation}
           />
           <TraceLine
             title="Auditée par"
             name={auditeurName || "Non renseigné"}
-            role={detail.audit?.auditeur?.role || "Auditeur interne"}
+            role={getRoleDisplayLabel(detail.audit?.auditeur?.role || "Auditeur interne")}
             date={detail.audit?.date_realisation}
           />
         </section>
