@@ -70,6 +70,13 @@ const incrementVersion = (vStr) => {
   return `${major + 1}.0`;
 };
 
+const normalizeRole = (role) =>
+  String(role || "")
+    .trim()
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
 const getNormeLabel = (version, normes) => {
   if (!version?.id_norme || !normes?.length) return null;
   const n = normes.find(n => n.id_norme === version.id_norme);
@@ -372,7 +379,11 @@ function FicheTab({ processusId, processus, user, normes = [], onVersionCreated 
   const containerRef = useRef(null);
   const [overlayStyle, setOverlayStyle] = useState({});
 
-  const isPilote = user?.roles?.some(r => ["Pilote", "pilote", "PILOTE"].includes(r));
+  const normalizedRoles = (user?.roles || []).map(normalizeRole);
+  const isPilote =
+    normalizedRoles.includes("PILOTE") ||
+    normalizedRoles.includes("PILOTE DE PROCESSUS");
+  const isExternalAuditor = normalizedRoles.includes("AUDITEUR EXTERNE");
   const canEdit  = isPilote && currentStatut === "Brouillon";
   const canArchive = isPilote && currentStatut === "Publiee";
 
@@ -396,6 +407,7 @@ function FicheTab({ processusId, processus, user, normes = [], onVersionCreated 
   useEffect(() => {
     async function load() {
       setLoading(true);
+      setError(null);
       try {
         // Fetch fiche + processus list first so we know which norm's sections to load
         const [pl, fiches] = await Promise.all([
@@ -404,9 +416,28 @@ function FicheTab({ processusId, processus, user, normes = [], onVersionCreated 
         ]);
         setProcessusList(pl);
 
-        const latestFiche = fiches?.length > 0
-          ? fiches.reduce((a, b) => (a.id_version > b.id_version ? a : b))
+        const visibleFiches = isExternalAuditor
+          ? (fiches || []).filter((fiche) => fiche.statut === "Publiee")
+          : fiches;
+
+        const latestFiche = visibleFiches?.length > 0
+          ? visibleFiches.reduce((a, b) => (a.id_version > b.id_version ? a : b))
           : null;
+
+        if (isExternalAuditor && !latestFiche) {
+          setSections([]);
+          setFormValues({});
+          setAmontIds([]);
+          setAvalIds([]);
+          setExistingVersionId(null);
+          setCurrentStatut("Publiee");
+          setVersionNumero(null);
+          setRevue(false);
+          setAuditDoc(null);
+          setFicheNormeId(null);
+          setError("Aucune fiche publiee n'est disponible pour ce processus.");
+          return;
+        }
 
         // Archived or no version → active norm (new version follows active norm)
         // Any other status → sections of that version's own norm
@@ -443,7 +474,7 @@ function FicheTab({ processusId, processus, user, normes = [], onVersionCreated 
             const activeNorme = normesList.find(n => n.est_active);
             let baseVersion = latestFiche.numero_version;
             if (activeNorme) {
-              const fichesByNorm = fiches.filter(f => f.id_norme === activeNorme.id_norme);
+              const fichesByNorm = (visibleFiches || []).filter(f => f.id_norme === activeNorme.id_norme);
               if (fichesByNorm.length > 0) {
                 baseVersion = fichesByNorm.reduce((a, b) =>
                   parseFloat(a.numero_version) > parseFloat(b.numero_version) ? a : b
@@ -475,7 +506,7 @@ function FicheTab({ processusId, processus, user, normes = [], onVersionCreated 
       }
     }
     load();
-  }, [processusId]);
+  }, [processusId, isExternalAuditor, isPilote]);
 
   // Derive norm label:
   // - non-archived existing version → use fiche's own id_norme
@@ -726,7 +757,14 @@ function FicheTab({ processusId, processus, user, normes = [], onVersionCreated 
               </div>
             ) : (
               <div>
+                {isExternalAuditor && !existingVersionId && sections.length === 0 && (
+                  <div className="px-6 py-12 text-center text-[12px] text-slate-500">
+                    Aucune fiche publiee n'est disponible pour consultation sur ce processus.
+                  </div>
+                )}
                 {/* Section 0 — Liens processus */}
+                {(!isExternalAuditor || existingVersionId || sections.length > 0) && (
+                  <>
                 <div style={{ borderTop: `1px solid ${BORDER}` }}>
                   <div className="flex items-center gap-3 px-6 py-3"
                     style={{ backgroundColor: "#F9FAFB", borderBottom: `1px solid ${BORDER}` }}>
@@ -778,6 +816,8 @@ function FicheTab({ processusId, processus, user, normes = [], onVersionCreated 
                   label="BPMN"
                   bpmnDescription="Déposez ici le diagramme BPMN décrivant le workflow complet du processus."
                 />
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -916,7 +956,7 @@ function VersionsTab({ versions, loading, processus, normes = [], onConsulterCur
                   </div>
                   <p className="text-[11px] text-slate-400 mt-0.5">{fmtDate(version.date_creation ?? version.created_at)}</p>
                   {processus?.pilote_nom && (
-                    <p className="text-[11px] text-slate-500 mt-0.5">Pilote : {processus.pilote_nom}</p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">Gestionnaire de processus : {processus.pilote_nom}</p>
                   )}
                 </div>
                 <div className="flex items-center gap-3">
@@ -1385,7 +1425,7 @@ export default function DossierProcessusPage() {
               <div style={{ width: 1, backgroundColor: BORDER }} />
               <InfoItem label="Intitulé">{processus?.nom ?? "—"}</InfoItem>
               <div style={{ width: 1, backgroundColor: BORDER }} />
-              <InfoItem label="Pilote affecté">
+              <InfoItem label="Gestionnaire de processus affecté">
                 {processus?.pilote_nom ? (
                   <div className="flex items-center gap-2">
                     <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white"

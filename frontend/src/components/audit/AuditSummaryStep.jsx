@@ -6,6 +6,7 @@ export default function AuditSummaryStep({
   evaluations,
   complianceRate,
   auditMetrics,
+  sectionScores = [],
   recommendations,
   correctiveActions,
   nonConformities: auditNonConformities = [],
@@ -58,17 +59,17 @@ export default function AuditSummaryStep({
 
   return (
     <>
-      <section className="rounded-lg border border-gray-100 bg-white p-4 shadow-sm">
-        <div className="grid grid-cols-3 gap-3">
-          <div className="rounded-lg bg-emerald-50 p-3 text-emerald-700">
+      <section className="rounded-lg border border-gray-100 bg-white p-3 shadow-sm">
+        <div className="grid grid-cols-3 gap-2.5">
+          <div className="rounded-lg bg-emerald-50 p-2.5 text-emerald-700">
             <p className="text-xs font-bold uppercase">Taux de conformité</p>
-            <div className="mt-3 h-3 overflow-hidden rounded-full bg-emerald-100">
+            <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-emerald-100">
               <div
                 className="h-full rounded-full bg-emerald-600 transition-all duration-500"
                 style={{ width: `${complianceRate}%` }}
               />
             </div>
-            <p className="mt-2 text-2xl font-bold">{complianceRate}%</p>
+            <p className="mt-2 text-xl font-bold">{complianceRate}%</p>
           </div>
           <Metric
             label="Non-conformités"
@@ -79,7 +80,7 @@ export default function AuditSummaryStep({
         </div>
 
         {auditMetrics && (
-          <div className="mt-3 grid grid-cols-4 gap-3">
+          <div className="mt-2.5 grid grid-cols-4 gap-2.5">
             <Metric label="Completude" value={`${auditMetrics.tauxCompletudeMoyen}%`} tone="purple" />
             <Metric label="Checklist" value={`${auditMetrics.scoreChecklist}%`} tone="purple" />
             <Metric label="BPMN" value={`${auditMetrics.scoreBpmn}%`} tone="purple" />
@@ -87,14 +88,18 @@ export default function AuditSummaryStep({
           </div>
         )}
 
-        <div className="mt-4 rounded-lg border border-gray-100 bg-gray-50 p-3">
+        {sectionScores.length > 0 && (
+          <GlobalScoreFormula sectionScores={sectionScores} complianceRate={complianceRate} />
+        )}
+
+        <div className="mt-3 rounded-lg border border-gray-100 bg-gray-50 p-2.5">
           <h3 className="text-sm font-bold text-gray-900">Non-conformités détectées</h3>
           {weakRequirements.length === 0 && auditNonConformities.length === 0 ? (
             <p className="mt-2 text-sm text-slate-500">Aucune non-conformité détectée.</p>
           ) : (
-            <ul className="mt-3 space-y-2">
+            <ul className="mt-2 space-y-1.5">
               {weakRequirements.map((item) => (
-                <li key={item.id} className="rounded-md bg-white px-3 py-2 text-sm text-slate-700">
+                <li key={item.id} className="rounded-md bg-white px-2.5 py-1.5 text-xs text-slate-700">
                   <span className="font-semibold text-red-700">{item.clause}</span>
                   {" - "}
                   {item.label}
@@ -104,7 +109,7 @@ export default function AuditSummaryStep({
                 </li>
               ))}
               {auditNonConformities.map((item) => (
-                <li key={item.id} className="rounded-md bg-white px-3 py-2 text-sm text-slate-700">
+                <li key={item.id} className="rounded-md bg-white px-2.5 py-1.5 text-xs text-slate-700">
                   <span className="font-semibold text-red-700">{item.title}</span>
                   <span className="ml-2 text-xs text-slate-400">
                     {item.sectionTitle} - {item.severity}
@@ -115,21 +120,21 @@ export default function AuditSummaryStep({
           )}
         </div>
 
-        <label className="mt-4 block">
-          <span className="text-sm font-bold text-gray-900">Recommandations globales</span>
+        <label className="mt-3 block">
+          <span className="text-[13px] font-bold text-gray-900">Recommandations globales</span>
           <textarea
             value={recommendations}
             onChange={(event) => onRecommendationsChange(event.target.value)}
             placeholder="Saisir les recommandations globales de l'audit..."
-            className="mt-2 min-h-[90px] w-full resize-y rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100"
+            className="mt-1.5 min-h-[74px] w-full resize-y rounded-lg border border-gray-200 px-2.5 py-2 text-xs outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100"
           />
         </label>
 
-        <div className="mt-4">
+        <div className="mt-3">
           <h3 className="text-sm font-bold text-gray-900">Actions correctives liées aux NC</h3>
-          <div className="mt-3 space-y-3">
+          <div className="mt-2 space-y-2">
             {auditNonConformities.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 px-3 py-3 text-sm text-slate-500">
+              <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 px-2.5 py-2 text-xs text-slate-500">
                 Ajoutez d'abord une non-conformité dans une section pour pouvoir créer une action corrective.
               </div>
             ) : (
@@ -137,10 +142,10 @@ export default function AuditSummaryStep({
                 const ncActions = correctiveActions.filter((action) => action.ncId === nc.id);
 
                 return (
-                  <div key={nc.id} className="rounded-lg border border-red-100 bg-red-50 p-3">
+                  <div key={nc.id} className="rounded-lg border border-red-100 bg-red-50 p-2.5">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <div className="text-sm font-bold text-red-800">{nc.title}</div>
+                        <div className="text-xs font-bold text-red-800">{nc.title}</div>
                         <div className="mt-1 text-xs text-red-700">
                           {nc.sectionTitle} - {nc.severity}
                         </div>
@@ -155,7 +160,7 @@ export default function AuditSummaryStep({
                       </button>
                     </div>
 
-                    <div className="mt-3 space-y-2">
+                    <div className="mt-2 space-y-1.5">
                       {ncActions.length === 0 ? (
                         <p className="text-xs text-red-700">
                           Aucune action corrective liée à cette NC.
@@ -190,7 +195,7 @@ export default function AuditSummaryStep({
           </div>
         </div>
 
-        <div className="mt-5 flex justify-end gap-2.5">
+        <div className="mt-4 flex justify-end gap-2">
           <button
             type="button"
             onClick={() => setFinishOpen(true)}
@@ -228,7 +233,7 @@ export default function AuditSummaryStep({
               <div>
                 <h2 className="m-0 text-lg font-bold text-gray-950">Finaliser l&apos;audit</h2>
                 <p className="mt-1 text-sm text-slate-500">
-                  Choisissez si la fiche doit être renvoyée au pilote ou publiée.
+                  Choisissez si la fiche doit être renvoyée au gestionnaire de processus ou publiée.
                 </p>
               </div>
               <button
@@ -244,10 +249,10 @@ export default function AuditSummaryStep({
             <div className="space-y-4 px-6 py-5">
               <div className="rounded-lg border border-amber-100 bg-amber-50 p-4">
                 <p className="text-sm font-semibold text-amber-900">
-                  Renvoyer au pilote pour correction
+                  Renvoyer au gestionnaire de processus pour correction
                 </p>
                 <p className="mt-1 text-sm text-amber-800">
-                  La fiche reste en révision et le pilote pourra la corriger puis la renvoyer.
+                  La fiche reste en révision et le gestionnaire de processus pourra la corriger puis la renvoyer.
                 </p>
               </div>
 
@@ -283,7 +288,7 @@ export default function AuditSummaryStep({
                 disabled={isSubmitting}
                 className="rounded-md border border-amber-200 bg-white px-4 py-2 text-xs font-semibold text-amber-800 hover:bg-amber-50 disabled:opacity-60"
               >
-                Renvoyer au pilote pour correction
+                Renvoyer au gestionnaire de processus pour correction
               </button>
               <button
                 type="button"
@@ -485,6 +490,73 @@ function SummaryMetric({ label, value }) {
   );
 }
 
+function GlobalScoreFormula({ sectionScores, complianceRate }) {
+  const hasConfiguredWeights = sectionScores.some((section) => section.weight > 0);
+  const weightedSections = hasConfiguredWeights
+    ? sectionScores.filter((section) => section.weight > 0)
+    : sectionScores.map((section) => ({ ...section, weight: 1 }));
+  const weightTotal = weightedSections.reduce((total, section) => total + section.weight, 0);
+  const numerator = weightedSections.reduce(
+    (total, section) => total + section.score * section.weight,
+    0
+  );
+  const finalScore = weightTotal ? Math.round(numerator / weightTotal) : complianceRate;
+
+  return (
+    <details className="mt-3 rounded-lg border border-purple-100 bg-purple-50/40 p-2.5">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
+        <div>
+          <h3 className="text-[13px] font-bold text-gray-900">Détail du calcul du taux de conformité global</h3>
+          <p className="mt-0.5 text-[11px] text-slate-500">
+            Ouvrir pour voir les pondérations appliquées à chaque section.
+          </p>
+        </div>
+        <span className="text-[12px] font-bold text-purple-700">Score final global : {complianceRate}%</span>
+      </summary>
+
+      <div className="mt-2.5 overflow-hidden rounded-lg border border-purple-100 bg-white">
+        <table className="w-full border-collapse text-xs">
+          <thead>
+            <tr className="bg-purple-50 text-left text-[10px] font-bold uppercase tracking-wide text-purple-700">
+              <th className="px-2.5 py-2">Section</th>
+              <th className="px-2.5 py-2">Score section</th>
+              <th className="px-2.5 py-2">Pondération</th>
+              <th className="px-2.5 py-2">Contribution</th>
+            </tr>
+          </thead>
+          <tbody>
+            {weightedSections.map((section) => (
+              <tr key={section.id} className="border-t border-purple-50">
+                <td className="px-2.5 py-1.5 font-semibold text-slate-800">{section.title}</td>
+                <td className="px-2.5 py-1.5 text-slate-600">{section.score}%</td>
+                <td className="px-2.5 py-1.5 text-slate-600">
+                  {section.weight} point{section.weight > 1 ? "s" : ""} sur {weightTotal}
+                </td>
+                <td className="px-2.5 py-1.5 font-semibold text-purple-700">
+                  {Math.round((section.score * section.weight) / weightTotal)} point{Math.round((section.score * section.weight) / weightTotal) > 1 ? "s" : ""}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="mt-2.5 rounded-md border border-purple-100 bg-white px-2.5 py-2 text-[11px] text-slate-600">
+        <div className="font-semibold text-slate-800">
+          Score global = moyenne pondérée des scores de section
+        </div>
+        <div className="mt-1 leading-5 text-slate-600">
+          Total des pondérations prises en compte : {weightTotal} points. Les points ne sont pas des pourcentages à additionner directement : ils servent de poids dans la moyenne.
+        </div>
+        <div className="mt-1 leading-5 text-purple-700">
+          Score global calculé = {finalScore}%.
+          {!hasConfiguredWeights && " Aucune pondération spécifique n'a été trouvée, chaque section compte donc pareil."}
+        </div>
+      </div>
+    </details>
+  );
+}
+
 function formatSummaryFieldValue(value) {
   if (value === null || value === undefined || value === "") {
     return "Non renseigné";
@@ -525,9 +597,9 @@ function Metric({ label, value, tone }) {
   };
 
   return (
-    <div className={`rounded-lg p-3 ${tones[tone]}`}>
-      <p className="text-xs font-bold uppercase">{label}</p>
-      <p className="mt-1 text-2xl font-bold">{value}</p>
+    <div className={`rounded-lg p-2.5 ${tones[tone]}`}>
+      <p className="text-[11px] font-bold uppercase">{label}</p>
+      <p className="mt-1 text-xl font-bold">{value}</p>
     </div>
   );
 }

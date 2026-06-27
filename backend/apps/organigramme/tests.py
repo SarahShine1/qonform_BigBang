@@ -5,6 +5,7 @@ from rest_framework.test import APITestCase
 from apps.accounts.models import Role, User, UserRole, Utilisateur
 
 from .models import OrganizationUnit
+from .services import sync_unit_responsable_assignment
 
 
 def make_user(email, password, role):
@@ -94,3 +95,36 @@ class OrganigrammeApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 1)
         self.assertEqual(response.data[0]['children'][0]['code'], 'DIR-001')
+
+
+class ResponsableAssignmentTests(TestCase):
+    def setUp(self):
+        _, self.previous = make_user('previous@esi.dz', 'pass12345', 'Pilote')
+        _, self.current = make_user('current@esi.dz', 'pass12345', 'Pilote')
+        self.unit = OrganizationUnit.objects.create(
+            code='DEPT-001',
+            name='Qualite',
+            type=OrganizationUnit.UnitType.DEPARTMENT,
+            level=2,
+            responsable_id=self.current.id_user,
+        )
+
+    def test_selected_responsable_is_assigned_to_unit_department(self):
+        sync_unit_responsable_assignment(self.unit)
+
+        self.current.refresh_from_db()
+        self.assertEqual(self.current.id_departement, self.unit.id)
+
+    def test_replacing_responsable_clears_previous_unit_assignment(self):
+        self.previous.id_departement = self.unit.id
+        self.previous.save(update_fields=['id_departement'])
+
+        sync_unit_responsable_assignment(
+            self.unit,
+            previous_responsable_id=self.previous.id_user,
+        )
+
+        self.previous.refresh_from_db()
+        self.current.refresh_from_db()
+        self.assertIsNone(self.previous.id_departement)
+        self.assertEqual(self.current.id_departement, self.unit.id)

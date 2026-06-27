@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import AppLayout from "../../components/layout/AppLayout";
 import { useAuth } from "../../hooks/useAuth";
 import { getDashboardDG } from "./dashboardDGService";
@@ -30,9 +31,23 @@ function KpiIcon({ type, orange = false }) {
   );
 }
 
-function KpiCard({ type, title, value, badge, orange = false }) {
+function KpiCard({ type, title, value, badge, orange = false, onClick }) {
+  const handleKeyDown = (e) => {
+    if (!onClick) return;
+    if (e.key === "Enter" || e.key === " " || e.key === "Spacebar") {
+      e.preventDefault();
+      onClick();
+    }
+  };
+
   return (
-    <div className="relative flex h-[86px] items-center gap-3 overflow-hidden rounded-2xl border border-violet-100 bg-white px-4 shadow-sm">
+    <div
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={handleKeyDown}
+      onClick={onClick}
+      className={`relative flex h-[86px] items-center gap-3 overflow-hidden rounded-2xl border border-violet-100 bg-white px-4 shadow-sm ${onClick ? "cursor-pointer hover:-translate-y-0.5 hover:shadow-md transition" : ""}`}
+    >
       <div className={`absolute left-0 top-0 h-full w-1 ${orange ? "bg-orange-500" : "bg-[#641ab5]"}`} />
       <KpiIcon type={type} orange={orange} />
       <div>
@@ -157,6 +172,7 @@ function AnnualChart({ current = 0 }) {
 
 export default function DashboardDG() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [data, setData] = useState(null);
 
   useEffect(() => {
@@ -181,10 +197,36 @@ export default function DashboardDG() {
         </div>
 
         <div className="grid grid-cols-4 gap-3">
-          <KpiCard type="process" title="Processus publiés" value={data.processus_publies} badge="Validés" />
-          <KpiCard type="audit" title="Audits clôturés" value={data.audits_clotures} badge="Réalisés" orange />
-          <KpiCard type="iso" title="Conformité ISO" value={`${Number(data.conformite_iso || 0)}%`} badge="Taux global" />
-          <KpiCard type="layers" title="Processus actifs" value={data.processus_actifs} badge="Total actifs" orange />
+          <KpiCard
+            type="process"
+            title="Processus publiés"
+            value={data.processus_publies}
+            badge="Validés"
+            onClick={() => navigate("/cartographie/processus?statut=Publiee")}
+          />
+          <KpiCard
+            type="audit"
+            title="Audits clôturés"
+            value={data.audits_clotures}
+            badge="Réalisés"
+            orange
+            onClick={() => navigate("/audit/audits-terrain?statut=cloture")}
+          />
+          <KpiCard
+            type="iso"
+            title="Conformité ISO"
+            value={`${Number(data.conformite_iso || 0)}%`}
+            badge="Taux global"
+            onClick={() => navigate("/cartographie/canevas-fiche")}
+          />
+          <KpiCard
+            type="layers"
+            title="Processus actifs"
+            value={data.processus_actifs}
+            badge="Total actifs"
+            orange
+            onClick={() => navigate("/cartographie/processus")}
+          />
         </div>
 
         <div className="mt-3 grid grid-cols-3 gap-3">

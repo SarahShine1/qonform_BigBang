@@ -3,6 +3,7 @@ import {
   Calendar,
   ClipboardCheck,
   ClipboardList,
+  ClipboardListIcon,
   FileText,
   FolderOpen,
   GitBranch,
@@ -11,7 +12,6 @@ import {
   Network,
   Settings,
   Users,
-  ClipboardListIcon
 } from "lucide-react";
 
 const chefProjetItems = [
@@ -48,6 +48,7 @@ const piloteItems = [
     icon: Map,
     children: [
       { label: "Processus", icon: Network, to: "/cartographie/processus" },
+      { label: "Ajouter processus", icon: FileText, to: "/audit/preaudit" },
       { label: "Interactions", icon: GitBranch, to: "/cartographie/interactions" },
     ],
   },
@@ -97,6 +98,30 @@ const auditeurItems = [
   { label: "Paramètres", icon: Settings, to: "/parametres" },
 ];
 
+const auditeurExterneItems = [
+  { label: "Tableau de bord", icon: LayoutDashboard, to: "/dashboard-auditeur-externe" },
+  { label: "Organigramme", icon: GitBranch, to: "/organigramme" },
+  {
+    label: "Cartographie",
+    icon: Map,
+    children: [
+      { label: "Processus", icon: Network, to: "/cartographie/processus" },
+      { label: "Interactions", icon: GitBranch, to: "/cartographie/interactions" },
+    ],
+  },
+  { label: "Support documentaire", icon: FolderOpen, to: "/documents" },
+  {
+    label: "Audits",
+    icon: ClipboardCheck,
+    children: [
+      { label: "Audits terrain", icon: Map, to: "/audit/audits-terrain" },
+      { label: "Résultats d'audit", icon: ClipboardListIcon, to: "/audit/mes-audits" },
+    ],
+  },
+  { label: "Niveau de maturité", icon: BarChart3, to: "/niveau-maturite" },
+  { label: "Paramètres", icon: Settings, to: "/parametres" },
+];
+
 const dgItems = [
   { label: "Tableau de bord", icon: LayoutDashboard, to: "/dashboard-DG" },
   { label: "Organigramme", icon: GitBranch, to: "/organigramme" },
@@ -114,6 +139,7 @@ const dgItems = [
     ],
   },
   { label: "Support documentaire", icon: FolderOpen, to: "/documents" },
+  { label: "Audits clôturés", icon: ClipboardCheck, to: "/audit/audits-terrain?statut=cloture" },
   { label: "Paramètres", icon: Settings, to: "/parametres" },
 ];
 
@@ -149,9 +175,12 @@ export function getSidebarItemsByRole(roles = []) {
     normalizedRoles.includes("AUDITEUR") ||
     normalizedRoles.includes("AUDITEUR INTERNE");
 
+  const isAuditeurExterne = normalizedRoles.includes("AUDITEUR EXTERNE");
+
   if (isChefProjet) return chefProjetItems;
   if (isDg) return dgItems;
   if (isPilote) return piloteItems;
+  if (isAuditeurExterne) return auditeurExterneItems;
   if (isAuditeur) return auditeurItems;
 
   return [

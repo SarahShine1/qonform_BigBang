@@ -64,7 +64,7 @@ export default function DashboardPilote() {
 
   return (
     <AppLayout
-      pageTitle="Dashboard Pilote"
+      pageTitle="Dashboard Gestionnaire de processus"
       userName={userName}
       userRole="Pilote"
       contentClassName="bg-gray-50 px-4 py-4 pb-6"

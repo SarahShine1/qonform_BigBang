@@ -46,6 +46,12 @@ class MessagingApiTests(APITestCase):
             prenom="Yacine",
             roles=["Pilote"],
         )
+        cls.caq_user, cls.caq_profile = make_user(
+            email="caq@esi.dz",
+            nom="Qualite",
+            prenom="Sara",
+            roles=["CAQ"],
+        )
         cls.other_user, cls.other_profile = make_user(
             email="other@esi.dz",
             nom="Ben",
@@ -67,15 +73,17 @@ class MessagingApiTests(APITestCase):
         legacy_role, _ = Role.objects.get_or_create(libelle="Pilote")
         UserRole.objects.create(utilisateur=cls.legacy_profile, role=legacy_role)
 
-    def test_contacts_endpoint_filters_by_auditeur_role(self):
+    def test_contacts_endpoint_returns_all_active_users_with_login_accounts(self):
         self.client.force_authenticate(user=self.auditeur_user)
         response = self.client.get("/api/v1/messaging/contacts/")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         returned_ids = {entry["id_user"] for entry in response.data}
         self.assertIn(self.utilisateur_profile.id_user, returned_ids)
+        self.assertIn(self.caq_profile.id_user, returned_ids)
         self.assertIn(self.legacy_profile.id_user, returned_ids)
-        self.assertNotIn(self.other_profile.id_user, returned_ids)
+        self.assertIn(self.other_profile.id_user, returned_ids)
+        self.assertNotIn(self.auditeur_profile.id_user, returned_ids)
 
     def test_user_can_send_message_to_auditeur(self):
         self.client.force_authenticate(user=self.utilisateur_user)
@@ -147,4 +155,38 @@ class MessagingApiTests(APITestCase):
         self.assertEqual(
             response.data["conversation"]["counterpart"]["id_user"],
             self.legacy_profile.id_user,
+        )
+
+    def test_non_auditeur_user_can_send_message_to_another_non_auditeur(self):
+        self.client.force_authenticate(user=self.utilisateur_user)
+        response = self.client.post(
+            "/api/v1/messaging/messages/",
+            {
+                "recipient_id": self.caq_profile.id_user,
+                "content": "Bonjour, je vous contacte pour le processus.",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(
+            response.data["conversation"]["counterpart"]["id_user"],
+            self.caq_profile.id_user,
+        )
+
+    def test_auditeur_can_send_message_to_another_auditeur(self):
+        self.client.force_authenticate(user=self.auditeur_user)
+        response = self.client.post(
+            "/api/v1/messaging/messages/",
+            {
+                "recipient_id": self.other_profile.id_user,
+                "content": "Bonjour, peux-tu verifier ce point d'audit ?",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(
+            response.data["conversation"]["counterpart"]["id_user"],
+            self.other_profile.id_user,
         )

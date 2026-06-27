@@ -105,3 +105,31 @@ class MaturityAssessmentApiTests(APITestCase):
         response = client.get("/api/v1/maturity/my-assessment/")
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
+    def test_external_auditor_has_read_only_access(self):
+        external_user, _ = make_user(
+            username="external_maturity_user",
+            email="external-maturity@esi.dz",
+            password="externalpass123",
+            roles=["Auditeur Externe"],
+        )
+        del external_user
+
+        client = APIClient()
+        login_response = client.post(
+            "/api/v1/auth/token/",
+            {"email": "external-maturity@esi.dz", "password": "externalpass123"},
+            format="json",
+        )
+        self.assertEqual(login_response.status_code, status.HTTP_200_OK)
+        client.credentials(HTTP_AUTHORIZATION=f"Bearer {login_response.data['access']}")
+
+        get_response = client.get("/api/v1/maturity/my-assessment/")
+        self.assertEqual(get_response.status_code, status.HTTP_200_OK)
+
+        put_response = client.put(
+            "/api/v1/maturity/my-assessment/",
+            {"responses": []},
+            format="json",
+        )
+        self.assertEqual(put_response.status_code, status.HTTP_403_FORBIDDEN)
+

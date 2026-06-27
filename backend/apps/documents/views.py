@@ -10,10 +10,11 @@ from rest_framework import status
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.parsers import FormParser, MultiPartParser
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, SAFE_METHODS
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.accounts.permissions import ReadOnlyForRole, request_has_role
 from .models import Document
 from .serializers import (
     DocumentSerializer,
@@ -127,6 +128,28 @@ def _is_caq(user):
         return False
 
 
+def _external_auditor_can_read_doc(request, doc):
+    if not request_has_role(request, "Auditeur Externe"):
+        return True
+
+    if getattr(doc, "type_document", None) == "Support":
+        return True
+
+    version_id = getattr(doc, "id_version", None)
+    if not version_id:
+        return True
+
+    try:
+        from apps.fiches.models import VersionFiche
+
+        return VersionFiche.objects.filter(
+            id_version=version_id,
+            statut="Publiee",
+        ).exists()
+    except Exception:
+        return False
+
+
 # ── Pagination ────────────────────────────────────────────────────────────────
 
 class DocumentPagination(PageNumberPagination):
@@ -159,6 +182,19 @@ class DocumentListView(APIView):
         id_version = request.query_params.get("id_version")
         if not id_version:
             return Response({"detail": "id_version requis."}, status=status.HTTP_400_BAD_REQUEST)
+        if request_has_role(request, "Auditeur Externe"):
+            try:
+                from apps.fiches.models import VersionFiche
+
+                is_published = VersionFiche.objects.filter(
+                    id_version=id_version,
+                    statut="Publiee",
+                ).exists()
+            except Exception:
+                is_published = False
+
+            if not is_published:
+                return Response([], status=status.HTTP_200_OK)
         docs = Document.objects.filter(id_version=id_version)
         return Response(_serialize_with_urls(docs))
 
@@ -168,7 +204,7 @@ class DocumentUploadView(APIView):
     POST /api/v1/documents/upload/
     Uploads a fiche document (BPMN, Preuve, Rapport_audit_fiche) to Supabase Storage.
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, ReadOnlyForRole("Auditeur Externe")]
 
     def post(self, request):
         file           = request.FILES.get("file")
@@ -251,6 +287,11 @@ class DocumentListCreateView(APIView):
     parser_classes = [MultiPartParser, FormParser]
     permission_classes = [IsAuthenticated]
 
+    def get_permissions(self):
+        if self.request.method in SAFE_METHODS:
+            return [IsAuthenticated()]
+        return [IsAuthenticated(), ReadOnlyForRole("Auditeur Externe")()]
+
     def get(self, request):
         qs = Document.objects.filter(type_document="Support").order_by("-date_upload")
 
@@ -323,6 +364,11 @@ class DocumentDetailView(APIView):
     """
     permission_classes = [IsAuthenticated]
 
+    def get_permissions(self):
+        if self.request.method in SAFE_METHODS:
+            return [IsAuthenticated()]
+        return [IsAuthenticated(), ReadOnlyForRole("Auditeur Externe")()]
+
     def _get_doc(self, pk):
         try:
             return Document.objects.get(pk=pk)
@@ -332,6 +378,8 @@ class DocumentDetailView(APIView):
     def get(self, request, pk):
         doc = self._get_doc(pk)
         if doc is None:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        if not _external_auditor_can_read_doc(request, doc):
             return Response(status=status.HTTP_404_NOT_FOUND)
         if doc.type_document in LOCAL_TYPES:
             return Response(DocumentDetailSerializer(doc).data)
@@ -373,6 +421,8 @@ class DocumentDownloadView(APIView):
         try:
             doc = Document.objects.get(pk=pk)
         except Document.DoesNotExist:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        if not _external_auditor_can_read_doc(request, doc):
             return Response(status=status.HTTP_404_NOT_FOUND)
 
         if doc.type_document not in LOCAL_TYPES:

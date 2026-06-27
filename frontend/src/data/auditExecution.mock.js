@@ -14,7 +14,7 @@
       title: "Informations générales",
       shortTitle: "Général",
       processFields: [
-        { label: "Pilote du processus", value: "Responsable IT Infrastructure" },
+        { label: "Gestionnaire de processus", value: "Responsable IT Infrastructure" },
         { label: "Désignation du processus", value: "Support informatique et assistance utilisateurs" },
         { label: "Objectif du processus", value: "Garantir la disponibilité du SI et la résolution rapide des incidents." },
         { label: "Structures concernées", value: "Direction SI, départements pédagogiques, scolarité" },
@@ -23,14 +23,14 @@
       requirements: [
         {
           id: "REQ-GEN-01",
-          label: "Le processus est identifié, nommé et rattaché à un pilote.",
+          label: "Le processus est identifié, nommé et rattaché à un gestionnaire de processus.",
           clause: "§4.4.1",
           type: "auto",
           autoStatus: "conforme",
         },
         {
           id: "REQ-GEN-02",
-          label: "Les responsabilités du pilote sont claires et cohérentes.",
+          label: "Les responsabilités du gestionnaire de processus sont claires et cohérentes.",
           clause: "§5.3",
           type: "manual",
         },

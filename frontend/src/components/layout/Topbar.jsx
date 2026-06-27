@@ -1,10 +1,13 @@
-import { Bell, Menu, MessageSquare, Moon, Sun, ClipboardCheck, CheckCircle, XCircle, Edit3, FileText, FilePen } from "lucide-react";
+import { Bell, Menu, MessageSquare, Moon, Sun, ClipboardCheck, CheckCircle, XCircle, Edit3, FileText, FilePen, BookOpen, Bot, Send, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { messagingApi } from "../../api/messages.api";
 import { useAuth } from "../../hooks/useAuth";
 import { useTheme } from "../../hooks/useTheme";
+import { getRoleDisplayLabel } from "../../utils/roles";
 import { SIDEBAR_WIDTH, TOPBAR_HEIGHT } from "./layout.constants";
+import AssistantPanel from "./AssistantPanel";
+import DictionaryPanel from "./DictionaryPanel";
 import MessagingPanel from "./MessagingPanel";
 import { getNotifications, markNotificationAsRead } from "../../services/notificationService";
 export default function Topbar({ pageTitle, userName, userRole, leftOffset = SIDEBAR_WIDTH, onMenuClick }) {
@@ -30,8 +33,8 @@ export default function Topbar({ pageTitle, userName, userRole, leftOffset = SID
     }
   }, [user]);
 
-  const isPvNotification = (notification) =>
-    notification.type_notification === "PV_CREE";
+const isPvNotification = (n) =>
+  ["PV_CREE", "PV_SOUMIS", "PV_REJETE", "PV_VALIDE"].includes(n.type_notification);
 
   const isFicheNotification = (notification) =>
     notification.type_notification === "SOUMISSION_FICHE";
@@ -71,12 +74,12 @@ export default function Topbar({ pageTitle, userName, userRole, leftOffset = SID
     return title?.split(" ")[0]?.[0]?.toUpperCase() || "N";
   };
   
-  const getPvIcon = (typeNotification) => {
-  switch (typeNotification) {
-    case "PV_CREE":
-      return FileText;
-    default:
-      return FileText;
+ const getPvIcon = (type) => {
+  switch (type) {
+    case "PV_VALIDE":  return CheckCircle;
+    case "PV_REJETE":  return XCircle;
+    case "PV_SOUMIS":  return Send;
+    default:           return FileText;
   }
 };
 
@@ -129,6 +132,10 @@ export default function Topbar({ pageTitle, userName, userRole, leftOffset = SID
       if (isFicheNotification(notification)) {
         return "bg-white hover:bg-amber-50 dark:bg-slate-900 dark:hover:bg-slate-800";
       }
+      
+      if (isPvNotification(notification)) {
+        return "bg-white hover:bg-blue-50 dark:bg-slate-900 dark:hover:bg-slate-800";
+      }
       return "bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800";
     }
 
@@ -141,6 +148,10 @@ export default function Topbar({ pageTitle, userName, userRole, leftOffset = SID
     if (isFicheNotification(notification)) {
       return "bg-amber-50/70 hover:bg-amber-50 dark:bg-slate-800 dark:hover:bg-slate-700";
     }
+     if (isPvNotification(notification)) {
+      return "bg-blue-50/70 hover:bg-blue-50 dark:bg-slate-800 dark:hover:bg-slate-700";
+     }
+      
     return "bg-violet-50/70 hover:bg-violet-100/70 dark:bg-slate-800 dark:hover:bg-slate-700";
   };
 
@@ -156,6 +167,7 @@ export default function Topbar({ pageTitle, userName, userRole, leftOffset = SID
     if (isTaskNotification(notification)) return "bg-red-500";
     if (isAuditNotification(notification)) return "bg-yellow-600";
     if (isFicheNotification(notification)) return "bg-amber-500";
+    if (isPvNotification(notification)) return "bg-blue-500";
     return "bg-violet-600 dark:bg-violet-400";
   };
 
@@ -174,7 +186,12 @@ export default function Topbar({ pageTitle, userName, userRole, leftOffset = SID
     return date.toLocaleDateString("fr-FR");
   };
   const messagingRef = useRef(null);
+  const dictionaryRef = useRef(null);
+  const assistantRef = useRef(null);
+  const notificationRef = useRef(null);
   const [messagingOpen, setMessagingOpen] = useState(false);
+  const [dictionaryOpen, setDictionaryOpen] = useState(false);
+  const [assistantOpen, setAssistantOpen] = useState(false);
   const [messageUnreadCount, setMessageUnreadCount] = useState(0);
   const initials = userName
     ? userName
@@ -184,6 +201,7 @@ export default function Topbar({ pageTitle, userName, userRole, leftOffset = SID
         .join("")
         .toUpperCase()
     : "?";
+  const displayedUserRole = getRoleDisplayLabel(userRole);
 
   const refreshUnreadCount = useCallback(async () => {
     if (!user?.id_user) return;
@@ -253,6 +271,78 @@ export default function Topbar({ pageTitle, userName, userRole, leftOffset = SID
     };
   }, [messagingOpen]);
 
+  useEffect(() => {
+    if (!dictionaryOpen) return undefined;
+
+    function handleClickOutside(event) {
+      if (!dictionaryRef.current?.contains(event.target)) {
+        setDictionaryOpen(false);
+      }
+    }
+
+    function handleEscape(event) {
+      if (event.key === "Escape") {
+        setDictionaryOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [dictionaryOpen]);
+
+  useEffect(() => {
+    if (!assistantOpen) return undefined;
+
+    function handleClickOutside(event) {
+      if (!assistantRef.current?.contains(event.target)) {
+        setAssistantOpen(false);
+      }
+    }
+
+    function handleEscape(event) {
+      if (event.key === "Escape") {
+        setAssistantOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [assistantOpen]);
+
+  useEffect(() => {
+    if (!openNotif) return undefined;
+
+    function handleClickOutside(event) {
+      if (!notificationRef.current?.contains(event.target)) {
+        setOpenNotif(false);
+      }
+    }
+
+    function handleEscape(event) {
+      if (event.key === "Escape") {
+        setOpenNotif(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [openNotif]);
+
   return (
     <header
       className="fixed top-0 right-0 z-10 flex items-center justify-between border-b border-[#EEE7FA] bg-white px-5 transition-colors dark:border-slate-800 dark:bg-slate-900 xl:px-6"
@@ -272,6 +362,45 @@ export default function Topbar({ pageTitle, userName, userRole, leftOffset = SID
       </div>
 
       <div className="flex items-center gap-3">
+        <div ref={dictionaryRef} className="relative">
+          <button
+            type="button"
+            onClick={() => setDictionaryOpen((current) => !current)}
+            className="relative inline-flex h-[34px] w-[34px] items-center justify-center rounded-md border border-[#E9E1F8] text-[#3B0A7A] transition hover:bg-[#F8F2FF] dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+            title="Ouvrir le dictionnaire qualite"
+            aria-label="Ouvrir le dictionnaire qualite"
+          >
+            <BookOpen className="h-4 w-4" />
+          </button>
+
+          {dictionaryOpen ? (
+            <DictionaryPanel
+              open={dictionaryOpen}
+              onClose={() => setDictionaryOpen(false)}
+            />
+          ) : null}
+        </div>
+
+        <div ref={assistantRef} className="relative">
+          <button
+            type="button"
+            onClick={() => setAssistantOpen((current) => !current)}
+            className="relative inline-flex h-[34px] w-[34px] items-center justify-center rounded-md border border-[#E9E1F8] text-[#3B0A7A] transition hover:bg-[#F8F2FF] dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+            title="Ouvrir l'assistant Qonform"
+            aria-label="Ouvrir l'assistant Qonform"
+          >
+            <Bot className="h-4 w-4" />
+          </button>
+
+          {assistantOpen ? (
+            <AssistantPanel
+              open={assistantOpen}
+              onClose={() => setAssistantOpen(false)}
+              pageTitle={pageTitle}
+            />
+          ) : null}
+        </div>
+
         <div ref={messagingRef} className="relative">
           <button
             type="button"
@@ -313,22 +442,32 @@ export default function Topbar({ pageTitle, userName, userRole, leftOffset = SID
   </button>
 
   {openNotif && (
-    <div className="absolute right-0 top-12 z-[9999] w-[400px] max-h-[440px] overflow-hidden rounded-2xl border border-violet-100 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+    <div ref={notificationRef} className="absolute right-0 top-12 z-[9999] w-[400px] max-h-[440px] overflow-hidden rounded-2xl border border-violet-100 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
       {/* Header fixe */}
       <div className="border-b border-slate-200 bg-gradient-to-r from-violet-50 to-orange-50 px-5 py-4 dark:border-slate-700 dark:from-slate-800 dark:to-slate-800">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3">
           <h3 className="text-[15px] font-extrabold text-slate-900 dark:text-white">
             Notifications
           </h3>
-          {notificationUnreadCount > 0 && (
+          <div className="flex items-center gap-2">
+            {notificationUnreadCount > 0 && (
+              <button
+                type="button"
+                onClick={markAllAsRead}
+                className="text-[12px] text-[#3B0A7A] transition hover:text-[#58148E] dark:text-violet-400 dark:hover:text-violet-300"
+              >
+                Tout marquer comme lu
+              </button>
+            )}
             <button
               type="button"
-              onClick={markAllAsRead}
-              className="text-[12px] text-[#3B0A7A] transition hover:text-[#58148E] dark:text-violet-400 dark:hover:text-violet-300"
+              onClick={() => setOpenNotif(false)}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+              aria-label="Fermer les notifications"
             >
-              Tout marquer comme lu
+              <X className="h-4 w-4" />
             </button>
-          )}
+          </div>
         </div>
       </div>
 
@@ -454,7 +593,7 @@ export default function Topbar({ pageTitle, userName, userRole, leftOffset = SID
           <p className="text-[12.5px] font-semibold leading-[1.2] text-slate-900 dark:text-slate-100">
             {userName}
           </p>
-          <p className="text-[10px] leading-[1.2] text-slate-400 dark:text-slate-500">{userRole}</p>
+          <p className="text-[10px] leading-[1.2] text-slate-400 dark:text-slate-500">{displayedUserRole}</p>
         </div>
 
         <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#58148E]">

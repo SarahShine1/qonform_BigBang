@@ -737,7 +737,7 @@ export default function FicheProcessusForm() {
               <div style={{ width: 1, backgroundColor: BORDER }} />
               <InfoItem label="Intitulé">{selectedProcessus?.nom ?? "—"}</InfoItem>
               <div style={{ width: 1, backgroundColor: BORDER }} />
-              <InfoItem label="Pilote affecté">
+              <InfoItem label="Gestionnaire de processus affecté">
                 {selectedProcessus?.pilote_nom ? (
                   <div className="flex items-center gap-2">
                     <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white"

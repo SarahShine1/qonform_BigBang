@@ -396,6 +396,23 @@ class MeEndpointTests(APITestCase):
         self.assertIn("roles", response.data)
         self.assertIn("id_user", response.data)
 
+    def test_me_returns_current_database_department(self):
+        """Department changes after login are reflected by /me/."""
+        access = self._get_access_token()
+        departement = Departement.objects.create(
+            id_departement=77,
+            nom="Qualite",
+            code="QLT",
+        )
+        self.utilisateur.id_departement = departement.id_departement
+        self.utilisateur.save(update_fields=["id_departement"])
+
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {access}")
+        response = self.client.get(self.me_url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["departement"], departement.id_departement)
+
     def test_valid_token_returns_correct_roles(self):
         """The roles list in /me/ response matches the user's assigned roles."""
         access = self._get_access_token()
@@ -781,6 +798,7 @@ class ManagedUsersApiTests(APITestCase):
         response = self.client.get("/api/v1/auth/roles/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         labels = [item["libelle"] for item in response.data]
+        self.assertIn("Auditeur Externe", labels)
         self.assertIn("CAQ", labels)
         self.assertIn("Pilote", labels)
 
@@ -866,6 +884,32 @@ class ManagedUsersApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.target_utilisateur.refresh_from_db()
         self.assertFalse(self.target_utilisateur.est_actif)
+
+    def test_external_auditor_cannot_access_user_management_endpoints(self):
+        external_client = APIClient()
+        external_user, _ = make_user(
+            username="external_auditor_user",
+            email="external.auditor@esi.dz",
+            password="externalpass123",
+            roles=["Auditeur Externe"],
+        )
+        del external_user
+
+        response = external_client.post(
+            "/api/v1/auth/token/",
+            {"email": "external.auditor@esi.dz", "password": "externalpass123"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        external_client.credentials(HTTP_AUTHORIZATION=f"Bearer {response.data['access']}")
+
+        for url in (
+            "/api/v1/auth/roles/",
+            "/api/v1/auth/users/",
+            "/api/v1/auth/users/stats/",
+        ):
+            denied = external_client.get(url)
+            self.assertEqual(denied.status_code, status.HTTP_403_FORBIDDEN)
 
 
 class MySettingsApiTests(APITestCase):

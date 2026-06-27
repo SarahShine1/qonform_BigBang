@@ -29,6 +29,14 @@ const columns = [
   },
 ];
 
+function normalizeRole(role) {
+  return String(role || "")
+    .trim()
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
 export default function AuditFiches() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -39,6 +47,8 @@ export default function AuditFiches() {
   const [flash, setFlash] = useState(location.state?.flash || null);
   const [search, setSearch] = useState("");
   const [department, setDepartment] = useState("Tous les services");
+  const normalizedRoles = (user?.roles || []).map(normalizeRole);
+  const isExternalAuditor = normalizedRoles.includes("AUDITEUR EXTERNE");
 
   useEffect(() => {
     if (!location.state?.flash) return;
@@ -56,10 +66,17 @@ export default function AuditFiches() {
       .getFiches()
       .then((payload) => {
         if (!mounted) return;
+        const safePayload = isExternalAuditor
+          ? {
+              soumise: [],
+              en_revision: [],
+              publiee_audit: payload.publiee_audit || [],
+            }
+          : payload;
         setData({
-          soumise: payload.soumise || [],
-          en_revision: payload.en_revision || [],
-          publiee_audit: payload.publiee_audit || [],
+          soumise: safePayload.soumise || [],
+          en_revision: safePayload.en_revision || [],
+          publiee_audit: safePayload.publiee_audit || [],
         });
       })
       .catch((requestError) => {
@@ -73,7 +90,7 @@ export default function AuditFiches() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [isExternalAuditor]);
 
   const userName = useMemo(() => {
     if (!user) return "";
@@ -111,18 +128,22 @@ export default function AuditFiches() {
   const totalCount = Object.values(data).flat().length;
 
   const openFiche = (fiche, columnKey) => {
-    if (columnKey === "publiee_audit") {
+    if (columnKey === "publiee_audit" || isExternalAuditor) {
       navigate(`/auditeur/fiches-auditees/${fiche.id_version}`);
       return;
     }
     navigate(`/auditeur/execution-audit/${fiche.id_version}`);
   };
 
+  const visibleColumns = isExternalAuditor
+    ? columns.filter((column) => column.key === "publiee_audit")
+    : columns;
+
   return (
     <AppLayout
       pageTitle="Audit des fiches processus"
       userName={userName}
-      userRole="Auditeur"
+      userRole={isExternalAuditor ? "Auditeur Externe" : "Auditeur"}
       contentClassName="bg-gray-50 px-4 py-4 pb-6"
     >
       <div className="mb-4 flex items-start justify-between gap-4">
@@ -144,6 +165,12 @@ export default function AuditFiches() {
           }`}
         >
           {flash.message}
+        </div>
+      )}
+
+      {isExternalAuditor && (
+        <div className="mb-4 rounded-md border border-[#E9E1F8] bg-[#F8F5FF] px-3 py-2 text-sm text-slate-600">
+          Consultation limitee aux fiches publiees et aux resultats d'audit deja finalises.
         </div>
       )}
 
@@ -175,7 +202,7 @@ export default function AuditFiches() {
       )}
 
       <section className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        {columns.map((column) => {
+        {visibleColumns.map((column) => {
           const fiches = filteredData[column.key] || [];
           return (
             <div

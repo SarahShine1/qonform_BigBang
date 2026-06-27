@@ -14,7 +14,7 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from .models import Departement, Role, Utilisateur, UtilisateurSettings
-from .permissions import HasRole
+from .permissions import DenyRole, HasRole
 from .serializers import (
     ChangePasswordSerializer,
     CustomTokenObtainPairSerializer,
@@ -115,7 +115,6 @@ class MeView(APIView):
         payload = request.auth.payload
         email = payload.get("email")
         roles = payload.get("roles", [])
-        departement_id = payload.get("departement_id")
 
         utilisateur = Utilisateur.objects.get(email=email)
         settings_obj = UtilisateurSettings.objects.filter(utilisateur=utilisateur).first()
@@ -127,7 +126,7 @@ class MeView(APIView):
                 "prenom": utilisateur.prenom,
                 "email": email,
                 "roles": roles,
-                "departement": departement_id,
+                "departement": utilisateur.id_departement,
                 "photo_profil": get_profile_photo_url(
                     settings_obj.photo_profil if settings_obj else None,
                     request=request,
@@ -161,7 +160,7 @@ class ManagedUserListCreateView(APIView):
 
     def get_permissions(self):
         if self.request.method == "GET":
-            return [IsAuthenticated()]
+            return [IsAuthenticated(), DenyRole("Auditeur Externe")()]
         return [IsAuthenticated(), HasRole("CAQ", "ADMIN", "Admin")()]
 
     def get(self, request):
@@ -278,13 +277,16 @@ class ManagedUserDetailView(APIView):
 class RoleListView(APIView):
     permission_classes = [IsAuthenticated]
 
+    def get_permissions(self):
+        return [IsAuthenticated(), DenyRole("Auditeur Externe")()]
+
     def get(self, request):
         roles = list(Role.objects.all().order_by("libelle"))
-        has_dg_role = any(str(role.libelle or "").strip().upper() == "DG" for role in roles)
-
-        if not has_dg_role:
-            roles.append(Role(libelle="DG"))
-            roles.sort(key=lambda role: str(role.libelle or "").lower())
+        existing_labels = {str(role.libelle or "").strip().upper() for role in roles}
+        for label in ("DG", "Auditeur Externe"):
+            if label.upper() not in existing_labels:
+                roles.append(Role(libelle=label))
+        roles.sort(key=lambda role: str(role.libelle or "").lower())
 
         return Response(RoleSerializer(roles, many=True).data)
 
@@ -299,6 +301,9 @@ class DepartementListView(APIView):
 
 class ManagedUserStatsView(APIView):
     permission_classes = [IsAuthenticated]
+
+    def get_permissions(self):
+        return [IsAuthenticated(), DenyRole("Auditeur Externe")()]
 
     def get(self, request):
         stats = {

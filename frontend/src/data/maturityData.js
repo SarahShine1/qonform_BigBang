@@ -32,7 +32,7 @@ export const maturityArticles = [
       { ref: "5.1-2", text: "Politique qualite definie et coherente avec la strategie ESI.", score: 0, preuve: "" },
       { ref: "5.2-1", text: "Politique qualite documentee, approuvee et diffusee.", score: 0, preuve: "" },
       { ref: "5.3-1", text: "CAQ officiellement constituee avec membres identifies.", score: 0, preuve: "" },
-      { ref: "5.3-2", text: "Un pilote est designe formellement par processus ESI.", score: 0, preuve: "" },
+      { ref: "5.3-2", text: "Un gestionnaire de processus est designe formellement pour chaque processus ESI.", score: 0, preuve: "" },
       { ref: "5.3-3", text: "Responsabilites des auditeurs internes definies.", score: 0, preuve: "" },
     ],
   },
